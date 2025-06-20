@@ -1,9 +1,16 @@
 // ignore_for_file: public_member_api_docs, sort_constructors_first
 import 'dart:convert';
-
 import 'package:isar/isar.dart';
+import 'package:flutter/foundation.dart'; // For listEquals
 
 part 'note.g.dart';
+
+// class Uint8ListConverter {
+//   const Uint8ListConverter();
+
+//   static Uint8List from(List<int> object) => Uint8List.fromList(object);
+//   static List<int> to(Uint8List object) => object;
+// }
 
 @collection
 class Note {
@@ -11,11 +18,18 @@ class Note {
   final String title;
   final String description;
   final DateTime lastMod;
+
+  // @Uint8ListConverter()
+  // final Uint8List? drawing;
+
+  final List<int>? drawing;
+
   Note({
-    required this.id,
+    this.id = Isar.autoIncrement,
     required this.title,
     required this.description,
     required this.lastMod,
+    this.drawing,
   });
 
   Note copyWith({
@@ -23,12 +37,14 @@ class Note {
     String? title,
     String? description,
     DateTime? lastMod,
+    Uint8List? drawing,
   }) {
     return Note(
       id: id ?? this.id,
       title: title ?? this.title,
       description: description ?? this.description,
       lastMod: lastMod ?? this.lastMod,
+      drawing: drawing ?? this.drawing,
     );
   }
 
@@ -38,6 +54,7 @@ class Note {
       'title': title,
       'description': description,
       'lastMod': lastMod.millisecondsSinceEpoch,
+      'drawing': drawing != null ? base64Encode(drawing!) : null,
     };
   }
 
@@ -47,6 +64,10 @@ class Note {
       title: map['title'] as String,
       description: map['description'] as String,
       lastMod: DateTime.fromMillisecondsSinceEpoch(map['lastMod'] as int),
+      drawing:
+          map['drawing'] != null
+              ? base64Decode(map['drawing'] as String)
+              : null,
     );
   }
 
@@ -57,7 +78,7 @@ class Note {
 
   @override
   String toString() {
-    return 'Note(id: $id, title: $title, description: $description, lastMod: $lastMod)';
+    return 'Note(id: $id, title: $title, description: $description, lastMod: $lastMod, drawing: $drawing)';
   }
 
   @override
@@ -67,7 +88,8 @@ class Note {
     return other.id == id &&
         other.title == title &&
         other.description == description &&
-        other.lastMod == lastMod;
+        other.lastMod == lastMod &&
+        listEquals(other.drawing, drawing);
   }
 
   @override
@@ -75,6 +97,7 @@ class Note {
     return id.hashCode ^
         title.hashCode ^
         description.hashCode ^
-        lastMod.hashCode;
+        lastMod.hashCode ^
+        (drawing == null ? 0 : drawing.hashCode);
   }
 }

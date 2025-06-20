@@ -5,6 +5,8 @@ import 'package:lottie/lottie.dart';
 import 'package:slote/src/model/note.dart';
 import 'package:slote/src/res/assets.dart';
 import 'package:slote/src/services/local_db.dart';
+import 'package:signature/signature.dart';
+import 'dart:typed_data';
 
 class CreateNoteView extends StatefulWidget {
   const CreateNoteView({super.key, this.note});
@@ -21,6 +23,9 @@ class _CreateNoteViewState extends State<CreateNoteView> {
 
   final localDb = LocalDBService();
 
+  bool _showDrawing = false;
+  late SignatureController _signatureController;
+
   @override
   void initState() {
     super.initState();
@@ -28,6 +33,11 @@ class _CreateNoteViewState extends State<CreateNoteView> {
       _titleController.text = widget.note!.title;
       _descriptionController.text = widget.note!.description;
     }
+    _signatureController = SignatureController(
+      penStrokeWidth: 3,
+      penColor: Colors.black,
+      exportBackgroundColor: Colors.white,
+    );
   }
 
   @override
@@ -35,6 +45,8 @@ class _CreateNoteViewState extends State<CreateNoteView> {
     super.dispose();
     final title = _titleController.text;
     final description = _descriptionController.text;
+
+    _signatureController.dispose();
 
     if (widget.note != null) {
       if (title.isEmpty && description.isEmpty) {
@@ -77,6 +89,15 @@ class _CreateNoteViewState extends State<CreateNoteView> {
                     },
                     icon: Icon(Icons.arrow_back),
                   ),
+                ),
+
+                IconButton(
+                  icon: Icon(_showDrawing ? Icons.text_fields : Icons.draw),
+                  onPressed: () {
+                    setState(() {
+                      _showDrawing = !_showDrawing;
+                    });
+                  },
                 ),
 
                 widget.note != null
@@ -130,28 +151,100 @@ class _CreateNoteViewState extends State<CreateNoteView> {
                     : const SizedBox.shrink(),
               ],
             ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: TextFormField(
-                controller: _titleController,
-                decoration: const InputDecoration(
-                  border: InputBorder.none,
-                  hintText: "Title",
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    // Title field (no drawing here)
+                    TextFormField(
+                      controller: _titleController,
+                      decoration: const InputDecoration(
+                        border: InputBorder.none,
+                        hintText: "Title",
+                      ),
+                      style: GoogleFonts.poppins(fontSize: 28),
+                    ),
+                    const SizedBox(height: 16),
+                    // Description field with drawing overlay
+                    Expanded(
+                      child: Stack(
+                        children: [
+                          // Drawing layer: always visible, only interactive in draw mode
+                          IgnorePointer(
+                            ignoring: !_showDrawing,
+                            child: Signature(
+                              controller: _signatureController,
+                              width: double.infinity,
+                              height: double.infinity,
+                              backgroundColor: Colors.transparent,
+                            ),
+                          ),
+                          // If there's a saved drawing and the canvas is empty, show it
+                          if (widget.note?.drawing != null &&
+                              _signatureController.isEmpty)
+                            Positioned.fill(
+                              child: Image.memory(
+                                Uint8List.fromList(widget.note!.drawing!),
+                                fit: BoxFit.contain,
+                              ),
+                            ),
+                          // Description text field: always interactive unless drawing
+                          IgnorePointer(
+                            ignoring: _showDrawing,
+                            child: TextFormField(
+                              controller: _descriptionController,
+                              decoration: const InputDecoration(
+                                border: InputBorder.none,
+                                hintText: "Description",
+                              ),
+                              style: GoogleFonts.poppins(fontSize: 18),
+                              maxLines: null,
+                              expands: true,
+                            ),
+                          ),
+                          // Clear button for drawing
+                          if (_showDrawing)
+                            Positioned(
+                              right: 0,
+                              top: 0,
+                              child: IconButton(
+                                icon: Icon(Icons.clear),
+                                onPressed: () {
+                                  _signatureController.clear();
+                                },
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
-                style: GoogleFonts.poppins(fontSize: 28),
               ),
             ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: TextFormField(
-                controller: _descriptionController,
-                decoration: const InputDecoration(
-                  border: InputBorder.none,
-                  hintText: "Description",
-                ),
-                style: GoogleFonts.poppins(fontSize: 18),
-              ),
-            ),
+            // Padding(
+            //   padding: const EdgeInsets.symmetric(horizontal: 20),
+            //   child: TextFormField(
+            //     controller: _titleController,
+            //     decoration: const InputDecoration(
+            //       border: InputBorder.none,
+            //       hintText: "Title",
+            //     ),
+            //     style: GoogleFonts.poppins(fontSize: 28),
+            //   ),
+            // ),
+            // Padding(
+            //   padding: const EdgeInsets.symmetric(horizontal: 20),
+            //   child: TextFormField(
+            //     controller: _descriptionController,
+            //     decoration: const InputDecoration(
+            //       border: InputBorder.none,
+            //       hintText: "Description",
+            //     ),
+            //     style: GoogleFonts.poppins(fontSize: 18),
+            //   ),
+            // ),
           ],
         ),
       ),

@@ -46,6 +46,8 @@ dependencies:
   auto_animated: ^3.2.0
   auto_animated_list: ^2.0.0
 
+  signature: ^6.3.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
