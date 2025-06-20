@@ -75,82 +75,203 @@ class _CreateNoteViewState extends State<CreateNoteView> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      appBar: AppBar(
+        toolbarHeight: 80,
+        leading: IconButton(
+          onPressed: () {
+            Navigator.pop(context);
+          },
+          icon: Icon(Icons.arrow_back),
+        ),
+        // title: Text(
+        //   widget.note == null ? "New Note" : "Edit Note",
+        //   style: GoogleFonts.poppins(fontSize: 22),
+        // ),
+        actions: [
+          IconButton(
+            icon: Icon(_showDrawing ? Icons.text_fields : Icons.draw),
+            onPressed: () {
+              setState(() {
+                _showDrawing = !_showDrawing;
+              });
+            },
+          ),
+          if (widget.note != null)
+            IconButton(
+              icon: Icon(Icons.delete),
+              onPressed: () {
+                // show warnings
+                showDialog(
+                  context: context,
+                  builder: (context) {
+                    return AlertDialog(
+                      title: Text(
+                        "Delete Note?",
+                        style: GoogleFonts.poppins(fontSize: 20),
+                      ),
+                      content: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          Lottie.asset(AnimationAssets.delete),
+                          Text(
+                            "Are you sure you want to delete this note permernantly?",
+                            style: GoogleFonts.poppins(fontSize: 16),
+                          ),
+                        ],
+                      ),
+                      actions: [
+                        TextButton(
+                          onPressed: () {
+                            localDb.deleteNote(id: widget.note!.id);
+                            Navigator.pop(context);
+                            Navigator.pop(context);
+                          },
+                          child: Text("Proceed"),
+                        ),
+                        TextButton(
+                          onPressed: () {
+                            Navigator.pop(context);
+                          },
+                          child: Text("Cancel"),
+                        ),
+                      ],
+                    );
+                  },
+                );
+              },
+            ),
+        ],
+        bottom: PreferredSize(
+          preferredSize: Size.fromHeight(48),
+          child: Material(
+            elevation: 4, // Shadow depth
+            child: Container(
+              decoration: BoxDecoration(
+                color: Colors.grey.shade700,
+                border: const Border(
+                  bottom: BorderSide(
+                    color: Colors.black12, // Border color
+                    width: 1,
+                  ),
+                ),
+              ),
+              height: 48,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  IconButton(
+                    icon: Icon(
+                      Icons.undo,
+                      color: Theme.of(context).colorScheme.onPrimary,
+                    ),
+                    tooltip: 'Undo',
+                    onPressed:
+                        _showDrawing && _signatureController.canUndo
+                            ? () {
+                              setState(() {
+                                _signatureController.undo();
+                              });
+                            }
+                            : null,
+                  ),
+                  IconButton(
+                    icon: Icon(
+                      Icons.redo,
+                      color: Theme.of(context).colorScheme.onPrimary,
+                    ),
+                    tooltip: 'Redo',
+                    onPressed:
+                        _showDrawing && _signatureController.canRedo
+                            ? () {
+                              setState(() {
+                                _signatureController.redo();
+                              });
+                            }
+                            : null,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
       body: SafeArea(
         child: Column(
           children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                  child: IconButton(
-                    onPressed: () {
-                      Navigator.pop(context);
-                    },
-                    icon: Icon(Icons.arrow_back),
-                  ),
-                ),
+            // Row(
+            //   mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            //   children: [
+            //     Padding(
+            //       padding: const EdgeInsets.symmetric(vertical: 8),
+            //       child: IconButton(
+            //         onPressed: () {
+            //           Navigator.pop(context);
+            //         },
+            //         icon: Icon(Icons.arrow_back),
+            //       ),
+            //     ),
 
-                IconButton(
-                  icon: Icon(_showDrawing ? Icons.text_fields : Icons.draw),
-                  onPressed: () {
-                    setState(() {
-                      _showDrawing = !_showDrawing;
-                    });
-                  },
-                ),
+            //     IconButton(
+            //       icon: Icon(_showDrawing ? Icons.text_fields : Icons.draw),
+            //       onPressed: () {
+            //         setState(() {
+            //           _showDrawing = !_showDrawing;
+            //         });
+            //       },
+            //     ),
 
-                widget.note != null
-                    ? Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      child: IconButton(
-                        icon: Icon(Icons.delete),
-                        onPressed: () {
-                          // show warnings
-                          showDialog(
-                            context: context,
-                            builder: (context) {
-                              return AlertDialog(
-                                title: Text(
-                                  "Delete Note?",
-                                  style: GoogleFonts.poppins(fontSize: 20),
-                                ),
-                                content: Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  crossAxisAlignment: CrossAxisAlignment.center,
-                                  children: [
-                                    Lottie.asset(AnimationAssets.delete),
-                                    Text(
-                                      "Are you sure you want to delete this note permernantly?",
-                                      style: GoogleFonts.poppins(fontSize: 16),
-                                    ),
-                                  ],
-                                ),
-                                actions: [
-                                  TextButton(
-                                    onPressed: () {
-                                      localDb.deleteNote(id: widget.note!.id);
-                                      Navigator.pop(context);
-                                      Navigator.pop(context);
-                                    },
-                                    child: Text("Proceed"),
-                                  ),
-                                  TextButton(
-                                    onPressed: () {
-                                      Navigator.pop(context);
-                                    },
-                                    child: Text("Cancel"),
-                                  ),
-                                ],
-                              );
-                            },
-                          );
-                        },
-                      ),
-                    )
-                    : const SizedBox.shrink(),
-              ],
-            ),
+            //     widget.note != null
+            //         ? Padding(
+            //           padding: const EdgeInsets.symmetric(vertical: 8),
+            //           child: IconButton(
+            //             icon: Icon(Icons.delete),
+            //             onPressed: () {
+            //               // show warnings
+            //               showDialog(
+            //                 context: context,
+            //                 builder: (context) {
+            //                   return AlertDialog(
+            //                     title: Text(
+            //                       "Delete Note?",
+            //                       style: GoogleFonts.poppins(fontSize: 20),
+            //                     ),
+            //                     content: Column(
+            //                       mainAxisSize: MainAxisSize.min,
+            //                       crossAxisAlignment: CrossAxisAlignment.center,
+            //                       children: [
+            //                         Lottie.asset(AnimationAssets.delete),
+            //                         Text(
+            //                           "Are you sure you want to delete this note permernantly?",
+            //                           style: GoogleFonts.poppins(fontSize: 16),
+            //                         ),
+            //                       ],
+            //                     ),
+            //                     actions: [
+            //                       TextButton(
+            //                         onPressed: () {
+            //                           localDb.deleteNote(id: widget.note!.id);
+            //                           Navigator.pop(context);
+            //                           Navigator.pop(context);
+            //                         },
+            //                         child: Text("Proceed"),
+            //                       ),
+            //                       TextButton(
+            //                         onPressed: () {
+            //                           Navigator.pop(context);
+            //                         },
+            //                         child: Text("Cancel"),
+            //                       ),
+            //                     ],
+            //                   );
+            //                 },
+            //               );
+            //             },
+            //           ),
+            //         )
+            //         : const SizedBox.shrink(),
+            //   ],
+            // ),
             Expanded(
               child: Padding(
                 padding: const EdgeInsets.all(16.0),

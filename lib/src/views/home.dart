@@ -20,31 +20,58 @@ class _HomeViewState extends State<HomeView> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      appBar: AppBar(
+        toolbarHeight: 80,
+        title: Padding(
+          padding: const EdgeInsets.all(5.0),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                AppStrings.appName,
+                style: GoogleFonts.poppins(fontSize: 28),
+              ),
+              IconButton(
+                onPressed: () {
+                  setState(() {
+                    islistView = !islistView;
+                  });
+                },
+                icon: Icon(
+                  islistView ? Icons.splitscreen_outlined : Icons.grid_view,
+                ),
+              ),
+            ],
+          ),
+        ),
+        automaticallyImplyLeading:
+            false, // Removes default back button if needed
+      ),
       body: SafeArea(
         child: Column(
           children: [
-            Padding(
-              padding: const EdgeInsets.all(20.0),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    AppStrings.appName,
-                    style: GoogleFonts.poppins(fontSize: 28),
-                  ),
-                  IconButton(
-                    onPressed: () {
-                      setState(() {
-                        islistView = !islistView;
-                      });
-                    },
-                    icon: Icon(
-                      islistView ? Icons.splitscreen_outlined : Icons.grid_view,
-                    ),
-                  ),
-                ],
-              ),
-            ),
+            // Padding(
+            //   padding: const EdgeInsets.all(20.0),
+            //   child: Row(
+            //     mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            //     children: [
+            //       Text(
+            //         AppStrings.appName,
+            //         style: GoogleFonts.poppins(fontSize: 28),
+            //       ),
+            //       IconButton(
+            //         onPressed: () {
+            //           setState(() {
+            //             islistView = !islistView;
+            //           });
+            //         },
+            //         icon: Icon(
+            //           islistView ? Icons.splitscreen_outlined : Icons.grid_view,
+            //         ),
+            //       ),
+            //     ],
+            //   ),
+            // ),
             // const EmptyView(),
             Expanded(
               child: StreamBuilder<List<Note>>(
