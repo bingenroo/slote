@@ -7,6 +7,7 @@ import 'package:slote/src/res/assets.dart';
 import 'package:slote/src/services/local_db.dart';
 import 'package:signature/signature.dart';
 import 'dart:typed_data';
+import 'package:slote/src/functions/undo_redo.dart';
 
 class CreateNoteView extends StatefulWidget {
   const CreateNoteView({super.key, this.note});
@@ -20,6 +21,11 @@ class CreateNoteView extends StatefulWidget {
 class _CreateNoteViewState extends State<CreateNoteView> {
   final _titleController = TextEditingController();
   final _descriptionController = TextEditingController();
+
+  final _titleFocusNode = FocusNode();
+  final _descriptionFocusNode = FocusNode();
+
+  late final MultiFieldUndoRedoController _multiUndoRedo;
 
   final localDb = LocalDBService();
 
@@ -38,11 +44,19 @@ class _CreateNoteViewState extends State<CreateNoteView> {
       penColor: Colors.black,
       exportBackgroundColor: Colors.white,
     );
+    _multiUndoRedo = MultiFieldUndoRedoController(
+      _titleController,
+      _descriptionController,
+    );
   }
 
   @override
   void dispose() {
     super.dispose();
+    _multiUndoRedo.dispose();
+    _titleFocusNode.dispose();
+    _descriptionFocusNode.dispose();
+
     final title = _titleController.text;
     final description = _descriptionController.text;
 
@@ -167,10 +181,17 @@ class _CreateNoteViewState extends State<CreateNoteView> {
                     ),
                     tooltip: 'Undo',
                     onPressed:
-                        _showDrawing && _signatureController.canUndo
+                        _multiUndoRedo.canUndo
                             ? () {
                               setState(() {
-                                _signatureController.undo();
+                                final lastAction = _multiUndoRedo.peekUndo();
+                                _multiUndoRedo.undo();
+                                if (lastAction?.type == FieldType.title) {
+                                  _titleFocusNode.requestFocus();
+                                } else if (lastAction?.type ==
+                                    FieldType.description) {
+                                  _descriptionFocusNode.requestFocus();
+                                }
                               });
                             }
                             : null,
@@ -182,10 +203,17 @@ class _CreateNoteViewState extends State<CreateNoteView> {
                     ),
                     tooltip: 'Redo',
                     onPressed:
-                        _showDrawing && _signatureController.canRedo
+                        _multiUndoRedo.canRedo
                             ? () {
                               setState(() {
-                                _signatureController.redo();
+                                final lastAction = _multiUndoRedo.peekRedo();
+                                _multiUndoRedo.redo();
+                                if (lastAction?.type == FieldType.title) {
+                                  _titleFocusNode.requestFocus();
+                                } else if (lastAction?.type ==
+                                    FieldType.description) {
+                                  _descriptionFocusNode.requestFocus();
+                                }
                               });
                             }
                             : null,
@@ -281,6 +309,7 @@ class _CreateNoteViewState extends State<CreateNoteView> {
                     // Title field (no drawing here)
                     TextFormField(
                       controller: _titleController,
+                      focusNode: _titleFocusNode,
                       decoration: const InputDecoration(
                         border: InputBorder.none,
                         hintText: "Title",
@@ -316,6 +345,7 @@ class _CreateNoteViewState extends State<CreateNoteView> {
                             ignoring: _showDrawing,
                             child: TextFormField(
                               controller: _descriptionController,
+                              focusNode: _descriptionFocusNode,
                               decoration: const InputDecoration(
                                 border: InputBorder.none,
                                 hintText: "Description",
