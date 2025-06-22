@@ -9,7 +9,8 @@ class FieldAction {
   FieldAction(this.type, this.oldValue, this.newValue);
 }
 
-class MultiFieldUndoRedoController {
+// Change here: extend ChangeNotifier
+class MultiFieldUndoRedoController extends ChangeNotifier {
   final TextEditingController titleController;
   final TextEditingController descController;
 
@@ -22,6 +23,9 @@ class MultiFieldUndoRedoController {
   String _lastTitle = '';
   String _lastDesc = '';
 
+  bool _skipNextTitleChange = false;
+  bool _skipNextDescChange = false;
+
   MultiFieldUndoRedoController(this.titleController, this.descController) {
     _lastTitle = titleController.text;
     _lastDesc = descController.text;
@@ -30,66 +34,74 @@ class MultiFieldUndoRedoController {
   }
 
   void _onTitleChanged() {
-    if (_lastTitle != titleController.text) {
-      _undoStack.add(
-        FieldAction(FieldType.title, _lastTitle, titleController.text),
-      );
+    final newText = titleController.text;
+    if (_skipNextTitleChange) {
+      _skipNextTitleChange = false;
+      _lastTitle = newText;
+      return;
+    }
+
+    if (_lastTitle != newText) {
+      _undoStack.add(FieldAction(FieldType.title, _lastTitle, newText));
       _redoStack.clear();
-      _lastTitle = titleController.text;
+      _lastTitle = newText;
+      notifyListeners();
     }
   }
 
   void _onDescChanged() {
-    if (_lastDesc != descController.text) {
-      _undoStack.add(
-        FieldAction(FieldType.description, _lastDesc, descController.text),
-      );
+    final newText = descController.text;
+    if (_skipNextDescChange) {
+      _skipNextDescChange = false;
+      _lastDesc = newText;
+      return;
+    }
+
+    if (_lastDesc != newText) {
+      _undoStack.add(FieldAction(FieldType.description, _lastDesc, newText));
       _redoStack.clear();
-      _lastDesc = descController.text;
+      _lastDesc = newText;
+      notifyListeners();
     }
   }
 
   void undo() {
     if (_undoStack.isNotEmpty) {
       final action = _undoStack.removeLast();
-      _redoStack.add(action); // <-- push as-is
+      _redoStack.add(action);
       if (action.type == FieldType.title) {
-        titleController.removeListener(_onTitleChanged);
+        _skipNextTitleChange = true;
         titleController.text = action.oldValue;
-        _lastTitle = action.oldValue;
-        titleController.addListener(_onTitleChanged);
       } else {
-        descController.removeListener(_onDescChanged);
+        _skipNextDescChange = true;
         descController.text = action.oldValue;
-        _lastDesc = action.oldValue;
-        descController.addListener(_onDescChanged);
       }
+      notifyListeners();
     }
   }
 
   void redo() {
     if (_redoStack.isNotEmpty) {
       final action = _redoStack.removeLast();
-      _undoStack.add(action); // <-- push as-is
+      _undoStack.add(action);
       if (action.type == FieldType.title) {
-        titleController.removeListener(_onTitleChanged);
+        _skipNextTitleChange = true;
         titleController.text = action.newValue;
-        _lastTitle = action.newValue;
-        titleController.addListener(_onTitleChanged);
       } else {
-        descController.removeListener(_onDescChanged);
+        _skipNextDescChange = true;
         descController.text = action.newValue;
-        _lastDesc = action.newValue;
-        descController.addListener(_onDescChanged);
       }
+      notifyListeners();
     }
   }
 
   bool get canUndo => _undoStack.isNotEmpty;
   bool get canRedo => _redoStack.isNotEmpty;
 
+  @override
   void dispose() {
     titleController.removeListener(_onTitleChanged);
     descController.removeListener(_onDescChanged);
+    super.dispose(); // Call super.dispose() for ChangeNotifier
   }
 }

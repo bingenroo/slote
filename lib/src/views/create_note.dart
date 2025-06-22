@@ -48,10 +48,16 @@ class _CreateNoteViewState extends State<CreateNoteView> {
       _titleController,
       _descriptionController,
     );
+    _multiUndoRedo.addListener(_onUndoRedoChanged);
+  }
+
+  void _onUndoRedoChanged() {
+    setState(() {});
   }
 
   @override
   void dispose() {
+    _multiUndoRedo.removeListener(_onUndoRedoChanged);
     super.dispose();
     _multiUndoRedo.dispose();
     _titleFocusNode.dispose();
@@ -322,8 +328,9 @@ class _CreateNoteViewState extends State<CreateNoteView> {
                       child: Stack(
                         children: [
                           // Drawing layer: always visible, only interactive in draw mode
-                          IgnorePointer(
-                            ignoring: !_showDrawing,
+                          Visibility(
+                            visible: _showDrawing,
+                            maintainState: true,
                             child: Signature(
                               controller: _signatureController,
                               width: double.infinity,
