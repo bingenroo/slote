@@ -1,16 +1,8 @@
 // ignore_for_file: public_member_api_docs, sort_constructors_first
 import 'dart:convert';
 import 'package:isar/isar.dart';
-import 'package:flutter/foundation.dart'; // For listEquals
 
 part 'note.g.dart';
-
-// class Uint8ListConverter {
-//   const Uint8ListConverter();
-
-//   static Uint8List from(List<int> object) => Uint8List.fromList(object);
-//   static List<int> to(Uint8List object) => object;
-// }
 
 @collection
 class Note {
@@ -19,32 +11,19 @@ class Note {
   final String body;
   final DateTime lastMod;
 
-  // @Uint8ListConverter()
-  // final Uint8List? drawing;
-
-  final List<int>? drawing;
-
   Note({
     this.id = Isar.autoIncrement,
     required this.title,
     required this.body,
     required this.lastMod,
-    this.drawing,
   });
 
-  Note copyWith({
-    Id? id,
-    String? title,
-    String? body,
-    DateTime? lastMod,
-    Uint8List? drawing,
-  }) {
+  Note copyWith({Id? id, String? title, String? body, DateTime? lastMod}) {
     return Note(
       id: id ?? this.id,
       title: title ?? this.title,
       body: body ?? this.body,
       lastMod: lastMod ?? this.lastMod,
-      drawing: drawing ?? this.drawing,
     );
   }
 
@@ -54,7 +33,6 @@ class Note {
       'title': title,
       'body': body,
       'lastMod': lastMod.millisecondsSinceEpoch,
-      'drawing': drawing != null ? base64Encode(drawing!) : null,
     };
   }
 
@@ -64,10 +42,6 @@ class Note {
       title: map['title'] as String,
       body: map['body'] as String,
       lastMod: DateTime.fromMillisecondsSinceEpoch(map['lastMod'] as int),
-      drawing:
-          map['drawing'] != null
-              ? base64Decode(map['drawing'] as String)
-              : null,
     );
   }
 
@@ -78,7 +52,7 @@ class Note {
 
   @override
   String toString() {
-    return 'Note(id: $id, title: $title, body: $body, lastMod: $lastMod, drawing: $drawing)';
+    return 'Note(id: $id, title: $title, body: $body, lastMod: $lastMod)';
   }
 
   @override
@@ -88,16 +62,11 @@ class Note {
     return other.id == id &&
         other.title == title &&
         other.body == body &&
-        other.lastMod == lastMod &&
-        listEquals(other.drawing, drawing);
+        other.lastMod == lastMod;
   }
 
   @override
   int get hashCode {
-    return id.hashCode ^
-        title.hashCode ^
-        body.hashCode ^
-        lastMod.hashCode ^
-        (drawing == null ? 0 : drawing.hashCode);
+    return id.hashCode ^ title.hashCode ^ body.hashCode ^ lastMod.hashCode;
   }
 }

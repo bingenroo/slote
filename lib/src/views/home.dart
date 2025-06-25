@@ -78,15 +78,14 @@ class _HomeViewState extends State<HomeView> {
                 stream: LocalDBService().listenAllNotes(),
                 builder: (context, snapshot) {
                   if (snapshot.data == null) {
-                    return EmptyView();
+                    return const Center(child: CircularProgressIndicator());
                   }
                   final notes = snapshot.data!;
 
-                  // if (islistView) {
-                  //   return NotesList(notes: notes);
-                  // }
-
-                  // return NotesGrid(notes: notes);
+                  // Check if the list is empty
+                  if (notes.isEmpty) {
+                    return const EmptyView();
+                  }
 
                   return AnimatedSwitcher(
                     duration: const Duration(milliseconds: 300),
