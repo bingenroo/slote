@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:undo/undo.dart';
+import 'dart:async';
 
 class TextState {
   final String text;
@@ -12,11 +13,15 @@ class UndoRedoTextController extends ChangeNotifier {
   final TextEditingController _externalController;
   final ChangeStack _changeStack;
   bool _isUpdatingFromStack = false;
-  bool _isInitialState = true; // Add this flag
+  bool _isInitialState = true;
+  Timer? _debounceTimer;
+  static const Duration _debounceDuration = Duration(milliseconds: 100);
+
   TextState _lastState = TextState(
     '',
     const TextSelection.collapsed(offset: 0),
   );
+  TextState? _pendingState;
 
   UndoRedoTextController(this._changeStack, this._externalController) {
     _externalController.addListener(_onTextChanged);
@@ -34,12 +39,14 @@ class UndoRedoTextController extends ChangeNotifier {
 
   void undo() {
     if (_changeStack.canUndo) {
+      _cancelDebounce();
       _changeStack.undo();
     }
   }
 
   void redo() {
     if (_changeStack.canRedo) {
+      _cancelDebounce();
       _changeStack.redo();
     }
   }
@@ -61,6 +68,22 @@ class UndoRedoTextController extends ChangeNotifier {
     if (oldState.text == newText) return;
 
     final newState = TextState(newText, newSelection);
+    _pendingState = newState;
+
+    // Cancel existing timer
+    _debounceTimer?.cancel();
+
+    // Start new debounce timer
+    _debounceTimer = Timer(_debounceDuration, () {
+      _addToStack();
+    });
+  }
+
+  void _addToStack() {
+    if (_pendingState == null) return;
+
+    final oldState = _lastState;
+    final newState = _pendingState!;
 
     _changeStack.add(
       Change<TextState>(
@@ -71,7 +94,18 @@ class UndoRedoTextController extends ChangeNotifier {
     );
 
     _lastState = newState;
+    _pendingState = null;
     notifyListeners();
+  }
+
+  void _cancelDebounce() {
+    _debounceTimer?.cancel();
+    _debounceTimer = null;
+
+    // If there's a pending state, add it immediately
+    if (_pendingState != null) {
+      _addToStack();
+    }
   }
 
   void _updateTextFromStack(TextState state) {
@@ -101,16 +135,19 @@ class UndoRedoTextController extends ChangeNotifier {
   }
 
   void clearHistory() {
+    _cancelDebounce();
     _changeStack.clearHistory();
     notifyListeners();
   }
 
   void setText(String text) {
+    _cancelDebounce();
     _externalController.text = text;
   }
 
   @override
   void dispose() {
+    _debounceTimer?.cancel();
     _externalController.removeListener(_onTextChanged);
     super.dispose();
   }
