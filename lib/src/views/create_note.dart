@@ -8,6 +8,7 @@ import 'package:slote/src/services/local_db.dart';
 import 'package:signature/signature.dart';
 import 'dart:typed_data';
 import 'package:slote/src/functions/undo_redo.dart';
+import 'package:undo/undo.dart';
 
 class CreateNoteView extends StatefulWidget {
   const CreateNoteView({super.key, this.note});
@@ -20,12 +21,10 @@ class CreateNoteView extends StatefulWidget {
 
 class _CreateNoteViewState extends State<CreateNoteView> {
   final _titleController = TextEditingController();
-  final _descriptionController = TextEditingController();
+  final _bodyController = TextEditingController();
 
-  final _titleFocusNode = FocusNode();
-  final _descriptionFocusNode = FocusNode();
-
-  late final MultiFieldUndoRedoController _multiUndoRedo;
+  late UndoRedoTextController _undoRedoTextController;
+  late ChangeStack _changeStack;
 
   final localDb = LocalDBService();
 
@@ -35,61 +34,53 @@ class _CreateNoteViewState extends State<CreateNoteView> {
   @override
   void initState() {
     super.initState();
+
+    // undo redo
+    _changeStack = ChangeStack();
+    _undoRedoTextController = UndoRedoTextController(
+      _changeStack,
+      _bodyController,
+    );
+
     if (widget.note != null) {
       _titleController.text = widget.note!.title;
-      _descriptionController.text = widget.note!.description;
+      _bodyController.text = widget.note!.body;
     }
     _signatureController = SignatureController(
       penStrokeWidth: 3,
       penColor: Colors.black,
       exportBackgroundColor: Colors.white,
     );
-    _multiUndoRedo = MultiFieldUndoRedoController(
-      _titleController,
-      _descriptionController,
-    );
-    _multiUndoRedo.addListener(_onUndoRedoChanged);
-  }
-
-  void _onUndoRedoChanged() {
-    setState(() {});
   }
 
   @override
   void dispose() {
-    _multiUndoRedo.removeListener(_onUndoRedoChanged);
-    super.dispose();
-    _multiUndoRedo.dispose();
-    _titleFocusNode.dispose();
-    _descriptionFocusNode.dispose();
-
     final title = _titleController.text;
-    final description = _descriptionController.text;
+    final body = _bodyController.text;
 
     _signatureController.dispose();
 
     if (widget.note != null) {
-      if (title.isEmpty && description.isEmpty) {
+      if (title.isEmpty && body.isEmpty) {
         localDb.deleteNote(id: widget.note!.id);
-      } else if (widget.note!.title != title ||
-          widget.note!.description != description) {
-        final newNote = widget.note!.copyWith(
-          title: title,
-          description: description,
-        );
+      } else if (widget.note!.title != title || widget.note!.body != body) {
+        final newNote = widget.note!.copyWith(title: title, body: body);
         localDb.saveNote(note: newNote);
       }
     } else {
       final newNote = Note(
         id: Isar.autoIncrement,
         title: title,
-        description: description,
+        body: body,
         lastMod: DateTime.now(),
       );
       localDb.saveNote(note: newNote);
     }
     _titleController.dispose();
-    _descriptionController.dispose();
+    _bodyController.dispose();
+    _undoRedoTextController.dispose();
+
+    super.dispose();
   }
 
   @override
@@ -103,10 +94,25 @@ class _CreateNoteViewState extends State<CreateNoteView> {
           },
           icon: Icon(Icons.arrow_back),
         ),
-        // title: Text(
-        //   widget.note == null ? "New Note" : "Edit Note",
-        //   style: GoogleFonts.poppins(fontSize: 22),
-        // ),
+        title: TextField(
+          controller: _titleController,
+          decoration: InputDecoration(
+            border: InputBorder.none,
+            hintText: "New Slote",
+            hintStyle: TextStyle(
+              color: Theme.of(
+                context,
+              ).colorScheme.onPrimary.withValues(alpha: 0.6),
+            ),
+          ),
+          style: GoogleFonts.poppins(
+            fontSize: 28,
+            color: Theme.of(context).colorScheme.onPrimary,
+          ),
+          textAlign: TextAlign.start,
+          cursorColor: Theme.of(context).colorScheme.onPrimary,
+          showCursor: true,
+        ),
         actions: [
           IconButton(
             icon: Icon(_showDrawing ? Icons.text_fields : Icons.draw),
@@ -180,49 +186,72 @@ class _CreateNoteViewState extends State<CreateNoteView> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  IconButton(
-                    icon: Icon(
-                      Icons.undo,
-                      color: Theme.of(context).colorScheme.onPrimary,
-                    ),
-                    tooltip: 'Undo',
-                    onPressed:
-                        _multiUndoRedo.canUndo
-                            ? () {
-                              setState(() {
-                                final lastAction = _multiUndoRedo.peekUndo();
-                                _multiUndoRedo.undo();
-                                if (lastAction?.type == FieldType.title) {
-                                  _titleFocusNode.requestFocus();
-                                } else if (lastAction?.type ==
-                                    FieldType.description) {
-                                  _descriptionFocusNode.requestFocus();
-                                }
-                              });
-                            }
-                            : null,
+                  // IconButton(
+                  //   icon: Icon(
+                  //     Icons.undo,
+                  //     color:
+                  //         _bodyUndoRedo.canUndo
+                  //             ? Theme.of(context).colorScheme.onPrimary
+                  //             : Theme.of(
+                  //               context,
+                  //             ).colorScheme.onPrimary.withValues(alpha: 0.3),
+                  //   ),
+                  //   tooltip: 'Undo',
+                  //   onPressed: _bodyUndoRedoStack.canUndo ? _performUndo : null,
+                  // ),
+                  ListenableBuilder(
+                    listenable: _undoRedoTextController,
+                    builder: (context, child) {
+                      return IconButton(
+                        onPressed:
+                            _changeStack.canUndo
+                                ? _undoRedoTextController.undo
+                                : null,
+                        icon: Icon(
+                          Icons.undo,
+                          color:
+                              _changeStack.canUndo
+                                  ? Theme.of(context).colorScheme.onPrimary
+                                  : Theme.of(context).colorScheme.onPrimary
+                                      .withValues(alpha: 0.3),
+                        ),
+                        tooltip: 'Undo',
+                      );
+                    },
                   ),
-                  IconButton(
-                    icon: Icon(
-                      Icons.redo,
-                      color: Theme.of(context).colorScheme.onPrimary,
-                    ),
-                    tooltip: 'Redo',
-                    onPressed:
-                        _multiUndoRedo.canRedo
-                            ? () {
-                              setState(() {
-                                final lastAction = _multiUndoRedo.peekRedo();
-                                _multiUndoRedo.redo();
-                                if (lastAction?.type == FieldType.title) {
-                                  _titleFocusNode.requestFocus();
-                                } else if (lastAction?.type ==
-                                    FieldType.description) {
-                                  _descriptionFocusNode.requestFocus();
-                                }
-                              });
-                            }
-                            : null,
+
+                  // IconButton(
+                  //   icon: Icon(
+                  //     Icons.redo,
+                  //     color:
+                  //         _bodyUndoRedo.canRedo
+                  //             ? Theme.of(context).colorScheme.onPrimary
+                  //             : Theme.of(
+                  //               context,
+                  //             ).colorScheme.onPrimary.withValues(alpha: 0.3),
+                  //   ),
+                  //   tooltip: 'Redo',
+                  //   onPressed: _bodyUndoRedoStack.canUndo ? _performUndo : null,
+                  // ),
+                  ListenableBuilder(
+                    listenable: _undoRedoTextController,
+                    builder: (context, child) {
+                      return IconButton(
+                        onPressed:
+                            _changeStack.canRedo
+                                ? _undoRedoTextController.redo
+                                : null,
+                        icon: Icon(
+                          Icons.redo,
+                          color:
+                              _changeStack.canRedo
+                                  ? Theme.of(context).colorScheme.onPrimary
+                                  : Theme.of(context).colorScheme.onPrimary
+                                      .withValues(alpha: 0.3),
+                        ),
+                        tooltip: 'Redo',
+                      );
+                    },
                   ),
                 ],
               ),
@@ -313,15 +342,14 @@ class _CreateNoteViewState extends State<CreateNoteView> {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     // Title field (no drawing here)
-                    TextFormField(
-                      controller: _titleController,
-                      focusNode: _titleFocusNode,
-                      decoration: const InputDecoration(
-                        border: InputBorder.none,
-                        hintText: "Title",
-                      ),
-                      style: GoogleFonts.poppins(fontSize: 28),
-                    ),
+                    // TextFormField(
+                    //   controller: _titleController,
+                    //   decoration: const InputDecoration(
+                    //     border: InputBorder.none,
+                    //     hintText: "Title",
+                    //   ),
+                    //   style: GoogleFonts.poppins(fontSize: 28),
+                    // ),
                     const SizedBox(height: 16),
                     // Description field with drawing overlay
                     Expanded(
@@ -351,8 +379,9 @@ class _CreateNoteViewState extends State<CreateNoteView> {
                           IgnorePointer(
                             ignoring: _showDrawing,
                             child: TextFormField(
-                              controller: _descriptionController,
-                              focusNode: _descriptionFocusNode,
+                              controller:
+                                  // _undoRedoTextController.textController,
+                                  _bodyController,
                               decoration: const InputDecoration(
                                 border: InputBorder.none,
                                 hintText: "Description",

@@ -43,7 +43,7 @@ class NoteListItem extends StatelessWidget {
                         maxLines: 1,
                       ),
                       Text(
-                        note.description,
+                        note.body,
                         style: GoogleFonts.poppins(),
                         maxLines: 3,
                         overflow: TextOverflow.ellipsis,

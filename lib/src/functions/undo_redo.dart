@@ -1,107 +1,117 @@
 import 'package:flutter/material.dart';
+import 'package:undo/undo.dart';
 
-enum FieldType { title, description }
+class TextState {
+  final String text;
+  final TextSelection selection;
 
-class FieldAction {
-  final FieldType type;
-  final String oldValue;
-  final String newValue;
-  FieldAction(this.type, this.oldValue, this.newValue);
+  TextState(this.text, this.selection);
 }
 
-// Change here: extend ChangeNotifier
-class MultiFieldUndoRedoController extends ChangeNotifier {
-  final TextEditingController titleController;
-  final TextEditingController descController;
+class UndoRedoTextController extends ChangeNotifier {
+  final TextEditingController _externalController;
+  final ChangeStack _changeStack;
+  bool _isUpdatingFromStack = false;
+  bool _isInitialState = true; // Add this flag
+  TextState _lastState = TextState(
+    '',
+    const TextSelection.collapsed(offset: 0),
+  );
 
-  FieldAction? peekUndo() => _undoStack.isNotEmpty ? _undoStack.last : null;
-  FieldAction? peekRedo() => _redoStack.isNotEmpty ? _redoStack.last : null;
-
-  final List<FieldAction> _undoStack = [];
-  final List<FieldAction> _redoStack = [];
-
-  String _lastTitle = '';
-  String _lastDesc = '';
-
-  bool _skipNextTitleChange = false;
-  bool _skipNextDescChange = false;
-
-  MultiFieldUndoRedoController(this.titleController, this.descController) {
-    _lastTitle = titleController.text;
-    _lastDesc = descController.text;
-    titleController.addListener(_onTitleChanged);
-    descController.addListener(_onDescChanged);
+  UndoRedoTextController(this._changeStack, this._externalController) {
+    _externalController.addListener(_onTextChanged);
+    // Initialize with current text from external controller
+    _lastState = TextState(
+      _externalController.text,
+      _externalController.selection,
+    );
   }
 
-  void _onTitleChanged() {
-    final newText = titleController.text;
-    if (_skipNextTitleChange) {
-      _skipNextTitleChange = false;
-      _lastTitle = newText;
-      return;
-    }
-
-    if (_lastTitle != newText) {
-      _undoStack.add(FieldAction(FieldType.title, _lastTitle, newText));
-      _redoStack.clear();
-      _lastTitle = newText;
-      notifyListeners();
-    }
-  }
-
-  void _onDescChanged() {
-    final newText = descController.text;
-    if (_skipNextDescChange) {
-      _skipNextDescChange = false;
-      _lastDesc = newText;
-      return;
-    }
-
-    if (_lastDesc != newText) {
-      _undoStack.add(FieldAction(FieldType.description, _lastDesc, newText));
-      _redoStack.clear();
-      _lastDesc = newText;
-      notifyListeners();
-    }
-  }
+  TextEditingController get textController => _externalController;
+  String get currentText => _externalController.text;
+  bool get canUndo => _changeStack.canUndo;
+  bool get canRedo => _changeStack.canRedo;
 
   void undo() {
-    if (_undoStack.isNotEmpty) {
-      final action = _undoStack.removeLast();
-      _redoStack.add(action);
-      if (action.type == FieldType.title) {
-        _skipNextTitleChange = true;
-        titleController.text = action.oldValue;
-      } else {
-        _skipNextDescChange = true;
-        descController.text = action.oldValue;
-      }
-      notifyListeners();
+    if (_changeStack.canUndo) {
+      _changeStack.undo();
     }
   }
 
   void redo() {
-    if (_redoStack.isNotEmpty) {
-      final action = _redoStack.removeLast();
-      _undoStack.add(action);
-      if (action.type == FieldType.title) {
-        _skipNextTitleChange = true;
-        titleController.text = action.newValue;
-      } else {
-        _skipNextDescChange = true;
-        descController.text = action.newValue;
-      }
-      notifyListeners();
+    if (_changeStack.canRedo) {
+      _changeStack.redo();
     }
   }
 
-  bool get canUndo => _undoStack.isNotEmpty;
-  bool get canRedo => _redoStack.isNotEmpty;
+  void _onTextChanged() {
+    if (_isUpdatingFromStack) return;
+    final newText = _externalController.text;
+    final newSelection = _externalController.selection;
+    final oldState = _lastState;
+
+    // Skip adding to stack if this is the initial state setup
+    if (_isInitialState) {
+      _lastState = TextState(newText, newSelection);
+      _isInitialState = false;
+      return;
+    }
+
+    // Skip if text hasn't actually changed
+    if (oldState.text == newText) return;
+
+    final newState = TextState(newText, newSelection);
+
+    _changeStack.add(
+      Change<TextState>(
+        oldState,
+        () => _updateTextFromStack(newState),
+        (oldValue) => _updateTextFromStack(oldValue),
+      ),
+    );
+
+    _lastState = newState;
+    notifyListeners();
+  }
+
+  void _updateTextFromStack(TextState state) {
+    _isUpdatingFromStack = true;
+    _externalController.text = state.text;
+
+    // Use a post-frame callback to ensure the text is set before setting selection
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!_isUpdatingFromStack) return; // Safety check
+
+      final textLength = _externalController.text.length;
+      final selection = state.selection;
+
+      // Ensure the selection is within bounds
+      final safeStart = selection.start.clamp(0, textLength);
+      final safeEnd = selection.end.clamp(0, textLength);
+
+      _externalController.selection = TextSelection(
+        baseOffset: safeStart,
+        extentOffset: safeEnd,
+      );
+    });
+
+    _lastState = state;
+    _isUpdatingFromStack = false;
+    notifyListeners();
+  }
+
+  void clearHistory() {
+    _changeStack.clearHistory();
+    notifyListeners();
+  }
+
+  void setText(String text) {
+    _externalController.text = text;
+  }
 
   @override
   void dispose() {
-    titleController.removeListener(_onTitleChanged);
-    descController.removeListener(_onDescChanged);
-    super.dispose(); // Call super.dispose() for ChangeNotifier
+    _externalController.removeListener(_onTextChanged);
+    super.dispose();
   }
 }

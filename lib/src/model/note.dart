@@ -16,7 +16,7 @@ part 'note.g.dart';
 class Note {
   Id id = Isar.autoIncrement;
   final String title;
-  final String description;
+  final String body;
   final DateTime lastMod;
 
   // @Uint8ListConverter()
@@ -27,7 +27,7 @@ class Note {
   Note({
     this.id = Isar.autoIncrement,
     required this.title,
-    required this.description,
+    required this.body,
     required this.lastMod,
     this.drawing,
   });
@@ -35,14 +35,14 @@ class Note {
   Note copyWith({
     Id? id,
     String? title,
-    String? description,
+    String? body,
     DateTime? lastMod,
     Uint8List? drawing,
   }) {
     return Note(
       id: id ?? this.id,
       title: title ?? this.title,
-      description: description ?? this.description,
+      body: body ?? this.body,
       lastMod: lastMod ?? this.lastMod,
       drawing: drawing ?? this.drawing,
     );
@@ -52,7 +52,7 @@ class Note {
     return <String, dynamic>{
       'id': id,
       'title': title,
-      'description': description,
+      'body': body,
       'lastMod': lastMod.millisecondsSinceEpoch,
       'drawing': drawing != null ? base64Encode(drawing!) : null,
     };
@@ -62,7 +62,7 @@ class Note {
     return Note(
       id: map['id'],
       title: map['title'] as String,
-      description: map['description'] as String,
+      body: map['body'] as String,
       lastMod: DateTime.fromMillisecondsSinceEpoch(map['lastMod'] as int),
       drawing:
           map['drawing'] != null
@@ -78,7 +78,7 @@ class Note {
 
   @override
   String toString() {
-    return 'Note(id: $id, title: $title, description: $description, lastMod: $lastMod, drawing: $drawing)';
+    return 'Note(id: $id, title: $title, body: $body, lastMod: $lastMod, drawing: $drawing)';
   }
 
   @override
@@ -87,7 +87,7 @@ class Note {
 
     return other.id == id &&
         other.title == title &&
-        other.description == description &&
+        other.body == body &&
         other.lastMod == lastMod &&
         listEquals(other.drawing, drawing);
   }
@@ -96,7 +96,7 @@ class Note {
   int get hashCode {
     return id.hashCode ^
         title.hashCode ^
-        description.hashCode ^
+        body.hashCode ^
         lastMod.hashCode ^
         (drawing == null ? 0 : drawing.hashCode);
   }

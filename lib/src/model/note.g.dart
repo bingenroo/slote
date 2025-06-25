@@ -17,9 +17,9 @@ const NoteSchema = CollectionSchema(
   name: r'Note',
   id: 6284318083599466921,
   properties: {
-    r'description': PropertySchema(
+    r'body': PropertySchema(
       id: 0,
-      name: r'description',
+      name: r'body',
       type: IsarType.string,
     ),
     r'drawing': PropertySchema(
@@ -63,7 +63,7 @@ int _noteEstimateSize(
   Map<Type, List<int>> allOffsets,
 ) {
   var bytesCount = offsets.last;
-  bytesCount += 3 + object.description.length * 3;
+  bytesCount += 3 + object.body.length * 3;
   {
     final value = object.drawing;
     if (value != null) {
@@ -80,7 +80,7 @@ void _noteSerialize(
   List<int> offsets,
   Map<Type, List<int>> allOffsets,
 ) {
-  writer.writeString(offsets[0], object.description);
+  writer.writeString(offsets[0], object.body);
   writer.writeLongList(offsets[1], object.drawing);
   writer.writeLong(offsets[2], object.hashCode);
   writer.writeDateTime(offsets[3], object.lastMod);
@@ -94,7 +94,7 @@ Note _noteDeserialize(
   Map<Type, List<int>> allOffsets,
 ) {
   final object = Note(
-    description: reader.readString(offsets[0]),
+    body: reader.readString(offsets[0]),
     drawing: reader.readLongList(offsets[1]),
     id: id,
     lastMod: reader.readDateTime(offsets[3]),
@@ -213,20 +213,20 @@ extension NoteQueryWhere on QueryBuilder<Note, Note, QWhereClause> {
 }
 
 extension NoteQueryFilter on QueryBuilder<Note, Note, QFilterCondition> {
-  QueryBuilder<Note, Note, QAfterFilterCondition> descriptionEqualTo(
+  QueryBuilder<Note, Note, QAfterFilterCondition> bodyEqualTo(
     String value, {
     bool caseSensitive = true,
   }) {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(FilterCondition.equalTo(
-        property: r'description',
+        property: r'body',
         value: value,
         caseSensitive: caseSensitive,
       ));
     });
   }
 
-  QueryBuilder<Note, Note, QAfterFilterCondition> descriptionGreaterThan(
+  QueryBuilder<Note, Note, QAfterFilterCondition> bodyGreaterThan(
     String value, {
     bool include = false,
     bool caseSensitive = true,
@@ -234,14 +234,14 @@ extension NoteQueryFilter on QueryBuilder<Note, Note, QFilterCondition> {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(FilterCondition.greaterThan(
         include: include,
-        property: r'description',
+        property: r'body',
         value: value,
         caseSensitive: caseSensitive,
       ));
     });
   }
 
-  QueryBuilder<Note, Note, QAfterFilterCondition> descriptionLessThan(
+  QueryBuilder<Note, Note, QAfterFilterCondition> bodyLessThan(
     String value, {
     bool include = false,
     bool caseSensitive = true,
@@ -249,14 +249,14 @@ extension NoteQueryFilter on QueryBuilder<Note, Note, QFilterCondition> {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(FilterCondition.lessThan(
         include: include,
-        property: r'description',
+        property: r'body',
         value: value,
         caseSensitive: caseSensitive,
       ));
     });
   }
 
-  QueryBuilder<Note, Note, QAfterFilterCondition> descriptionBetween(
+  QueryBuilder<Note, Note, QAfterFilterCondition> bodyBetween(
     String lower,
     String upper, {
     bool includeLower = true,
@@ -265,7 +265,7 @@ extension NoteQueryFilter on QueryBuilder<Note, Note, QFilterCondition> {
   }) {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(FilterCondition.between(
-        property: r'description',
+        property: r'body',
         lower: lower,
         includeLower: includeLower,
         upper: upper,
@@ -275,69 +275,67 @@ extension NoteQueryFilter on QueryBuilder<Note, Note, QFilterCondition> {
     });
   }
 
-  QueryBuilder<Note, Note, QAfterFilterCondition> descriptionStartsWith(
+  QueryBuilder<Note, Note, QAfterFilterCondition> bodyStartsWith(
     String value, {
     bool caseSensitive = true,
   }) {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(FilterCondition.startsWith(
-        property: r'description',
+        property: r'body',
         value: value,
         caseSensitive: caseSensitive,
       ));
     });
   }
 
-  QueryBuilder<Note, Note, QAfterFilterCondition> descriptionEndsWith(
+  QueryBuilder<Note, Note, QAfterFilterCondition> bodyEndsWith(
     String value, {
     bool caseSensitive = true,
   }) {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(FilterCondition.endsWith(
-        property: r'description',
+        property: r'body',
         value: value,
         caseSensitive: caseSensitive,
       ));
     });
   }
 
-  QueryBuilder<Note, Note, QAfterFilterCondition> descriptionContains(
-      String value,
+  QueryBuilder<Note, Note, QAfterFilterCondition> bodyContains(String value,
       {bool caseSensitive = true}) {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(FilterCondition.contains(
-        property: r'description',
+        property: r'body',
         value: value,
         caseSensitive: caseSensitive,
       ));
     });
   }
 
-  QueryBuilder<Note, Note, QAfterFilterCondition> descriptionMatches(
-      String pattern,
+  QueryBuilder<Note, Note, QAfterFilterCondition> bodyMatches(String pattern,
       {bool caseSensitive = true}) {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(FilterCondition.matches(
-        property: r'description',
+        property: r'body',
         wildcard: pattern,
         caseSensitive: caseSensitive,
       ));
     });
   }
 
-  QueryBuilder<Note, Note, QAfterFilterCondition> descriptionIsEmpty() {
+  QueryBuilder<Note, Note, QAfterFilterCondition> bodyIsEmpty() {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(FilterCondition.equalTo(
-        property: r'description',
+        property: r'body',
         value: '',
       ));
     });
   }
 
-  QueryBuilder<Note, Note, QAfterFilterCondition> descriptionIsNotEmpty() {
+  QueryBuilder<Note, Note, QAfterFilterCondition> bodyIsNotEmpty() {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(FilterCondition.greaterThan(
-        property: r'description',
+        property: r'body',
         value: '',
       ));
     });
@@ -787,15 +785,15 @@ extension NoteQueryObject on QueryBuilder<Note, Note, QFilterCondition> {}
 extension NoteQueryLinks on QueryBuilder<Note, Note, QFilterCondition> {}
 
 extension NoteQuerySortBy on QueryBuilder<Note, Note, QSortBy> {
-  QueryBuilder<Note, Note, QAfterSortBy> sortByDescription() {
+  QueryBuilder<Note, Note, QAfterSortBy> sortByBody() {
     return QueryBuilder.apply(this, (query) {
-      return query.addSortBy(r'description', Sort.asc);
+      return query.addSortBy(r'body', Sort.asc);
     });
   }
 
-  QueryBuilder<Note, Note, QAfterSortBy> sortByDescriptionDesc() {
+  QueryBuilder<Note, Note, QAfterSortBy> sortByBodyDesc() {
     return QueryBuilder.apply(this, (query) {
-      return query.addSortBy(r'description', Sort.desc);
+      return query.addSortBy(r'body', Sort.desc);
     });
   }
 
@@ -837,15 +835,15 @@ extension NoteQuerySortBy on QueryBuilder<Note, Note, QSortBy> {
 }
 
 extension NoteQuerySortThenBy on QueryBuilder<Note, Note, QSortThenBy> {
-  QueryBuilder<Note, Note, QAfterSortBy> thenByDescription() {
+  QueryBuilder<Note, Note, QAfterSortBy> thenByBody() {
     return QueryBuilder.apply(this, (query) {
-      return query.addSortBy(r'description', Sort.asc);
+      return query.addSortBy(r'body', Sort.asc);
     });
   }
 
-  QueryBuilder<Note, Note, QAfterSortBy> thenByDescriptionDesc() {
+  QueryBuilder<Note, Note, QAfterSortBy> thenByBodyDesc() {
     return QueryBuilder.apply(this, (query) {
-      return query.addSortBy(r'description', Sort.desc);
+      return query.addSortBy(r'body', Sort.desc);
     });
   }
 
@@ -899,10 +897,10 @@ extension NoteQuerySortThenBy on QueryBuilder<Note, Note, QSortThenBy> {
 }
 
 extension NoteQueryWhereDistinct on QueryBuilder<Note, Note, QDistinct> {
-  QueryBuilder<Note, Note, QDistinct> distinctByDescription(
+  QueryBuilder<Note, Note, QDistinct> distinctByBody(
       {bool caseSensitive = true}) {
     return QueryBuilder.apply(this, (query) {
-      return query.addDistinctBy(r'description', caseSensitive: caseSensitive);
+      return query.addDistinctBy(r'body', caseSensitive: caseSensitive);
     });
   }
 
@@ -939,9 +937,9 @@ extension NoteQueryProperty on QueryBuilder<Note, Note, QQueryProperty> {
     });
   }
 
-  QueryBuilder<Note, String, QQueryOperations> descriptionProperty() {
+  QueryBuilder<Note, String, QQueryOperations> bodyProperty() {
     return QueryBuilder.apply(this, (query) {
-      return query.addPropertyName(r'description');
+      return query.addPropertyName(r'body');
     });
   }
 
