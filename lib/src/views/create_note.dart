@@ -7,6 +7,7 @@ import 'package:slote/src/res/assets.dart';
 import 'package:slote/src/services/local_db.dart';
 import 'package:slote/src/functions/undo_redo.dart';
 import 'package:undo/undo.dart';
+import 'package:flutter_drawing_board/flutter_drawing_board.dart';
 
 class CreateNoteView extends StatefulWidget {
   const CreateNoteView({super.key, this.note});
@@ -20,6 +21,8 @@ class CreateNoteView extends StatefulWidget {
 class _CreateNoteViewState extends State<CreateNoteView> {
   final _titleController = TextEditingController();
   final _bodyController = TextEditingController();
+  final DrawingController _drawingController = DrawingController();
+  bool _isDrawingMode = false;
 
   late UndoRedoTextController _undoRedoTextController;
   late ChangeStack _changeStack;
@@ -29,6 +32,8 @@ class _CreateNoteViewState extends State<CreateNoteView> {
   @override
   void initState() {
     super.initState();
+
+    _drawingController.setStyle(color: Colors.black);
 
     // undo redo
     _changeStack = ChangeStack();
@@ -50,6 +55,7 @@ class _CreateNoteViewState extends State<CreateNoteView> {
     _titleController.dispose();
     _bodyController.dispose();
     _undoRedoTextController.dispose();
+    _drawingController.dispose();
 
     super.dispose();
   }
@@ -111,49 +117,64 @@ class _CreateNoteViewState extends State<CreateNoteView> {
         actions: [
           if (widget.note != null)
             IconButton(
-              icon: Icon(Icons.delete),
+              icon: Icon(_isDrawingMode ? Icons.text_fields : Icons.draw),
               onPressed: () {
-                // show warnings
-                showDialog(
-                  context: context,
-                  builder: (context) {
-                    return AlertDialog(
-                      title: Text(
-                        "Delete Note?",
-                        style: GoogleFonts.poppins(fontSize: 20),
-                      ),
-                      content: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        children: [
-                          Lottie.asset(AnimationAssets.delete),
-                          Text(
-                            "Are you sure you want to delete this note permernantly?",
-                            style: GoogleFonts.poppins(fontSize: 16),
-                          ),
-                        ],
-                      ),
-                      actions: [
-                        TextButton(
-                          onPressed: () {
-                            localDb.deleteNote(id: widget.note!.id);
-                            Navigator.pop(context);
-                            Navigator.pop(context);
-                          },
-                          child: Text("Proceed"),
-                        ),
-                        TextButton(
-                          onPressed: () {
-                            Navigator.pop(context);
-                          },
-                          child: Text("Cancel"),
+                setState(() {
+                  _isDrawingMode = !_isDrawingMode;
+                  if (_isDrawingMode) {
+                    // Clear any existing text selection
+                    _bodyController.selection = TextSelection.collapsed(
+                      offset: _bodyController.selection.baseOffset,
+                    );
+                  }
+                });
+              },
+              tooltip: _isDrawingMode ? 'Text Mode' : 'Drawing Mode',
+            ),
+          IconButton(
+            icon: Icon(Icons.delete),
+            onPressed: () {
+              // show warnings
+              showDialog(
+                context: context,
+                builder: (context) {
+                  return AlertDialog(
+                    title: Text(
+                      "Delete Note?",
+                      style: GoogleFonts.poppins(fontSize: 20),
+                    ),
+                    content: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        Lottie.asset(AnimationAssets.delete),
+                        Text(
+                          "Are you sure you want to delete this note permernantly?",
+                          style: GoogleFonts.poppins(fontSize: 16),
                         ),
                       ],
-                    );
-                  },
-                );
-              },
-            ),
+                    ),
+                    actions: [
+                      TextButton(
+                        onPressed: () {
+                          localDb.deleteNote(id: widget.note!.id);
+                          Navigator.pop(context);
+                          Navigator.pop(context);
+                        },
+                        child: Text("Proceed"),
+                      ),
+                      TextButton(
+                        onPressed: () {
+                          Navigator.pop(context);
+                        },
+                        child: Text("Cancel"),
+                      ),
+                    ],
+                  );
+                },
+              );
+            },
+          ),
         ],
         bottom: PreferredSize(
           preferredSize: Size.fromHeight(48),
@@ -219,35 +240,83 @@ class _CreateNoteViewState extends State<CreateNoteView> {
           ),
         ),
       ),
+
       body: SafeArea(
         child: Column(
           children: [
             Expanded(
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  children: [
-                    const SizedBox(height: 16),
-                    // Description field
-                    Expanded(
-                      child: TextFormField(
-                        controller: _bodyController,
-                        decoration: InputDecoration(
-                          border: InputBorder.none,
-                          hintText: "Description",
-                          hintStyle: TextStyle(
-                            color: Theme.of(
-                              context,
-                            ).colorScheme.onSurface.withValues(alpha: 0.3),
+              child: Stack(
+                children: [
+                  // Original text field with padding
+                  Positioned.fill(
+                    child: Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Column(
+                        children: [
+                          const SizedBox(height: 16),
+                          Expanded(
+                            child: AbsorbPointer(
+                              absorbing: _isDrawingMode,
+                              child: TextFormField(
+                                controller: _bodyController,
+                                decoration: InputDecoration(
+                                  border: InputBorder.none,
+                                  hintText: "Description",
+                                  hintStyle: TextStyle(
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .onSurface
+                                        .withValues(alpha: 0.3),
+                                  ),
+                                ),
+                                style: GoogleFonts.poppins(fontSize: 18),
+                                maxLines: null,
+                                expands: true,
+                                readOnly: _isDrawingMode,
+                                enableInteractiveSelection: !_isDrawingMode,
+                                showCursor: !_isDrawingMode,
+                                contextMenuBuilder:
+                                    _isDrawingMode
+                                        ? null
+                                        : (context, editableTextState) {
+                                          return AdaptiveTextSelectionToolbar.editableText(
+                                            editableTextState:
+                                                editableTextState,
+                                          );
+                                        },
+                              ),
+                            ),
                           ),
-                        ),
-                        style: GoogleFonts.poppins(fontSize: 18),
-                        maxLines: null,
-                        expands: true,
+                        ],
                       ),
                     ),
-                  ],
-                ),
+                  ),
+                  // Drawing board overlay - full area
+                  Positioned.fill(
+                    child: LayoutBuilder(
+                      builder: (
+                        BuildContext context,
+                        BoxConstraints constraints,
+                      ) {
+                        return IgnorePointer(
+                          ignoring:
+                              !_isDrawingMode, // Block drawing interaction when in text mode
+                          child: DrawingBoard(
+                            controller: _drawingController,
+                            background: SizedBox(
+                              width: constraints.maxWidth,
+                              height: constraints.maxHeight,
+                            ),
+                            showDefaultActions:
+                                _isDrawingMode, // Only show tools in drawing mode
+                            showDefaultTools:
+                                _isDrawingMode, // Only show tools in drawing mode
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ],
               ),
             ),
           ],

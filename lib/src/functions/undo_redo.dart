@@ -65,9 +65,19 @@ class UndoRedoTextController extends ChangeNotifier {
     }
 
     // Skip if text hasn't actually changed
-    if (oldState.text == newText) return;
+    if (oldState.text == newText) {
+      // Update selection even if text hasn't changed
+      _lastState = TextState(newText, newSelection);
+      return;
+    }
 
-    final newState = TextState(newText, newSelection);
+    // Capture selection at the current cursor position (end of new text for typing)
+    final capturedSelection =
+        newSelection.isValid
+            ? newSelection
+            : TextSelection.collapsed(offset: newText.length);
+
+    final newState = TextState(newText, capturedSelection);
     _pendingState = newState;
 
     // Cancel existing timer
@@ -110,26 +120,26 @@ class UndoRedoTextController extends ChangeNotifier {
 
   void _updateTextFromStack(TextState state) {
     _isUpdatingFromStack = true;
-    _externalController.text = state.text;
 
-    // Use a post-frame callback to ensure the text is set before setting selection
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!_isUpdatingFromStack) return; // Safety check
+    final textLength = state.text.length;
+    final restoredSelection = state.selection;
 
-      final textLength = _externalController.text.length;
-      final selection = state.selection;
+    // Ensure we don't go beyond text bounds
+    final safeStart = restoredSelection.start.clamp(0, textLength);
+    final safeEnd = restoredSelection.end.clamp(safeStart, textLength);
 
-      // Ensure the selection is within bounds
-      final safeStart = selection.start.clamp(0, textLength);
-      final safeEnd = selection.end.clamp(0, textLength);
+    final newSelection = TextSelection(
+      baseOffset: safeStart,
+      extentOffset: safeEnd,
+    );
 
-      _externalController.selection = TextSelection(
-        baseOffset: safeStart,
-        extentOffset: safeEnd,
-      );
-    });
+    // Set text and selection together using value setter to avoid the jump
+    _externalController.value = TextEditingValue(
+      text: state.text,
+      selection: newSelection,
+    );
 
-    _lastState = state;
+    _lastState = TextState(state.text, newSelection);
     _isUpdatingFromStack = false;
     notifyListeners();
   }
