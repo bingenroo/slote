@@ -7,7 +7,6 @@ import 'package:slote/src/views/create_note.dart';
 import 'package:slote/src/views/widgets/empty_view.dart';
 import 'package:slote/src/views/widgets/notes_grid.dart';
 import 'package:slote/src/views/widgets/notes_list.dart';
-import 'package:flutter_drawing_board/flutter_drawing_board.dart';
 
 class HomeView extends StatefulWidget {
   const HomeView({super.key});
@@ -16,11 +15,8 @@ class HomeView extends StatefulWidget {
   State<HomeView> createState() => _HomeViewState();
 }
 
-// final DrawingController _drawingController = DrawingController();
-
 class _HomeViewState extends State<HomeView> {
   bool islistView = true;
-  final DrawingController _drawingController = DrawingController();
   @override
   Widget build(BuildContext context) {
     return Scaffold(

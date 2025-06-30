@@ -22,18 +22,23 @@ const NoteSchema = CollectionSchema(
       name: r'body',
       type: IsarType.string,
     ),
-    r'hashCode': PropertySchema(
+    r'drawingData': PropertySchema(
       id: 1,
+      name: r'drawingData',
+      type: IsarType.string,
+    ),
+    r'hashCode': PropertySchema(
+      id: 2,
       name: r'hashCode',
       type: IsarType.long,
     ),
     r'lastMod': PropertySchema(
-      id: 2,
+      id: 3,
       name: r'lastMod',
       type: IsarType.dateTime,
     ),
     r'title': PropertySchema(
-      id: 3,
+      id: 4,
       name: r'title',
       type: IsarType.string,
     )
@@ -59,6 +64,12 @@ int _noteEstimateSize(
 ) {
   var bytesCount = offsets.last;
   bytesCount += 3 + object.body.length * 3;
+  {
+    final value = object.drawingData;
+    if (value != null) {
+      bytesCount += 3 + value.length * 3;
+    }
+  }
   bytesCount += 3 + object.title.length * 3;
   return bytesCount;
 }
@@ -70,9 +81,10 @@ void _noteSerialize(
   Map<Type, List<int>> allOffsets,
 ) {
   writer.writeString(offsets[0], object.body);
-  writer.writeLong(offsets[1], object.hashCode);
-  writer.writeDateTime(offsets[2], object.lastMod);
-  writer.writeString(offsets[3], object.title);
+  writer.writeString(offsets[1], object.drawingData);
+  writer.writeLong(offsets[2], object.hashCode);
+  writer.writeDateTime(offsets[3], object.lastMod);
+  writer.writeString(offsets[4], object.title);
 }
 
 Note _noteDeserialize(
@@ -83,9 +95,10 @@ Note _noteDeserialize(
 ) {
   final object = Note(
     body: reader.readString(offsets[0]),
+    drawingData: reader.readStringOrNull(offsets[1]),
     id: id,
-    lastMod: reader.readDateTime(offsets[2]),
-    title: reader.readString(offsets[3]),
+    lastMod: reader.readDateTime(offsets[3]),
+    title: reader.readString(offsets[4]),
   );
   return object;
 }
@@ -100,10 +113,12 @@ P _noteDeserializeProp<P>(
     case 0:
       return (reader.readString(offset)) as P;
     case 1:
-      return (reader.readLong(offset)) as P;
+      return (reader.readStringOrNull(offset)) as P;
     case 2:
-      return (reader.readDateTime(offset)) as P;
+      return (reader.readLong(offset)) as P;
     case 3:
+      return (reader.readDateTime(offset)) as P;
+    case 4:
       return (reader.readString(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
@@ -321,6 +336,152 @@ extension NoteQueryFilter on QueryBuilder<Note, Note, QFilterCondition> {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(FilterCondition.greaterThan(
         property: r'body',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<Note, Note, QAfterFilterCondition> drawingDataIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNull(
+        property: r'drawingData',
+      ));
+    });
+  }
+
+  QueryBuilder<Note, Note, QAfterFilterCondition> drawingDataIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNotNull(
+        property: r'drawingData',
+      ));
+    });
+  }
+
+  QueryBuilder<Note, Note, QAfterFilterCondition> drawingDataEqualTo(
+    String? value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'drawingData',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Note, Note, QAfterFilterCondition> drawingDataGreaterThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'drawingData',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Note, Note, QAfterFilterCondition> drawingDataLessThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'drawingData',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Note, Note, QAfterFilterCondition> drawingDataBetween(
+    String? lower,
+    String? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'drawingData',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Note, Note, QAfterFilterCondition> drawingDataStartsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.startsWith(
+        property: r'drawingData',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Note, Note, QAfterFilterCondition> drawingDataEndsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.endsWith(
+        property: r'drawingData',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Note, Note, QAfterFilterCondition> drawingDataContains(
+      String value,
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.contains(
+        property: r'drawingData',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Note, Note, QAfterFilterCondition> drawingDataMatches(
+      String pattern,
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.matches(
+        property: r'drawingData',
+        wildcard: pattern,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Note, Note, QAfterFilterCondition> drawingDataIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'drawingData',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<Note, Note, QAfterFilterCondition> drawingDataIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        property: r'drawingData',
         value: '',
       ));
     });
@@ -629,6 +790,18 @@ extension NoteQuerySortBy on QueryBuilder<Note, Note, QSortBy> {
     });
   }
 
+  QueryBuilder<Note, Note, QAfterSortBy> sortByDrawingData() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'drawingData', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Note, Note, QAfterSortBy> sortByDrawingDataDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'drawingData', Sort.desc);
+    });
+  }
+
   QueryBuilder<Note, Note, QAfterSortBy> sortByHashCode() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'hashCode', Sort.asc);
@@ -676,6 +849,18 @@ extension NoteQuerySortThenBy on QueryBuilder<Note, Note, QSortThenBy> {
   QueryBuilder<Note, Note, QAfterSortBy> thenByBodyDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'body', Sort.desc);
+    });
+  }
+
+  QueryBuilder<Note, Note, QAfterSortBy> thenByDrawingData() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'drawingData', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Note, Note, QAfterSortBy> thenByDrawingDataDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'drawingData', Sort.desc);
     });
   }
 
@@ -736,6 +921,13 @@ extension NoteQueryWhereDistinct on QueryBuilder<Note, Note, QDistinct> {
     });
   }
 
+  QueryBuilder<Note, Note, QDistinct> distinctByDrawingData(
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'drawingData', caseSensitive: caseSensitive);
+    });
+  }
+
   QueryBuilder<Note, Note, QDistinct> distinctByHashCode() {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'hashCode');
@@ -766,6 +958,12 @@ extension NoteQueryProperty on QueryBuilder<Note, Note, QQueryProperty> {
   QueryBuilder<Note, String, QQueryOperations> bodyProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'body');
+    });
+  }
+
+  QueryBuilder<Note, String?, QQueryOperations> drawingDataProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'drawingData');
     });
   }
 

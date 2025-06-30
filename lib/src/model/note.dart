@@ -1,5 +1,3 @@
-// ignore_for_file: public_member_api_docs, sort_constructors_first
-import 'dart:convert';
 import 'package:isar/isar.dart';
 
 part 'note.g.dart';
@@ -9,6 +7,7 @@ class Note {
   Id id = Isar.autoIncrement;
   final String title;
   final String body;
+  final String? drawingData;
   final DateTime lastMod;
 
   Note({
@@ -16,13 +15,21 @@ class Note {
     required this.title,
     required this.body,
     required this.lastMod,
+    this.drawingData,
   });
 
-  Note copyWith({Id? id, String? title, String? body, DateTime? lastMod}) {
+  Note copyWith({
+    Id? id,
+    String? title,
+    String? body,
+    String? drawingData,
+    DateTime? lastMod,
+  }) {
     return Note(
       id: id ?? this.id,
       title: title ?? this.title,
       body: body ?? this.body,
+      drawingData: drawingData ?? this.drawingData,
       lastMod: lastMod ?? this.lastMod,
     );
   }
@@ -32,6 +39,7 @@ class Note {
       'id': id,
       'title': title,
       'body': body,
+      'drawingData': drawingData,
       'lastMod': lastMod.millisecondsSinceEpoch,
     };
   }
@@ -41,18 +49,14 @@ class Note {
       id: map['id'],
       title: map['title'] as String,
       body: map['body'] as String,
+      drawingData: map['drawingData'] as String?,
       lastMod: DateTime.fromMillisecondsSinceEpoch(map['lastMod'] as int),
     );
   }
 
-  String toJson() => json.encode(toMap());
-
-  factory Note.fromJson(String source) =>
-      Note.fromMap(json.decode(source) as Map<String, dynamic>);
-
   @override
   String toString() {
-    return 'Note(id: $id, title: $title, body: $body, lastMod: $lastMod)';
+    return 'Note(id: $id, title: $title, body: $body, drawingData: $drawingData, lastMod: $lastMod)';
   }
 
   @override
@@ -62,11 +66,16 @@ class Note {
     return other.id == id &&
         other.title == title &&
         other.body == body &&
+        other.drawingData == drawingData &&
         other.lastMod == lastMod;
   }
 
   @override
   int get hashCode {
-    return id.hashCode ^ title.hashCode ^ body.hashCode ^ lastMod.hashCode;
+    return id.hashCode ^
+        title.hashCode ^
+        body.hashCode ^
+        drawingData.hashCode ^
+        lastMod.hashCode;
   }
 }
