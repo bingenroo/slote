@@ -9,9 +9,46 @@ import 'package:slote/src/model/note.dart';
 import 'package:slote/src/res/assets.dart';
 import 'package:slote/src/services/local_db.dart';
 import 'package:slote/src/functions/undo_redo.dart';
+// import 'package:slote/src/functions/stroke_eraser.dart';
 import 'package:undo/undo.dart';
 import 'package:flutter_drawing_board/flutter_drawing_board.dart';
 import 'package:flutter_drawing_board/paint_contents.dart';
+import 'widgets/pixel_detector.dart';
+
+final _testLine1 = [
+  {
+    "type": "StraightLine",
+    "startPoint": {"dx": 114.5670061088183, "dy": 117.50547159585983},
+    "endPoint": {"dx": 252.9362813512929, "dy": 254.91849554320638},
+    "paint": {
+      "blendMode": 3,
+      "color": 4294198070,
+      "filterQuality": 3,
+      "invertColors": false,
+      "isAntiAlias": false,
+      "strokeCap": 1,
+      "strokeJoin": 1,
+      "strokeWidth": 4.0,
+      "style": 1,
+    },
+  },
+  {
+    "type": "StraightLine",
+    "startPoint": {"dx": 226.6379349225167, "dy": 152.11430225316613},
+    "endPoint": {"dx": 135.67632523940733, "dy": 210.35948249064901},
+    "paint": {
+      "blendMode": 3,
+      "color": 4294198070,
+      "filterQuality": 3,
+      "invertColors": false,
+      "isAntiAlias": false,
+      "strokeCap": 1,
+      "strokeJoin": 1,
+      "strokeWidth": 4.0,
+      "style": 1,
+    },
+  },
+];
 
 class CreateNoteView extends StatefulWidget {
   const CreateNoteView({super.key, this.note});
@@ -27,8 +64,10 @@ class _CreateNoteViewState extends State<CreateNoteView> {
   final _bodyController = TextEditingController();
   final DrawingController _drawingController = DrawingController();
   bool _isDrawingMode = false;
+  // bool _isStrokeEraserMode = false;
 
-  late UndoRedoTextController _undoRedoTextController;
+  // late UndoRedoTextController _undoRedoTextController;
+  late UnifiedUndoRedoController _unifiedUndoRedoController;
   late ChangeStack _changeStack;
 
   final localDb = LocalDBService();
@@ -55,6 +94,8 @@ class _CreateNoteViewState extends State<CreateNoteView> {
         case 'Eraser':
           contents.add(Eraser.fromJson(item));
           break;
+        // case 'StrokeEraserContent': // Add this case
+        //   contents.add(StrokeEraserContent.fromJson(item));
         default:
           log('Unknown drawing type: $type');
       }
@@ -78,9 +119,15 @@ class _CreateNoteViewState extends State<CreateNoteView> {
 
     // undo redo
     _changeStack = ChangeStack();
-    _undoRedoTextController = UndoRedoTextController(
+    // _undoRedoTextController = UndoRedoTextController(
+    //   _changeStack,
+    //   _bodyController,
+    // );
+
+    _unifiedUndoRedoController = UnifiedUndoRedoController(
       _changeStack,
       _bodyController,
+      _drawingController,
     );
 
     if (widget.note != null) {
@@ -96,7 +143,14 @@ class _CreateNoteViewState extends State<CreateNoteView> {
           );
           final List<Map<String, dynamic>> drawingData =
               drawingJson.cast<Map<String, dynamic>>();
+          // drawingData
+          //     .removeLast(); //last array is removable. meaning we can use this to delete strokes
           _loadDrawingFromJson(drawingData);
+
+          // Initialize the undo/redo controller with the loaded state
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            _unifiedUndoRedoController.initializeWithCurrentState();
+          });
         } catch (e) {
           log('Error loading drawing data: $e');
         }
@@ -110,7 +164,9 @@ class _CreateNoteViewState extends State<CreateNoteView> {
 
     _titleController.dispose();
     _bodyController.dispose();
-    _undoRedoTextController.dispose();
+    // _undoRedoTextController.dispose();
+
+    _unifiedUndoRedoController.dispose();
     _drawingController.dispose();
 
     super.dispose();
@@ -263,12 +319,14 @@ class _CreateNoteViewState extends State<CreateNoteView> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   ListenableBuilder(
-                    listenable: _undoRedoTextController,
+                    // listenable: _undoRedoTextController,
+                    listenable: _unifiedUndoRedoController,
                     builder: (context, child) {
                       return IconButton(
                         onPressed:
                             _changeStack.canUndo
-                                ? _undoRedoTextController.undo
+                                // ? _undoRedoTextController.undo
+                                ? _unifiedUndoRedoController.undo
                                 : null,
                         icon: Icon(
                           Icons.undo,
@@ -283,12 +341,14 @@ class _CreateNoteViewState extends State<CreateNoteView> {
                     },
                   ),
                   ListenableBuilder(
-                    listenable: _undoRedoTextController,
+                    // listenable: _undoRedoTextController,
+                    listenable: _unifiedUndoRedoController,
                     builder: (context, child) {
                       return IconButton(
                         onPressed:
                             _changeStack.canRedo
-                                ? _undoRedoTextController.redo
+                                // ? _undoRedoTextController.redo
+                                ? _unifiedUndoRedoController.redo
                                 : null,
                         icon: Icon(
                           Icons.redo,
@@ -302,6 +362,32 @@ class _CreateNoteViewState extends State<CreateNoteView> {
                       );
                     },
                   ),
+                  if (_isDrawingMode)
+                    IconButton(
+                      onPressed: () {
+                        // Toggle eraser mode
+                        if (_drawingController.drawConfig.value.contentType ==
+                            Eraser) {
+                          // Switch back to drawing mode (SimpleLine)
+                          _drawingController.setPaintContent(SimpleLine());
+                        } else {
+                          _drawingController.setPaintContent(Eraser());
+                        }
+                        setState(() {}); // Refresh UI to show current tool
+                      },
+                      icon: Icon(
+                        _drawingController.drawConfig.value.contentType ==
+                                Eraser
+                            ? Icons.brush
+                            : Icons.auto_fix_off,
+                        color: Theme.of(context).colorScheme.onPrimary,
+                      ),
+                      tooltip:
+                          _drawingController.drawConfig.value.contentType ==
+                                  Eraser
+                              ? 'Drawing Mode'
+                              : 'Eraser Mode',
+                    ),
                 ],
               ),
             ),
@@ -384,16 +470,19 @@ class _CreateNoteViewState extends State<CreateNoteView> {
                               return IgnorePointer(
                                 ignoring:
                                     !_isDrawingMode, // Block drawing interaction when in text mode
-                                child: DrawingBoard(
-                                  controller: _drawingController,
-                                  background: SizedBox(
-                                    width: constraints.maxWidth,
-                                    height: constraints.maxHeight,
+                                child: PixelDetector(
+                                  drawingData: widget.note?.drawingData,
+                                  child: DrawingBoard(
+                                    controller: _drawingController,
+                                    background: SizedBox(
+                                      width: constraints.maxWidth,
+                                      height: constraints.maxHeight,
+                                    ),
+                                    // showDefaultActions:
+                                    //     true, // Only show tools in drawing mode
+                                    // showDefaultTools:
+                                    //     true, // Only show tools in drawing mode
                                   ),
-                                  showDefaultActions:
-                                      _isDrawingMode, // Only show tools in drawing mode
-                                  showDefaultTools:
-                                      _isDrawingMode, // Only show tools in drawing mode
                                 ),
                               );
                             },
