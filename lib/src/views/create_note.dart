@@ -59,12 +59,39 @@ class CreateNoteView extends StatefulWidget {
   State<CreateNoteView> createState() => _CreateNoteViewState();
 }
 
+class NoOpPaintContent extends PaintContent {
+  @override
+  void startDraw(Offset startPoint) {
+    // Do nothing
+  }
+
+  @override
+  void drawing(Offset nowPoint) {
+    // Do nothing
+  }
+
+  @override
+  void draw(Canvas canvas, Size size, bool deeper) {
+    // Do nothing - don't draw anything
+  }
+
+  @override
+  PaintContent copy() => NoOpPaintContent();
+
+  @override
+  Map<String, dynamic> toJson() => {'type': 'NoOp'};
+
+  @override
+  Map<String, dynamic> toContentJson() => {'type': 'NoOp'};
+}
+
 class _CreateNoteViewState extends State<CreateNoteView> {
   final _titleController = TextEditingController();
   final _bodyController = TextEditingController();
   final DrawingController _drawingController = DrawingController();
   bool _isDrawingMode = false;
   // bool _isStrokeEraserMode = false;
+  bool _isEraserStrokeMode = false; // Add this flag
 
   // late UndoRedoTextController _undoRedoTextController;
   late UnifiedUndoRedoController _unifiedUndoRedoController;
@@ -205,6 +232,49 @@ class _CreateNoteViewState extends State<CreateNoteView> {
         );
         localDb.saveNote(note: newNote);
       }
+    }
+  }
+
+  void _removeElementFromDrawing(Map<String, dynamic> elementToRemove) {
+    if (!_isEraserStrokeMode) return;
+    try {
+      final List<dynamic> drawingJson = json.decode(
+        widget.note?.drawingData ?? '[]',
+      );
+
+      // Find and remove the matching element
+      drawingJson.removeWhere((item) {
+        if (item is Map<String, dynamic>) {
+          return json.encode(item) == json.encode(elementToRemove);
+        }
+        return false;
+      });
+
+      // Update the note's drawing data
+      final updatedDrawingData = json.encode(drawingJson);
+
+      // Clear and reload the drawing controller
+      _drawingController.clear();
+
+      if (drawingJson.isNotEmpty) {
+        final List<Map<String, dynamic>> drawingData =
+            drawingJson.cast<Map<String, dynamic>>();
+        _loadDrawingFromJson(drawingData);
+      }
+
+      // Update the widget's note data if it exists
+      if (widget.note != null) {
+        final updatedNote = widget.note!.copyWith(
+          drawingData: updatedDrawingData,
+        );
+        // Update the note in the database or state management
+        localDb.saveNote(note: updatedNote);
+      }
+
+      log('Removed element from drawing');
+      setState(() {}); // Refresh the UI
+    } catch (e) {
+      log('Error removing element from drawing: $e');
     }
   }
 
@@ -366,27 +436,27 @@ class _CreateNoteViewState extends State<CreateNoteView> {
                     IconButton(
                       onPressed: () {
                         // Toggle eraser mode
-                        if (_drawingController.drawConfig.value.contentType ==
-                            Eraser) {
+                        // if (_drawingController.drawConfig.value.contentType ==
+                        //     Eraser) {
+                        if (_isEraserStrokeMode) {
                           // Switch back to drawing mode (SimpleLine)
+                          _isEraserStrokeMode = false;
                           _drawingController.setPaintContent(SimpleLine());
                         } else {
-                          _drawingController.setPaintContent(Eraser());
+                          _isEraserStrokeMode = true;
+                          // _drawingController.setPaintContent(Eraser());
+                          _drawingController.setPaintContent(
+                            NoOpPaintContent(),
+                          );
                         }
                         setState(() {}); // Refresh UI to show current tool
                       },
                       icon: Icon(
-                        _drawingController.drawConfig.value.contentType ==
-                                Eraser
-                            ? Icons.brush
-                            : Icons.auto_fix_off,
+                        _isEraserStrokeMode ? Icons.brush : Icons.auto_fix_off,
                         color: Theme.of(context).colorScheme.onPrimary,
                       ),
                       tooltip:
-                          _drawingController.drawConfig.value.contentType ==
-                                  Eraser
-                              ? 'Drawing Mode'
-                              : 'Eraser Mode',
+                          _isEraserStrokeMode ? 'Drawing Mode' : 'Eraser Mode',
                     ),
                 ],
               ),
@@ -472,6 +542,7 @@ class _CreateNoteViewState extends State<CreateNoteView> {
                                     !_isDrawingMode, // Block drawing interaction when in text mode
                                 child: PixelDetector(
                                   drawingData: widget.note?.drawingData,
+                                  onElementRemoved: _removeElementFromDrawing,
                                   child: DrawingBoard(
                                     controller: _drawingController,
                                     background: SizedBox(
@@ -497,6 +568,8 @@ class _CreateNoteViewState extends State<CreateNoteView> {
           ],
         ),
       ),
+
+      // Remove the _buildTextMode() and _buildDrawingMode() methods
     );
   }
 }
