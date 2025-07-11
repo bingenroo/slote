@@ -50,7 +50,7 @@ class _PixelDetectorState extends State<PixelDetector> {
     try {
       final List<dynamic> drawingJson = json.decode(widget.drawingData!);
       // Debug print the drawing data
-      log('[PixelDetector] Drawing data: ' + widget.drawingData!);
+      // log('[PixelDetector] Drawing data: ${widget.drawingData!}');
 
       for (final dynamic item in drawingJson) {
         if (item is Map<String, dynamic>) {

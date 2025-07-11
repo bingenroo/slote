@@ -14,41 +14,42 @@ import 'package:undo/undo.dart';
 import 'package:flutter_drawing_board/flutter_drawing_board.dart';
 import 'package:flutter_drawing_board/paint_contents.dart';
 import 'widgets/pixel_detector.dart';
+import 'package:slote/src/functions/extended_drawing_controller.dart';
 
-final _testLine1 = [
-  {
-    "type": "StraightLine",
-    "startPoint": {"dx": 114.5670061088183, "dy": 117.50547159585983},
-    "endPoint": {"dx": 252.9362813512929, "dy": 254.91849554320638},
-    "paint": {
-      "blendMode": 3,
-      "color": 4294198070,
-      "filterQuality": 3,
-      "invertColors": false,
-      "isAntiAlias": false,
-      "strokeCap": 1,
-      "strokeJoin": 1,
-      "strokeWidth": 4.0,
-      "style": 1,
-    },
-  },
-  {
-    "type": "StraightLine",
-    "startPoint": {"dx": 226.6379349225167, "dy": 152.11430225316613},
-    "endPoint": {"dx": 135.67632523940733, "dy": 210.35948249064901},
-    "paint": {
-      "blendMode": 3,
-      "color": 4294198070,
-      "filterQuality": 3,
-      "invertColors": false,
-      "isAntiAlias": false,
-      "strokeCap": 1,
-      "strokeJoin": 1,
-      "strokeWidth": 4.0,
-      "style": 1,
-    },
-  },
-];
+// final _testLine1 = [
+//   {
+//     "type": "StraightLine",
+//     "startPoint": {"dx": 114.5670061088183, "dy": 117.50547159585983},
+//     "endPoint": {"dx": 252.9362813512929, "dy": 254.91849554320638},
+//     "paint": {
+//       "blendMode": 3,
+//       "color": 4294198070,
+//       "filterQuality": 3,
+//       "invertColors": false,
+//       "isAntiAlias": false,
+//       "strokeCap": 1,
+//       "strokeJoin": 1,
+//       "strokeWidth": 4.0,
+//       "style": 1,
+//     },
+//   },
+//   {
+//     "type": "StraightLine",
+//     "startPoint": {"dx": 226.6379349225167, "dy": 152.11430225316613},
+//     "endPoint": {"dx": 135.67632523940733, "dy": 210.35948249064901},
+//     "paint": {
+//       "blendMode": 3,
+//       "color": 4294198070,
+//       "filterQuality": 3,
+//       "invertColors": false,
+//       "isAntiAlias": false,
+//       "strokeCap": 1,
+//       "strokeJoin": 1,
+//       "strokeWidth": 4.0,
+//       "style": 1,
+//     },
+//   },
+// ];
 
 class CreateNoteView extends StatefulWidget {
   const CreateNoteView({super.key, this.note});
@@ -88,7 +89,7 @@ class NoOpPaintContent extends PaintContent {
 class _CreateNoteViewState extends State<CreateNoteView> {
   final _titleController = TextEditingController();
   final _bodyController = TextEditingController();
-  final DrawingController _drawingController = DrawingController();
+  late final ExtendedDrawingController _drawingController;
   bool _isDrawingMode = false;
   // bool _isStrokeEraserMode = false;
   bool _isEraserStrokeMode = false; // Add this flag
@@ -142,6 +143,7 @@ class _CreateNoteViewState extends State<CreateNoteView> {
   void initState() {
     super.initState();
 
+    _drawingController = ExtendedDrawingController();
     _drawingController.setStyle(color: Colors.black);
 
     // undo redo
@@ -232,49 +234,6 @@ class _CreateNoteViewState extends State<CreateNoteView> {
         );
         localDb.saveNote(note: newNote);
       }
-    }
-  }
-
-  void _removeElementFromDrawing(Map<String, dynamic> elementToRemove) {
-    if (!_isEraserStrokeMode) return;
-    try {
-      final List<dynamic> drawingJson = json.decode(
-        widget.note?.drawingData ?? '[]',
-      );
-
-      // Find and remove the matching element
-      drawingJson.removeWhere((item) {
-        if (item is Map<String, dynamic>) {
-          return json.encode(item) == json.encode(elementToRemove);
-        }
-        return false;
-      });
-
-      // Update the note's drawing data
-      final updatedDrawingData = json.encode(drawingJson);
-
-      // Clear and reload the drawing controller
-      _drawingController.clear();
-
-      if (drawingJson.isNotEmpty) {
-        final List<Map<String, dynamic>> drawingData =
-            drawingJson.cast<Map<String, dynamic>>();
-        _loadDrawingFromJson(drawingData);
-      }
-
-      // Update the widget's note data if it exists
-      if (widget.note != null) {
-        final updatedNote = widget.note!.copyWith(
-          drawingData: updatedDrawingData,
-        );
-        // Update the note in the database or state management
-        localDb.saveNote(note: updatedNote);
-      }
-
-      log('Removed element from drawing');
-      setState(() {}); // Refresh the UI
-    } catch (e) {
-      log('Error removing element from drawing: $e');
     }
   }
 
@@ -458,13 +417,21 @@ class _CreateNoteViewState extends State<CreateNoteView> {
                       tooltip:
                           _isEraserStrokeMode ? 'Drawing Mode' : 'Eraser Mode',
                     ),
+                  IconButton(
+                    icon: Icon(Icons.adb_rounded),
+                    color: Theme.of(context).colorScheme.onPrimary,
+                    onPressed: () {
+                      log('button pressed');
+                      _drawingController.removeLastContent();
+                      // _loadDrawingFromJson(drawingData);
+                    },
+                  ),
                 ],
               ),
             ),
           ),
         ),
       ),
-
       body: SafeArea(
         child: Column(
           children: [
