@@ -417,15 +417,15 @@ class _CreateNoteViewState extends State<CreateNoteView> {
                       tooltip:
                           _isEraserStrokeMode ? 'Drawing Mode' : 'Eraser Mode',
                     ),
-                  IconButton(
-                    icon: Icon(Icons.adb_rounded),
-                    color: Theme.of(context).colorScheme.onPrimary,
-                    onPressed: () {
-                      log('button pressed');
-                      _drawingController.removeLastContent();
-                      // _loadDrawingFromJson(drawingData);
-                    },
-                  ),
+                  // IconButton(
+                  //   icon: Icon(Icons.adb_rounded),
+                  //   color: Theme.of(context).colorScheme.onPrimary,
+                  //   onPressed: () {
+                  //     log('button pressed');
+                  //     _drawingController.removeLastContent();
+                  //     // _loadDrawingFromJson(drawingData);
+                  //   },
+                  // ),
                 ],
               ),
             ),
@@ -511,13 +511,24 @@ class _CreateNoteViewState extends State<CreateNoteView> {
                                   height: constraints.maxHeight,
                                 ),
                               );
+                              const double eraserRadius = 16.0;
                               if (_isEraserStrokeMode) {
                                 drawingWidget = PixelDetector(
                                   drawingData: _getDrawingDataAsJson(),
                                   child: drawingWidget,
                                   onPixelTouched: (offset) {
-                                    // No-op, logging is handled inside PixelDetector
+                                    _drawingController.removeContentAtPixel(
+                                      offset,
+                                      tolerance: eraserRadius,
+                                    );
                                   },
+                                  // Add a builder to expose the pointer position
+                                );
+                                // We'll wrap with a custom widget to show the eraser circle
+                                drawingWidget = _EraserOverlay(
+                                  radius: eraserRadius,
+                                  enabled: _isEraserStrokeMode,
+                                  child: drawingWidget,
                                 );
                               }
                               return IgnorePointer(
@@ -539,6 +550,76 @@ class _CreateNoteViewState extends State<CreateNoteView> {
       ),
 
       // Remove the _buildTextMode() and _buildDrawingMode() methods
+    );
+  }
+}
+
+class _EraserOverlay extends StatefulWidget {
+  final Widget child;
+  final double radius;
+  final bool enabled;
+  const _EraserOverlay({
+    required this.child,
+    required this.radius,
+    required this.enabled,
+    super.key,
+  });
+
+  @override
+  State<_EraserOverlay> createState() => _EraserOverlayState();
+}
+
+class _EraserOverlayState extends State<_EraserOverlay> {
+  Offset? _pointerPosition;
+
+  void _updatePosition(PointerEvent event) {
+    setState(() {
+      _pointerPosition = event.localPosition;
+    });
+  }
+
+  void _clearPosition(PointerEvent event) {
+    setState(() {
+      _pointerPosition = null;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Listener(
+      onPointerHover: widget.enabled ? _updatePosition : null,
+      onPointerDown: widget.enabled ? _updatePosition : null,
+      onPointerMove: widget.enabled ? _updatePosition : null,
+      onPointerUp: widget.enabled ? _clearPosition : null,
+      onPointerCancel: widget.enabled ? _clearPosition : null,
+      child: Stack(
+        children: [
+          widget.child,
+          if (widget.enabled && _pointerPosition != null)
+            Positioned(
+              left: _pointerPosition!.dx - widget.radius,
+              top: _pointerPosition!.dy - widget.radius,
+              child: IgnorePointer(
+                child: Container(
+                  width: widget.radius * 2,
+                  height: widget.radius * 2,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.white.withValues(
+                      alpha: 0.5,
+                    ), // more visible white fill
+                    border: Border.all(
+                      color: Colors.black.withValues(
+                        alpha: 1.0,
+                      ), // solid black border
+                      width: 2,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
     );
   }
 }
