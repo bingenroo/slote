@@ -537,24 +537,26 @@ class _CreateNoteViewState extends State<CreateNoteView> {
                               BuildContext context,
                               BoxConstraints constraints,
                             ) {
+                              Widget drawingWidget = DrawingBoard(
+                                controller: _drawingController,
+                                background: SizedBox(
+                                  width: constraints.maxWidth,
+                                  height: constraints.maxHeight,
+                                ),
+                              );
+                              if (_isEraserStrokeMode) {
+                                drawingWidget = PixelDetector(
+                                  drawingData: _getDrawingDataAsJson(),
+                                  child: drawingWidget,
+                                  onPixelTouched: (offset) {
+                                    // No-op, logging is handled inside PixelDetector
+                                  },
+                                );
+                              }
                               return IgnorePointer(
                                 ignoring:
                                     !_isDrawingMode, // Block drawing interaction when in text mode
-                                child: PixelDetector(
-                                  drawingData: widget.note?.drawingData,
-                                  onElementRemoved: _removeElementFromDrawing,
-                                  child: DrawingBoard(
-                                    controller: _drawingController,
-                                    background: SizedBox(
-                                      width: constraints.maxWidth,
-                                      height: constraints.maxHeight,
-                                    ),
-                                    // showDefaultActions:
-                                    //     true, // Only show tools in drawing mode
-                                    // showDefaultTools:
-                                    //     true, // Only show tools in drawing mode
-                                  ),
-                                ),
+                                child: drawingWidget,
                               );
                             },
                           ),

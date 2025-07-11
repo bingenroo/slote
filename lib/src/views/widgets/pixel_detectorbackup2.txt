@@ -29,6 +29,12 @@ class _PixelDetectorState extends State<PixelDetector> {
   @override
   void initState() {
     super.initState();
+    // Log the initial drawing data
+    // if (widget.drawingData != null && widget.drawingData!.isNotEmpty) {
+    //   log('Initial drawing data JSON: ${widget.drawingData}');
+    // } else {
+    //   log('No initial drawing data provided');
+    // }
     _extractDrawingPixels();
   }
 
@@ -49,14 +55,10 @@ class _PixelDetectorState extends State<PixelDetector> {
 
     try {
       final List<dynamic> drawingJson = json.decode(widget.drawingData!);
-      // Debug print the drawing data
-      log('[PixelDetector] Drawing data: ' + widget.drawingData!);
 
       for (final dynamic item in drawingJson) {
         if (item is Map<String, dynamic>) {
           final String type = item['type'] as String;
-
-          if (type == 'NoOp') continue; // Ignore NoOp types
 
           switch (type) {
             case 'StraightLine':
@@ -71,15 +73,14 @@ class _PixelDetectorState extends State<PixelDetector> {
             case 'Circle':
               _extractCirclePixels(item);
               break;
+            // Note: Skip Eraser as it removes pixels rather than adds them
             default:
               log('Unknown drawing type for pixel extraction: $type');
           }
         }
       }
 
-      log(
-        'Extracted  [32m${drawingPixels.length} [0m pixels from drawing data',
-      );
+      log('Extracted ${drawingPixels.length} pixels from drawing data');
     } catch (e) {
       log('Error extracting drawing pixels: $e');
     }
@@ -95,6 +96,7 @@ class _PixelDetectorState extends State<PixelDetector> {
     );
     final end = Offset(endPoint['dx'] as double, endPoint['dy'] as double);
 
+    // Simple line interpolation - you might want to make this more sophisticated
     final distance = (end - start).distance;
     final steps = distance.round();
 
@@ -131,12 +133,14 @@ class _PixelDetectorState extends State<PixelDetector> {
   }
 
   void _extractRectanglePixels(Map<String, dynamic> data) {
+    // Extract rectangle outline pixels
     final rect = data['rect'] as Map<String, dynamic>;
     final left = rect['left'] as double;
     final top = rect['top'] as double;
     final right = rect['right'] as double;
     final bottom = rect['bottom'] as double;
 
+    // Add rectangle outline pixels
     for (double x = left; x <= right; x++) {
       drawingPixels.add(Offset(x.round().toDouble(), top.round().toDouble()));
       drawingPixels.add(
@@ -151,11 +155,13 @@ class _PixelDetectorState extends State<PixelDetector> {
   }
 
   void _extractCirclePixels(Map<String, dynamic> data) {
+    // Extract circle outline pixels
     final center = data['center'] as Map<String, dynamic>;
     final radius = data['radius'] as double;
 
     final centerPoint = Offset(center['dx'] as double, center['dy'] as double);
 
+    // Simple circle pixel extraction using trigonometry
     for (int angle = 0; angle < 360; angle++) {
       final radians = angle * (3.14159 / 180);
       final x = centerPoint.dx + radius * cos(radians);
@@ -171,36 +177,152 @@ class _PixelDetectorState extends State<PixelDetector> {
   double cos(double radians) => math.cos(radians);
   double sin(double radians) => math.sin(radians);
 
-  bool _isWithinTolerance(Offset a, Offset b, {double tolerance = 2.0}) {
-    return (a - b).distance <= tolerance;
-  }
+  // void _capturePixel(Offset point) {
+  //   // Round to actual pixel coordinates
+  //   final pixelX = point.dx.round();
+  //   final pixelY = point.dy.round();
+  //   final pixelOffset = Offset(pixelX.toDouble(), pixelY.toDouble());
+
+  //   // Avoid duplicate consecutive pixels
+  //   if (touchedPixels.isEmpty || touchedPixels.last != pixelOffset) {
+  //     touchedPixels.add(pixelOffset);
+
+  //     // Check if this pixel exists in the drawing data
+  //     final isDrawingPixel = drawingPixels.contains(pixelOffset);
+
+  //     // Log the touched pixel
+  //     log(
+  //       'Touched Pixel: x=$pixelX, y=$pixelY ${isDrawingPixel ? "(DRAWING PIXEL)" : "(EMPTY SPACE)"}',
+  //     );
+  //     log('Total pixels touched: ${touchedPixels.length}');
+
+  //     // Callback if provided
+  //     widget.onPixelTouched?.call(pixelOffset);
+  //   }
+  // }
 
   Offset? _capturePixel(Offset point) {
+    // Round to actual pixel coordinates
     final pixelX = point.dx.round();
     final pixelY = point.dy.round();
     final pixelOffset = Offset(pixelX.toDouble(), pixelY.toDouble());
 
+    // Avoid duplicate consecutive pixels
     if (touchedPixels.isEmpty || touchedPixels.last != pixelOffset) {
       touchedPixels.add(pixelOffset);
 
-      // Use tolerance when checking if this pixel exists in the drawing data
-      final isDrawingPixel = drawingPixels.any(
-        (drawPixel) => _isWithinTolerance(drawPixel, pixelOffset),
+      // Check if this pixel exists in the drawing data
+      final isDrawingPixel = drawingPixels.contains(pixelOffset);
+
+      // Log the touched pixel
+      log(
+        'Touched Pixel: x=$pixelX, y=$pixelY ${isDrawingPixel ? "(DRAWING PIXEL)" : "(EMPTY SPACE)"}',
       );
+      log('Total pixels touched: ${touchedPixels.length}');
 
-      if (isDrawingPixel) {
-        log(
-          'Touched Pixel: x= [36m$pixelX [0m, y= [36m$pixelY [0m (DRAWING PIXEL)',
-        );
-      }
-      // else {
-      //   log('Touched Pixel: x=$pixelX, y=$pixelY (EMPTY SPACE)');
-      // }
+      // Find and log matching JSON elements
+      // _findMatchingJsonElements(pixelOffset);
+      _removeMatchingJsonElement(pixelOffset);
 
+      // Callback if provided
       widget.onPixelTouched?.call(pixelOffset);
+
       return pixelOffset;
     }
     return null;
+  }
+
+  Map<String, dynamic>? _findMatchingJsonElement(Offset pixelOffset) {
+    if (widget.drawingData == null || widget.drawingData!.isEmpty) {
+      return null;
+    }
+
+    try {
+      final List<dynamic> drawingJson = json.decode(widget.drawingData!);
+
+      for (final dynamic item in drawingJson) {
+        if (item is Map<String, dynamic>) {
+          // Convert the item to string to search for coordinates
+          final itemString = json.encode(item);
+
+          // Check if this JSON contains the pixel coordinates
+          if (_containsPixelCoordinates(itemString, pixelOffset)) {
+            log('MATCHING JSON ELEMENT: $itemString');
+            return item;
+          }
+        }
+      }
+    } catch (e) {
+      log('Error finding matching JSON elements: $e');
+    }
+    return null;
+  }
+
+  void _removeMatchingJsonElement(Offset pixelOffset) {
+    final matchingElement = _findMatchingJsonElement(pixelOffset);
+
+    if (matchingElement != null && widget.onElementRemoved != null) {
+      // Call the callback to notify parent to remove the element
+      widget.onElementRemoved!(matchingElement);
+    }
+  }
+
+  bool _containsPixelCoordinates(String jsonString, Offset pixelOffset) {
+    final x = pixelOffset.dx;
+    final y = pixelOffset.dy;
+
+    // Check if the JSON string contains the exact coordinates
+    // Look for patterns like "x":123.0 or "dx":123.0
+    final xPatterns = [
+      '"x":$x',
+      '"dx":$x',
+      '"x":${x.toInt()}',
+      '"dx":${x.toInt()}',
+      '"x":${x.toInt()}.0',
+      '"dx":${x.toInt()}.0',
+    ];
+
+    final yPatterns = [
+      '"y":$y',
+      '"dy":$y',
+      '"y":${y.toInt()}',
+      '"dy":${y.toInt()}',
+      '"y":${y.toInt()}.0',
+      '"dy":${y.toInt()}.0',
+    ];
+
+    // Also check for approximate matches (within 1 pixel)
+    final xApproxPatterns = [
+      '"x":${(x - 1).toInt()}',
+      '"x":${(x + 1).toInt()}',
+      '"dx":${(x - 1).toInt()}',
+      '"dx":${(x + 1).toInt()}',
+      '"x":${(x - 1).toInt()}.0',
+      '"x":${(x + 1).toInt()}.0',
+      '"dx":${(x - 1).toInt()}.0',
+      '"dx":${(x + 1).toInt()}.0',
+    ];
+
+    final yApproxPatterns = [
+      '"y":${(y - 1).toInt()}',
+      '"y":${(y + 1).toInt()}',
+      '"dy":${(y - 1).toInt()}',
+      '"dy":${(y + 1).toInt()}',
+      '"y":${(y - 1).toInt()}.0',
+      '"y":${(y + 1).toInt()}.0',
+      '"dy":${(y - 1).toInt()}.0',
+      '"dy":${(y + 1).toInt()}.0',
+    ];
+
+    // Check if both x and y coordinates exist in the JSON string
+    bool hasX =
+        xPatterns.any((pattern) => jsonString.contains(pattern)) ||
+        xApproxPatterns.any((pattern) => jsonString.contains(pattern));
+    bool hasY =
+        yPatterns.any((pattern) => jsonString.contains(pattern)) ||
+        yApproxPatterns.any((pattern) => jsonString.contains(pattern));
+
+    return hasX && hasY;
   }
 
   void _handlePanStart(DragStartDetails details) {
@@ -212,12 +334,14 @@ class _PixelDetectorState extends State<PixelDetector> {
   }
 
   void _handlePanEnd(DragEndDetails details) {
-    log('Touch ended - Total unique pixels:  [33m${touchedPixels.length} [0m');
+    log('Touch ended - Total unique pixels: ${touchedPixels.length}');
   }
 
   void _handleTap(TapDownDetails details) {
     _capturePixel(details.localPosition);
-    // log('Single tap at pixel: x=${details.localPosition.dx.round()}, y=${details.localPosition.dy.round()}');
+    log(
+      'Single tap at pixel: x=${details.localPosition.dx.round()}, y=${details.localPosition.dy.round()}',
+    );
   }
 
   @override
@@ -228,6 +352,35 @@ class _PixelDetectorState extends State<PixelDetector> {
       onPanUpdate: _handlePanUpdate,
       onPanEnd: _handlePanEnd,
       child: widget.child,
+    );
+  }
+}
+
+/// Extension methods for easy usage
+// extension PixelDetectorExtension on Widget {
+//   Widget withPixelDetection({
+//     Function(Offset pixel)? onPixelTouched,
+//     String? drawingData,
+//   }) {
+//     return PixelDetector(
+//       onPixelTouched: onPixelTouched,
+//       drawingData: drawingData,
+//       child: this,
+//     );
+//   }
+// }
+
+extension PixelDetectorExtension on Widget {
+  Widget withPixelDetection({
+    Function(Offset pixel)? onPixelTouched,
+    String? drawingData,
+    Function(Map<String, dynamic> element)? onElementRemoved,
+  }) {
+    return PixelDetector(
+      onPixelTouched: onPixelTouched,
+      drawingData: drawingData,
+      onElementRemoved: onElementRemoved,
+      child: this,
     );
   }
 }
