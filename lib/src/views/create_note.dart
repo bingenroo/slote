@@ -14,7 +14,6 @@ import 'package:slote/src/functions/undo_redo.dart';
 import 'package:undo/undo.dart';
 import 'package:flutter_drawing_board/flutter_drawing_board.dart';
 import 'package:flutter_drawing_board/paint_contents.dart';
-import 'widgets/pixel_detector.dart';
 import 'package:slote/src/functions/extended_drawing_controller.dart';
 
 // final _testLine1 = [
@@ -103,7 +102,14 @@ class _CreateNoteViewState extends State<CreateNoteView> {
   final localDb = LocalDBService();
 
   Timer? _eraserThrottleTimer;
-  List<String>? _pendingEraserPoints;
+  // List<String>? _pendingEraserPoints;
+  List<Offset> _currentEraserPath = [];
+  Offset? _lastPointerPosition;
+  static const double _eraserRadius = 16.0;
+  static const double _eraserSampleDistance = 5.0;
+
+  // New: Track only the current eraser cursor position for visualization
+  Offset? _eraserCursorPosition;
 
   void _loadDrawingFromJson(List<Map<String, dynamic>> jsonData) {
     final List<PaintContent> contents = [];
@@ -144,20 +150,54 @@ class _CreateNoteViewState extends State<CreateNoteView> {
     return json.encode(contents);
   }
 
-  void _handleEraserComplete(List<String> points) {
-    _pendingEraserPoints = points;
-    if (_eraserThrottleTimer?.isActive ?? false) return;
-    _eraserThrottleTimer = Timer(const Duration(milliseconds: 40), () {
-      if (_pendingEraserPoints != null && _pendingEraserPoints!.isNotEmpty) {
-        final updatedData = _extendedDrawingController.processEraserPoints(
-          _pendingEraserPoints!,
+  void _handleEraserStart(Offset pos) {
+    _currentEraserPath = [pos];
+    _lastPointerPosition = pos;
+    _eraserCursorPosition = pos; // Track for visual
+    setState(() {});
+  }
+
+  Timer? _processTimer;
+  void _handleEraserUpdate(Offset pos) {
+    if (_lastPointerPosition == null ||
+        (pos - _lastPointerPosition!).distance > _eraserSampleDistance) {
+      _currentEraserPath.add(pos);
+      _lastPointerPosition = pos;
+      _eraserCursorPosition = pos; // Track for visual
+
+      // Throttle processing to every 16ms (~60fps)
+      _processTimer?.cancel();
+      _processTimer = Timer(const Duration(milliseconds: 16), () {
+        final points =
+            _currentEraserPath.map((e) => '(${e.dx},${e.dy})').toList();
+        _extendedDrawingController.processEraserPoints(
+          points,
+          eraserRadius: _eraserRadius,
         );
-        log(
-          'Eraser completed. Updated drawing data: ${updatedData.length} strokes remaining',
-        );
-      }
-      _pendingEraserPoints = null;
-    });
+      });
+
+      setState(() {});
+    }
+  }
+
+  void _handleEraserEnd() {
+    if (_currentEraserPath.isNotEmpty) {
+      final pointsAsString =
+          _currentEraserPath.map((e) => '(${e.dx},${e.dy})').toList();
+      _extendedDrawingController.processEraserPoints(
+        pointsAsString,
+        eraserRadius: _eraserRadius,
+      );
+    }
+    _currentEraserPath.clear();
+    _lastPointerPosition = null;
+    _eraserCursorPosition = null; // Clear visual
+    setState(() {});
+  }
+
+  void _trackDrawingChanges() {
+    final currentStrokes = _drawingController.getJsonList();
+    _extendedDrawingController.trackNewStrokes(currentStrokes);
   }
 
   @override
@@ -166,6 +206,8 @@ class _CreateNoteViewState extends State<CreateNoteView> {
 
     _drawingController.setStyle(color: Colors.black);
     _extendedDrawingController = ExtendedDrawingController(_drawingController);
+
+    _drawingController.addListener(_trackDrawingChanges);
 
     // undo redo
     _changeStack = ChangeStack();
@@ -200,6 +242,9 @@ class _CreateNoteViewState extends State<CreateNoteView> {
           // Initialize the undo/redo controller with the loaded state
           WidgetsBinding.instance.addPostFrameCallback((_) {
             _unifiedUndoRedoController.initializeWithCurrentState();
+            _extendedDrawingController.initialize(
+              _drawingController.getJsonList(),
+            );
           });
         } catch (e) {
           log('Error loading drawing data: $e');
@@ -212,6 +257,7 @@ class _CreateNoteViewState extends State<CreateNoteView> {
   void dispose() {
     _eraserThrottleTimer?.cancel();
     _saveNoteData();
+    _drawingController.removeListener(_trackDrawingChanges);
 
     _titleController.dispose();
     _bodyController.dispose();
@@ -526,8 +572,6 @@ class _CreateNoteViewState extends State<CreateNoteView> {
                               BuildContext context,
                               BoxConstraints constraints,
                             ) {
-                              const double eraserRadius = 16.0;
-
                               return IgnorePointer(
                                 ignoring:
                                     !_isDrawingMode, // Block drawing interaction when in text mode
@@ -543,11 +587,35 @@ class _CreateNoteViewState extends State<CreateNoteView> {
                                     ),
                                     // Show eraser overlay only when in eraser mode
                                     if (_isEraserStrokeMode)
-                                      PixelDetector(
-                                        eraserRadius: eraserRadius,
-                                        constraints: constraints,
-                                        onDrag: _handleEraserComplete,
-                                        onDragComplete: _handleEraserComplete,
+                                      GestureDetector(
+                                        onPanStart: (details) {
+                                          final local = (context
+                                                      .findRenderObject()
+                                                  as RenderBox)
+                                              .globalToLocal(
+                                                details.globalPosition,
+                                              );
+                                          _handleEraserStart(local);
+                                        },
+                                        onPanUpdate: (details) {
+                                          final local = (context
+                                                      .findRenderObject()
+                                                  as RenderBox)
+                                              .globalToLocal(
+                                                details.globalPosition,
+                                              );
+                                          _handleEraserUpdate(local);
+                                        },
+                                        onPanEnd: (_) {
+                                          _handleEraserEnd();
+                                        },
+                                        child: CustomPaint(
+                                          painter: _EraserCursorPainter(
+                                            _eraserCursorPosition,
+                                            _eraserRadius,
+                                          ),
+                                          size: Size.infinite,
+                                        ),
                                       ),
                                   ],
                                 ),
@@ -567,5 +635,35 @@ class _CreateNoteViewState extends State<CreateNoteView> {
 
       // Remove the _buildTextMode() and _buildDrawingMode() methods
     );
+  }
+}
+
+// New: Modern eraser cursor painter
+class _EraserCursorPainter extends CustomPainter {
+  final Offset? position;
+  final double radius;
+  _EraserCursorPainter(this.position, this.radius);
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (position == null) return;
+    final eraserRadius = radius * 0.7;
+    // Draw shadow (blurred dark circle)
+    final shadowPaint =
+        Paint()
+          ..color = Colors.black.withValues(alpha: 0.25)
+          ..maskFilter = MaskFilter.blur(BlurStyle.normal, eraserRadius * 0.7);
+    canvas.drawCircle(position!, eraserRadius, shadowPaint);
+    // Draw solid gray eraser
+    canvas.drawCircle(
+      position!,
+      eraserRadius,
+      Paint()..color = Colors.grey[300]!.withValues(alpha: 0.85),
+    );
+    // No white center, no halo
+  }
+
+  @override
+  bool shouldRepaint(covariant _EraserCursorPainter oldDelegate) {
+    return oldDelegate.position != position || oldDelegate.radius != radius;
   }
 }
