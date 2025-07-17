@@ -1,17 +1,22 @@
-import 'package:isar/isar.dart';
+import 'package:hive/hive.dart';
 
 part 'note.g.dart';
 
-@collection
-class Note {
-  Id id = Isar.autoIncrement;
-  final String title;
-  final String body;
-  final String? drawingData;
-  final DateTime lastMod;
+@HiveType(typeId: 0)
+class Note extends HiveObject {
+  @HiveField(0)
+  int id;
+  @HiveField(1)
+  String title;
+  @HiveField(2)
+  String body;
+  @HiveField(3)
+  String? drawingData;
+  @HiveField(4)
+  DateTime lastMod;
 
   Note({
-    this.id = Isar.autoIncrement,
+    required this.id,
     required this.title,
     required this.body,
     required this.lastMod,
@@ -19,7 +24,7 @@ class Note {
   });
 
   Note copyWith({
-    Id? id,
+    int? id,
     String? title,
     String? body,
     String? drawingData,

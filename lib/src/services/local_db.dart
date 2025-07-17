@@ -1,43 +1,35 @@
-import 'package:isar/isar.dart';
-import 'package:path_provider/path_provider.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 import 'package:slote/src/model/note.dart';
 
 class LocalDBService {
-  late Future<Isar> db;
+  static const String noteBoxName = 'notes';
+  late Future<Box<Note>> box;
 
   LocalDBService() {
-    db = openDB();
+    box = openDB();
   }
 
-  Future<Isar> openDB() async {
-    if (Isar.instanceNames.isEmpty) {
-      final dir = await getApplicationDocumentsDirectory();
-      return await Isar.open(
-        [NoteSchema],
-        directory: dir.path,
-        inspector: true,
-      );
+  Future<Box<Note>> openDB() async {
+    await Hive.initFlutter();
+    if (!Hive.isAdapterRegistered(0)) {
+      Hive.registerAdapter(NoteAdapter());
     }
-
-    return Future.value(Isar.getInstance());
+    return await Hive.openBox<Note>(noteBoxName);
   }
 
   Future<void> saveNote({required Note note}) async {
-    final isar = await db;
-    isar.writeTxnSync(() => isar.notes.putSync(note));
+    final b = await box;
+    await b.put(note.id, note);
   }
 
   Stream<List<Note>> listenAllNotes() async* {
-    final isar = await db;
-    yield* isar.notes.where().watch(fireImmediately: true);
+    final b = await box;
+    yield b.values.toList();
+    yield* b.watch().map((_) => b.values.toList());
   }
 
-  // Future<void> deleteNote({required int id}) async {
-  //   final isar = await db;
-  //   isar.writeTxnSync(() => isar.notes.delete(id));
-  // }
-  void deleteNote({required int id}) async {
-    final isar = await db;
-    isar.writeTxnSync(() => isar.notes.deleteSync(id));
+  Future<void> deleteNote({required int id}) async {
+    final b = await box;
+    await b.delete(id);
   }
 }

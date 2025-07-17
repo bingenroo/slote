@@ -2,7 +2,6 @@ import 'dart:convert';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:isar/isar.dart';
 import 'package:lottie/lottie.dart';
 import 'package:slote/src/model/note.dart';
 import 'package:slote/src/res/assets.dart';
@@ -208,7 +207,7 @@ class _CreateNoteViewState extends State<CreateNoteView> {
       if (title.isEmpty &&
           body.isEmpty &&
           (drawingData.isEmpty || drawingData == '[]')) {
-        localDb.deleteNote(id: widget.note!.id);
+        await localDb.deleteNote(id: widget.note!.id);
       } else if (widget.note!.title != title ||
           widget.note!.body != body ||
           widget.note!.drawingData != drawingData) {
@@ -217,20 +216,20 @@ class _CreateNoteViewState extends State<CreateNoteView> {
           body: body,
           drawingData: drawingData,
         );
-        localDb.saveNote(note: newNote);
+        await localDb.saveNote(note: newNote);
       }
     } else {
       if (title.isNotEmpty ||
           body.isNotEmpty ||
           (drawingData.isNotEmpty && drawingData != '[]')) {
         final newNote = Note(
-          id: Isar.autoIncrement,
+          id: DateTime.now().millisecondsSinceEpoch & 0xFFFFFFFF,
           title: title,
           body: body,
           drawingData: drawingData,
           lastMod: DateTime.now(),
         );
-        localDb.saveNote(note: newNote);
+        await localDb.saveNote(note: newNote);
       }
     }
   }
@@ -266,22 +265,21 @@ class _CreateNoteViewState extends State<CreateNoteView> {
           showCursor: true,
         ),
         actions: [
-          if (widget.note != null)
-            IconButton(
-              icon: Icon(_isDrawingMode ? Icons.text_fields : Icons.draw),
-              onPressed: () {
-                setState(() {
-                  _isDrawingMode = !_isDrawingMode;
-                  if (_isDrawingMode) {
-                    // Clear any existing text selection
-                    _bodyController.selection = TextSelection.collapsed(
-                      offset: _bodyController.selection.baseOffset,
-                    );
-                  }
-                });
-              },
-              tooltip: _isDrawingMode ? 'Text Mode' : 'Drawing Mode',
-            ),
+          IconButton(
+            icon: Icon(_isDrawingMode ? Icons.text_fields : Icons.draw),
+            onPressed: () {
+              setState(() {
+                _isDrawingMode = !_isDrawingMode;
+                if (_isDrawingMode) {
+                  // Clear any existing text selection
+                  _bodyController.selection = TextSelection.collapsed(
+                    offset: _bodyController.selection.baseOffset,
+                  );
+                }
+              });
+            },
+            tooltip: _isDrawingMode ? 'Text Mode' : 'Drawing Mode',
+          ),
           IconButton(
             icon: Icon(Icons.delete),
             onPressed: () {
@@ -587,7 +585,7 @@ class _EraserCursorPainter extends CustomPainter {
     canvas.drawCircle(
       position!,
       eraserRadius,
-      Paint()..color = Colors.grey[300]!.withValues(alpha: 0.85),
+      Paint()..color = Colors.grey[400]!.withValues(alpha: 0.85),
     );
     // No white center, no halo
   }

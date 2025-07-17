@@ -1,4 +1,3 @@
-import 'dart:developer';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_drawing_board/flutter_drawing_board.dart';
@@ -126,8 +125,9 @@ class ExtendedDrawingController {
             for (int i = 1; i < steps.length; i++) {
               final p1 = _parseOffsetFromStep(steps[i - 1]);
               final p2 = _parseOffsetFromStep(steps[i]);
-              if (_lineIntersects(p1, p2, eraserPath, eraserRadius))
+              if (_lineIntersects(p1, p2, eraserPath, eraserRadius)) {
                 return true;
+              }
             }
           }
         }
@@ -190,7 +190,7 @@ class ExtendedDrawingController {
     final proj = toCenter.dx * norm.dx + toCenter.dy * norm.dy;
     final closest = proj.clamp(0, lineLength);
     final closestPoint =
-        p1 + norm * (closest is double ? closest : (closest as num).toDouble());
+        p1 + norm * (closest is double ? closest : closest.toDouble());
     return (center - closestPoint).distance <= radius;
   }
 

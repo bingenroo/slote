@@ -1,7 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:slote/src/app.dart';
+import 'package:hive_flutter/hive_flutter.dart';
+import 'package:slote/src/model/note.dart';
+// import 'package:slote/src/services/hive_migration.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Hive.initFlutter();
+  if (!Hive.isAdapterRegistered(0)) {
+    Hive.registerAdapter(NoteAdapter());
+  }
+  // One-time migration: set MIGRATE=1 in your environment to run
+  // const migrate = bool.fromEnvironment('MIGRATE', defaultValue: false);
+  // if (migrate) {
+  //   await migrateNotesFromJson();
+  //   return;
+  // }
   runApp(const MyApp());
 }
 
