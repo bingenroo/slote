@@ -3,6 +3,7 @@ import 'package:undo/undo.dart';
 import 'package:flutter_drawing_board/flutter_drawing_board.dart';
 import 'package:flutter_drawing_board/paint_contents.dart';
 import 'dart:async';
+import 'package:slote/src/functions/drawing_utils.dart';
 
 enum ActionType { text, drawing }
 
@@ -230,7 +231,7 @@ class UnifiedUndoRedoController extends ChangeNotifier {
     // Restore drawing data if not empty
     if (drawingData.isNotEmpty) {
       // Convert JSON data back to PaintContent objects
-      final List<PaintContent> contents = _convertJsonToContents(drawingData);
+      final List<PaintContent> contents = paintContentsFromJson(drawingData);
       if (contents.isNotEmpty) {
         _drawingController.addContents(contents);
       }
@@ -238,44 +239,6 @@ class UnifiedUndoRedoController extends ChangeNotifier {
 
     _lastDrawingState = List.from(drawingData);
     _isUpdatingFromStack = false;
-  }
-
-  List<PaintContent> _convertJsonToContents(List<dynamic> jsonData) {
-    final List<PaintContent> contents = [];
-
-    for (final dynamic item in jsonData) {
-      if (item is Map<String, dynamic>) {
-        final String type = item['type'] as String? ?? '';
-
-        try {
-          switch (type) {
-            case 'StraightLine':
-              contents.add(StraightLine.fromJson(item));
-              break;
-            case 'SimpleLine':
-              contents.add(SimpleLine.fromJson(item));
-              break;
-            case 'Rectangle':
-              contents.add(Rectangle.fromJson(item));
-              break;
-            case 'Circle':
-              contents.add(Circle.fromJson(item));
-              break;
-            case 'Eraser':
-              contents.add(Eraser.fromJson(item));
-              break;
-            default:
-              // Skip unknown types
-              break;
-          }
-        } catch (e) {
-          // Skip invalid content items
-          continue;
-        }
-      }
-    }
-
-    return contents;
   }
 
   bool _areDrawingStatesEqual(List<dynamic> state1, List<dynamic> state2) {

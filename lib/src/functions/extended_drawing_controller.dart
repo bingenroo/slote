@@ -70,7 +70,7 @@ class ExtendedDrawingController {
         return currentDrawingData;
       }
     } catch (e) {
-      log('Error processing eraser points: $e');
+      // log('Error processing eraser points: $e');
       return _drawingController.getJsonList();
     }
   }
@@ -92,11 +92,11 @@ class ExtendedDrawingController {
   }
 
   List<int> _findMatchingStrokes(List<Offset> eraserPath, double eraserRadius) {
-    log('Processing eraser at: ${eraserPath.last}');
-    log('Current strokes: ${_strokes.length}');
-    log(
-      'Candidates found: ${_spatialIndex.getCandidates(eraserPath.last, eraserRadius).length}',
-    );
+    // log('Processing eraser at: ${eraserPath.last}');
+    // log('Current strokes: ${_strokes.length}');
+    // log(
+    //   'Candidates found: ${_spatialIndex.getCandidates(eraserPath.last, eraserRadius).length}',
+    // );
     final candidates = <int>{};
     for (final point in eraserPath) {
       candidates.addAll(_spatialIndex.getCandidates(point, eraserRadius));

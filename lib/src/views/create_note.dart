@@ -1,7 +1,5 @@
 import 'dart:convert';
-import 'dart:developer';
 import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:isar/isar.dart';
@@ -10,46 +8,11 @@ import 'package:slote/src/model/note.dart';
 import 'package:slote/src/res/assets.dart';
 import 'package:slote/src/services/local_db.dart';
 import 'package:slote/src/functions/undo_redo.dart';
-// import 'package:slote/src/functions/stroke_eraser.dart';
 import 'package:undo/undo.dart';
 import 'package:flutter_drawing_board/flutter_drawing_board.dart';
 import 'package:flutter_drawing_board/paint_contents.dart';
 import 'package:slote/src/functions/extended_drawing_controller.dart';
-
-// final _testLine1 = [
-//   {
-//     "type": "StraightLine",
-//     "startPoint": {"dx": 114.5670061088183, "dy": 117.50547159585983},
-//     "endPoint": {"dx": 252.9362813512929, "dy": 254.91849554320638},
-//     "paint": {
-//       "blendMode": 3,
-//       "color": 4294198070,
-//       "filterQuality": 3,
-//       "invertColors": false,
-//       "isAntiAlias": false,
-//       "strokeCap": 1,
-//       "strokeJoin": 1,
-//       "strokeWidth": 4.0,
-//       "style": 1,
-//     },
-//   },
-//   {
-//     "type": "StraightLine",
-//     "startPoint": {"dx": 226.6379349225167, "dy": 152.11430225316613},
-//     "endPoint": {"dx": 135.67632523940733, "dy": 210.35948249064901},
-//     "paint": {
-//       "blendMode": 3,
-//       "color": 4294198070,
-//       "filterQuality": 3,
-//       "invertColors": false,
-//       "isAntiAlias": false,
-//       "strokeCap": 1,
-//       "strokeJoin": 1,
-//       "strokeWidth": 4.0,
-//       "style": 1,
-//     },
-//   },
-// ];
+import 'package:slote/src/functions/drawing_utils.dart';
 
 class CreateNoteView extends StatefulWidget {
   const CreateNoteView({super.key, this.note});
@@ -110,40 +73,6 @@ class _CreateNoteViewState extends State<CreateNoteView> {
 
   // New: Track only the current eraser cursor position for visualization
   Offset? _eraserCursorPosition;
-
-  void _loadDrawingFromJson(List<Map<String, dynamic>> jsonData) {
-    final List<PaintContent> contents = [];
-
-    for (final Map<String, dynamic> item in jsonData) {
-      final String type = item['type'] as String;
-
-      switch (type) {
-        case 'StraightLine':
-          contents.add(StraightLine.fromJson(item));
-          break;
-        case 'SimpleLine':
-          contents.add(SimpleLine.fromJson(item));
-          break;
-        case 'Rectangle':
-          contents.add(Rectangle.fromJson(item));
-          break;
-        case 'Circle':
-          contents.add(Circle.fromJson(item));
-          break;
-        case 'Eraser':
-          contents.add(Eraser.fromJson(item));
-          break;
-        // case 'StrokeEraserContent': // Add this case
-        //   contents.add(StrokeEraserContent.fromJson(item));
-        default:
-          log('Unknown drawing type: $type');
-      }
-    }
-
-    if (contents.isNotEmpty) {
-      _drawingController.addContents(contents);
-    }
-  }
 
   String _getDrawingDataAsJson() {
     final contents = _drawingController.getJsonList();
@@ -233,11 +162,12 @@ class _CreateNoteViewState extends State<CreateNoteView> {
           final List<dynamic> drawingJson = json.decode(
             widget.note!.drawingData!,
           );
-          final List<Map<String, dynamic>> drawingData =
-              drawingJson.cast<Map<String, dynamic>>();
-          // drawingData
-          //     .removeLast(); //last array is removable. meaning we can use this to delete strokes
-          _loadDrawingFromJson(drawingData);
+          final List<PaintContent> contents = paintContentsFromJson(
+            drawingJson,
+          );
+          if (contents.isNotEmpty) {
+            _drawingController.addContents(contents);
+          }
 
           // Initialize the undo/redo controller with the loaded state
           WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -247,7 +177,7 @@ class _CreateNoteViewState extends State<CreateNoteView> {
             );
           });
         } catch (e) {
-          log('Error loading drawing data: $e');
+          // log('Error loading drawing data: $e');
         }
       }
     }
