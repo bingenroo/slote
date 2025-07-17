@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:developer';
+import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -101,6 +102,9 @@ class _CreateNoteViewState extends State<CreateNoteView> {
 
   final localDb = LocalDBService();
 
+  Timer? _eraserThrottleTimer;
+  List<String>? _pendingEraserPoints;
+
   void _loadDrawingFromJson(List<Map<String, dynamic>> jsonData) {
     final List<PaintContent> contents = [];
 
@@ -141,15 +145,20 @@ class _CreateNoteViewState extends State<CreateNoteView> {
   }
 
   void _handleEraserComplete(List<String> points) {
-    if (points.isNotEmpty) {
-      final updatedData = _extendedDrawingController.processEraserPoints(
-        points,
-        1.0,
-      );
-      log(
-        'Eraser completed. Updated drawing data: ${updatedData.length} strokes remaining',
-      );
-    }
+    _pendingEraserPoints = points;
+    if (_eraserThrottleTimer?.isActive ?? false) return;
+    _eraserThrottleTimer = Timer(const Duration(milliseconds: 40), () {
+      if (_pendingEraserPoints != null && _pendingEraserPoints!.isNotEmpty) {
+        final updatedData = _extendedDrawingController.processEraserPoints(
+          _pendingEraserPoints!,
+          1.0,
+        );
+        log(
+          'Eraser completed. Updated drawing data: ${updatedData.length} strokes remaining',
+        );
+      }
+      _pendingEraserPoints = null;
+    });
   }
 
   @override
@@ -202,6 +211,7 @@ class _CreateNoteViewState extends State<CreateNoteView> {
 
   @override
   void dispose() {
+    _eraserThrottleTimer?.cancel();
     _saveNoteData();
 
     _titleController.dispose();

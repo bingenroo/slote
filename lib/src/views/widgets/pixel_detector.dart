@@ -23,6 +23,7 @@ class PixelDetector extends StatefulWidget {
 class _PixelDetectorState extends State<PixelDetector> {
   bool _isPointerDown = false;
   Offset? _pointerPosition;
+  Offset? _lastPointerPosition;
   final List<Set<Offset>> _loggedAreas = [];
   Set<Offset> _currentDragLogged = {};
 
@@ -34,17 +35,20 @@ class _PixelDetectorState extends State<PixelDetector> {
           _isPointerDown = true;
           _pointerPosition = event.localPosition;
           _currentDragLogged = {};
+          _lastPointerPosition = event.localPosition;
         });
         _logArea(event.localPosition);
+        _callOnDrag();
       },
       onPointerMove: (event) {
         setState(() {
           _pointerPosition = event.localPosition;
         });
-        _logArea(event.localPosition);
-        if (widget.onDrag != null) {
-          final points = getLoggedPoints();
-          widget.onDrag!(points);
+        if (_lastPointerPosition == null ||
+            (event.localPosition - _lastPointerPosition!).distance > 2.0) {
+          _logArea(event.localPosition);
+          _lastPointerPosition = event.localPosition;
+          _callOnDrag();
         }
       },
       onPointerUp: (event) {
@@ -53,13 +57,11 @@ class _PixelDetectorState extends State<PixelDetector> {
         });
         if (_currentDragLogged.isNotEmpty) {
           _loggedAreas.add(_currentDragLogged);
-          // log('Logged drag: ${_currentDragLogged.length} points');
-
-          // Get logged points and pass to callback
           final points = getLoggedPoints();
           widget.onDragComplete?.call(points);
           clearLoggedPoints();
         }
+        _lastPointerPosition = null;
       },
       onPointerCancel: (event) {
         setState(() {
@@ -67,13 +69,11 @@ class _PixelDetectorState extends State<PixelDetector> {
         });
         if (_currentDragLogged.isNotEmpty) {
           _loggedAreas.add(_currentDragLogged);
-          // log('Logged drag (cancel): ${_currentDragLogged.length} points');
-
-          // Get logged points and pass to callback
           final points = getLoggedPoints();
           widget.onDragComplete?.call(points);
           clearLoggedPoints();
         }
+        _lastPointerPosition = null;
       },
       child: CustomPaint(
         painter:
@@ -134,6 +134,13 @@ class _PixelDetectorState extends State<PixelDetector> {
   void clearLoggedPoints() {
     _currentDragLogged.clear();
     _loggedAreas.clear();
+  }
+
+  void _callOnDrag() {
+    if (widget.onDrag != null) {
+      final points = getLoggedPoints();
+      widget.onDrag!(points);
+    }
   }
 }
 
