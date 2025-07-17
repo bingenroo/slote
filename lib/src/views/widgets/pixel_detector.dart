@@ -5,11 +5,15 @@ class PixelDetector extends StatefulWidget {
   final double eraserRadius;
   final double tolerance;
   final BoxConstraints? constraints;
+  final Function(List<String>)? onDragComplete;
+  final Function(List<String>)? onDrag;
   const PixelDetector({
     Key? key,
     this.eraserRadius = 16.0,
     this.tolerance = 20.0, // slightly larger than eraser
     this.constraints,
+    this.onDragComplete,
+    this.onDrag,
   }) : super(key: key);
 
   @override
@@ -38,6 +42,10 @@ class _PixelDetectorState extends State<PixelDetector> {
           _pointerPosition = event.localPosition;
         });
         _logArea(event.localPosition);
+        if (widget.onDrag != null) {
+          final points = getLoggedPoints();
+          widget.onDrag!(points);
+        }
       },
       onPointerUp: (event) {
         setState(() {
@@ -45,7 +53,12 @@ class _PixelDetectorState extends State<PixelDetector> {
         });
         if (_currentDragLogged.isNotEmpty) {
           _loggedAreas.add(_currentDragLogged);
-          log('Logged drag: ${_currentDragLogged.length} points');
+          // log('Logged drag: ${_currentDragLogged.length} points');
+
+          // Get logged points and pass to callback
+          final points = getLoggedPoints();
+          widget.onDragComplete?.call(points);
+          clearLoggedPoints();
         }
       },
       onPointerCancel: (event) {
@@ -54,7 +67,12 @@ class _PixelDetectorState extends State<PixelDetector> {
         });
         if (_currentDragLogged.isNotEmpty) {
           _loggedAreas.add(_currentDragLogged);
-          log('Logged drag (cancel): ${_currentDragLogged.length} points');
+          // log('Logged drag (cancel): ${_currentDragLogged.length} points');
+
+          // Get logged points and pass to callback
+          final points = getLoggedPoints();
+          widget.onDragComplete?.call(points);
+          clearLoggedPoints();
         }
       },
       child: CustomPaint(
@@ -76,10 +94,10 @@ class _PixelDetectorState extends State<PixelDetector> {
 
   void _logArea(Offset center) {
     // Calculate all points within the eraser + tolerance circle
-    final double r = widget.eraserRadius + widget.tolerance;
-    final int step = 4; // pixel step for performance
+    // final double r = widget.eraserRadius + widget.tolerance; // not eraserRadius + tolerance
+    final double r = widget.eraserRadius; // not eraserRadius + tolerance
+    final int step = 2; // or 1 for best match
     int newPointsCount = 0;
-    final List<String> newPoints = [];
 
     for (double dx = -r; dx <= r; dx += step) {
       for (double dy = -r; dy <= r; dy += step) {
@@ -89,9 +107,6 @@ class _PixelDetectorState extends State<PixelDetector> {
           if (!_currentDragLogged.contains(point)) {
             _currentDragLogged.add(point);
             newPointsCount++;
-            newPoints.add(
-              '(${point.dx.toStringAsFixed(1)}, ${point.dy.toStringAsFixed(1)})',
-            );
             // Log only once per drag for each point
           }
         }
@@ -99,11 +114,26 @@ class _PixelDetectorState extends State<PixelDetector> {
     }
 
     if (newPointsCount > 0) {
-      log(
-        'Eraser at: (${center.dx.toStringAsFixed(1)}, ${center.dy.toStringAsFixed(1)}) - logged $newPointsCount new area points:',
-      );
-      log('Points: ${newPoints.join(', ')}');
+      // log(
+      //   'Eraser at: (${center.dx.toStringAsFixed(1)}, ${center.dy.toStringAsFixed(1)}) - logged $newPointsCount new area points',
+      // );
     }
+  }
+
+  /// Get all logged points as strings
+  List<String> getLoggedPoints() {
+    return _currentDragLogged
+        .map(
+          (point) =>
+              '(${point.dx.toStringAsFixed(1)}, ${point.dy.toStringAsFixed(1)})',
+        )
+        .toList();
+  }
+
+  /// Clear logged points
+  void clearLoggedPoints() {
+    _currentDragLogged.clear();
+    _loggedAreas.clear();
   }
 }
 
@@ -116,7 +146,7 @@ class _EraserCursorPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final paint =
         Paint()
-          ..color = Colors.orange.withAlpha(128)
+          ..color = Colors.black.withAlpha(128)
           ..style = PaintingStyle.stroke
           ..strokeWidth = 2;
     canvas.drawCircle(position, radius, paint);

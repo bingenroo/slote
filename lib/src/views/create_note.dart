@@ -14,7 +14,7 @@ import 'package:undo/undo.dart';
 import 'package:flutter_drawing_board/flutter_drawing_board.dart';
 import 'package:flutter_drawing_board/paint_contents.dart';
 import 'widgets/pixel_detector.dart';
-// import 'package:slote/src/functions/extended_drawing_controller.dart';
+import 'package:slote/src/functions/extended_drawing_controller.dart';
 
 // final _testLine1 = [
 //   {
@@ -90,7 +90,7 @@ class _CreateNoteViewState extends State<CreateNoteView> {
   final _titleController = TextEditingController();
   final _bodyController = TextEditingController();
   final _drawingController = DrawingController();
-  // late final ExtendedDrawingController _drawingController;
+  late final ExtendedDrawingController _extendedDrawingController;
   bool _isDrawingMode = false;
   // bool _isStrokeEraserMode = false;
   bool _isEraserStrokeMode = false; // Add this flag
@@ -140,12 +140,24 @@ class _CreateNoteViewState extends State<CreateNoteView> {
     return json.encode(contents);
   }
 
+  void _handleEraserComplete(List<String> points) {
+    if (points.isNotEmpty) {
+      final updatedData = _extendedDrawingController.processEraserPoints(
+        points,
+        1.0,
+      );
+      log(
+        'Eraser completed. Updated drawing data: ${updatedData.length} strokes remaining',
+      );
+    }
+  }
+
   @override
   void initState() {
     super.initState();
 
-    // _drawingController = ExtendedDrawingController();
     _drawingController.setStyle(color: Colors.black);
+    _extendedDrawingController = ExtendedDrawingController(_drawingController);
 
     // undo redo
     _changeStack = ChangeStack();
@@ -525,6 +537,8 @@ class _CreateNoteViewState extends State<CreateNoteView> {
                                       PixelDetector(
                                         eraserRadius: eraserRadius,
                                         constraints: constraints,
+                                        onDrag: _handleEraserComplete,
+                                        onDragComplete: _handleEraserComplete,
                                       ),
                                   ],
                                 ),
