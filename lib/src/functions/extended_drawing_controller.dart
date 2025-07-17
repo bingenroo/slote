@@ -11,14 +11,9 @@ class ExtendedDrawingController {
 
   /// Process eraser points and remove matching drawing data
   /// Returns the updated drawing data after erasing
-  List<Map<String, dynamic>> processEraserPoints(
-    List<String> newPoints,
-    double tolerance,
-  ) {
+  List<Map<String, dynamic>> processEraserPoints(List<String> newPoints) {
     try {
-      log(
-        'Processing ${newPoints.length} eraser points with tolerance $tolerance',
-      );
+      log('Processing ${newPoints.length} eraser points with tolerance 1.0');
 
       // Get current drawing data from the controller
       final List<Map<String, dynamic>> currentDrawingData =
@@ -29,9 +24,6 @@ class ExtendedDrawingController {
         return [];
       }
 
-      // log('Current drawing data has ${currentDrawingData.length} strokes');
-      // log(currentDrawingData.toString());
-
       // Convert string points to Offset objects
       final List<Offset> eraserPoints = _parsePoints(newPoints);
       log('Parsed ${eraserPoints.length} eraser points');
@@ -40,7 +32,6 @@ class ExtendedDrawingController {
       final List<int> indicesToRemove = _findMatchingStrokes(
         currentDrawingData,
         eraserPoints,
-        tolerance,
       );
 
       if (indicesToRemove.isNotEmpty) {
@@ -49,11 +40,9 @@ class ExtendedDrawingController {
         );
 
         // Remove the matching strokes from the drawing controller
-
         _removeStrokesByIndices(indicesToRemove);
 
         // The drawing controller will automatically notify listeners when content changes
-
         // Return the updated drawing data
         return _drawingController.getJsonList();
       } else {
@@ -93,21 +82,16 @@ class ExtendedDrawingController {
   List<int> _findMatchingStrokes(
     List<Map<String, dynamic>> drawingData,
     List<Offset> eraserPoints,
-    double tolerance,
   ) {
     final List<int> matchingIndices = [];
 
     for (int i = 0; i < drawingData.length; i++) {
       final Map<String, dynamic> stroke = drawingData[i];
       final String type = stroke['type'] as String;
-      // log(stroke.toString());
-
       // Get points for this stroke based on its type
       final List<Offset> strokePoints = _getStrokePoints(stroke, type);
-      // log(strokePoints.toString());
-
       // Check if any stroke points are within tolerance of eraser points
-      if (_hasOverlap(strokePoints, eraserPoints, tolerance)) {
+      if (_hasOverlap(strokePoints, eraserPoints)) {
         matchingIndices.add(i);
         log('Stroke $i (type: $type) matches eraser area');
       } else {
@@ -224,11 +208,7 @@ class ExtendedDrawingController {
   }
 
   /// Check if stroke points overlap with eraser points
-  bool _hasOverlap(
-    List<Offset> strokePoints,
-    List<Offset> eraserPoints,
-    double tolerance,
-  ) {
+  bool _hasOverlap(List<Offset> strokePoints, List<Offset> eraserPoints) {
     if (strokePoints.isEmpty) {
       log('No stroke points to check for overlap.');
     }
@@ -238,7 +218,7 @@ class ExtendedDrawingController {
     for (final Offset strokePoint in strokePoints) {
       for (final Offset eraserPoint in eraserPoints) {
         final double distance = (strokePoint - eraserPoint).distance;
-        if (distance <= tolerance) {
+        if (distance <= 1.0) {
           log(
             'Overlap found: strokePoint=$strokePoint, eraserPoint=$eraserPoint, distance=$distance',
           );

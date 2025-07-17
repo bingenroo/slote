@@ -151,7 +151,6 @@ class _CreateNoteViewState extends State<CreateNoteView> {
       if (_pendingEraserPoints != null && _pendingEraserPoints!.isNotEmpty) {
         final updatedData = _extendedDrawingController.processEraserPoints(
           _pendingEraserPoints!,
-          1.0,
         );
         log(
           'Eraser completed. Updated drawing data: ${updatedData.length} strokes remaining',

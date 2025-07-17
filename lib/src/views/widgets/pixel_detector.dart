@@ -3,14 +3,12 @@ import 'package:flutter/material.dart';
 
 class PixelDetector extends StatefulWidget {
   final double eraserRadius;
-  final double tolerance;
   final BoxConstraints? constraints;
   final Function(List<String>)? onDragComplete;
   final Function(List<String>)? onDrag;
   const PixelDetector({
     Key? key,
     this.eraserRadius = 16.0,
-    this.tolerance = 20.0, // slightly larger than eraser
     this.constraints,
     this.onDragComplete,
     this.onDrag,
@@ -94,7 +92,6 @@ class _PixelDetectorState extends State<PixelDetector> {
 
   void _logArea(Offset center) {
     // Calculate all points within the eraser + tolerance circle
-    // final double r = widget.eraserRadius + widget.tolerance; // not eraserRadius + tolerance
     final double r = widget.eraserRadius; // not eraserRadius + tolerance
     final int step = 2; // or 1 for best match
     int newPointsCount = 0;
