@@ -83,14 +83,18 @@ class _HomeViewState extends State<HomeView> {
                             _selectedNoteIds = Set.from(_lastNoteIds ?? []);
                           } else {
                             _selectedNoteIds.clear();
-                            _selectionMode = false;
+                            // Do not set _selectionMode = false here
                           }
                         });
                       },
                       child:
                           _selectedNoteIds.length == (_lastNotesCount ?? 0) &&
                                   _selectedNoteIds.isNotEmpty
-                              ? AppCheckmark(color: Colors.grey, size: 26)
+                              ? AppCheckmark(
+                                color: Colors.grey,
+                                size: 26,
+                                showShadow: false,
+                              )
                               : Container(
                                 width: 26,
                                 height: 26,

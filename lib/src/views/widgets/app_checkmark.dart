@@ -4,7 +4,14 @@ class AppCheckmark extends StatelessWidget {
   final Color? color;
   final Color? iconColor;
   final double size;
-  const AppCheckmark({super.key, this.color, this.iconColor, this.size = 26});
+  final bool showShadow;
+  const AppCheckmark({
+    super.key,
+    this.color,
+    this.iconColor,
+    this.size = 26,
+    this.showShadow = true,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -14,9 +21,16 @@ class AppCheckmark extends StatelessWidget {
       decoration: BoxDecoration(
         color: color ?? Theme.of(context).colorScheme.primary,
         shape: BoxShape.circle,
-        boxShadow: [
-          BoxShadow(color: Colors.black26, blurRadius: 4, offset: Offset(0, 2)),
-        ],
+        boxShadow:
+            showShadow
+                ? [
+                  BoxShadow(
+                    color: Colors.black26,
+                    blurRadius: 4,
+                    offset: Offset(0, 2),
+                  ),
+                ]
+                : [],
       ),
       child: Center(
         child: Icon(

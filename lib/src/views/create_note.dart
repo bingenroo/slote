@@ -282,50 +282,53 @@ class _CreateNoteViewState extends State<CreateNoteView> {
             },
             tooltip: _isDrawingMode ? 'Text Mode' : 'Drawing Mode',
           ),
-          IconButton(
-            icon: Icon(Icons.delete),
-            onPressed: () {
-              // show warnings
-              showDialog(
-                context: context,
-                builder: (context) {
-                  return AlertDialog(
-                    title: Text(
-                      "Delete Note?",
-                      style: GoogleFonts.poppins(fontSize: 20),
-                    ),
-                    content: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        Lottie.asset(AnimationAssets.delete),
-                        Text(
-                          "Are you sure you want to delete this note permernantly?",
-                          style: GoogleFonts.poppins(fontSize: 16),
+          if (widget.note != null)
+            IconButton(
+              icon: Icon(Icons.delete),
+              onPressed: () {
+                // show warnings
+                showDialog(
+                  context: context,
+                  builder: (context) {
+                    return AlertDialog(
+                      title: Text(
+                        "Delete Note?",
+                        style: GoogleFonts.poppins(fontSize: 20),
+                      ),
+                      content: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          Lottie.asset(AnimationAssets.delete),
+                          Text(
+                            "Are you sure you want to delete this note permernantly?",
+                            style: GoogleFonts.poppins(fontSize: 16),
+                          ),
+                        ],
+                      ),
+                      actions: [
+                        TextButton(
+                          onPressed: () {
+                            if (widget.note != null) {
+                              localDb.deleteNote(id: widget.note!.id);
+                            }
+                            Navigator.pop(context);
+                            Navigator.pop(context);
+                          },
+                          child: Text("Proceed"),
+                        ),
+                        TextButton(
+                          onPressed: () {
+                            Navigator.pop(context);
+                          },
+                          child: Text("Cancel"),
                         ),
                       ],
-                    ),
-                    actions: [
-                      TextButton(
-                        onPressed: () {
-                          localDb.deleteNote(id: widget.note!.id);
-                          Navigator.pop(context);
-                          Navigator.pop(context);
-                        },
-                        child: Text("Proceed"),
-                      ),
-                      TextButton(
-                        onPressed: () {
-                          Navigator.pop(context);
-                        },
-                        child: Text("Cancel"),
-                      ),
-                    ],
-                  );
-                },
-              );
-            },
-          ),
+                    );
+                  },
+                );
+              },
+            ),
         ],
         bottom: PreferredSize(
           preferredSize: Size.fromHeight(48),
@@ -459,7 +462,6 @@ class _CreateNoteViewState extends State<CreateNoteView> {
                           padding: const EdgeInsets.all(16.0),
                           child: Column(
                             children: [
-                              const SizedBox(height: 16),
                               AbsorbPointer(
                                 absorbing: _isDrawingMode,
                                 child: TextFormField(
