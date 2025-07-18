@@ -17,6 +17,11 @@ class App extends StatelessWidget {
           onPrimary: Colors.white, // Text/icon color on primary
           // You can add more overrides as needed
         ),
+        textSelectionTheme: TextSelectionThemeData(
+          cursorColor: Colors.white, // Match onPrimary
+          selectionColor: Colors.white24, // Slightly transparent for selection
+          selectionHandleColor: Colors.white, // Match onPrimary
+        ),
         appBarTheme: AppBarTheme(
           backgroundColor: Colors.grey.shade700, // Set your preferred color
           foregroundColor: Colors.white, // Text/icon color

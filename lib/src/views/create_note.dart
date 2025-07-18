@@ -259,10 +259,14 @@ class _CreateNoteViewState extends State<CreateNoteView> {
           style: GoogleFonts.poppins(
             fontSize: 28,
             color: Theme.of(context).colorScheme.onPrimary,
+            decorationColor:
+                Theme.of(
+                  context,
+                ).colorScheme.onPrimary, // Ensures underline matches text color
           ),
           textAlign: TextAlign.start,
           cursorColor: Theme.of(context).colorScheme.onPrimary,
-          showCursor: true,
+          // Remove showCursor: true to match body field
         ),
         actions: [
           IconButton(
@@ -459,30 +463,52 @@ class _CreateNoteViewState extends State<CreateNoteView> {
                       children: [
                         // Text field with padding
                         Padding(
-                          padding: const EdgeInsets.all(16.0),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16.0,
+                            vertical: 8.0,
+                          ),
                           child: Column(
                             children: [
                               AbsorbPointer(
                                 absorbing: _isDrawingMode,
-                                child: TextFormField(
+                                child: TextField(
                                   controller: _bodyController,
                                   decoration: InputDecoration(
-                                    border: InputBorder.none,
+                                    border: UnderlineInputBorder(
+                                      borderSide: BorderSide(
+                                        color: Colors.transparent,
+                                      ),
+                                    ),
+                                    enabledBorder: UnderlineInputBorder(
+                                      borderSide: BorderSide(
+                                        color: Colors.transparent,
+                                      ),
+                                    ),
+                                    focusedBorder: UnderlineInputBorder(
+                                      borderSide: BorderSide(
+                                        color: Colors.transparent,
+                                      ),
+                                    ),
                                     hintText: "Description",
                                     hintStyle: TextStyle(
-                                      color: Theme.of(context)
-                                          .colorScheme
-                                          .onSurface
-                                          .withValues(alpha: 0.3),
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.onSurface.withOpacity(0.3),
                                     ),
                                   ),
-                                  style: GoogleFonts.poppins(fontSize: 18),
+                                  style: GoogleFonts.poppins(
+                                    fontSize: 18,
+                                    color:
+                                        Theme.of(context).colorScheme.onSurface,
+                                    decorationColor:
+                                        Theme.of(context).colorScheme.onSurface,
+                                  ),
                                   maxLines: null,
-                                  minLines:
-                                      20, // Ensure minimum height for drawing area
+                                  minLines: 20,
                                   readOnly: _isDrawingMode,
                                   enableInteractiveSelection: !_isDrawingMode,
-                                  showCursor: !_isDrawingMode,
+                                  cursorColor:
+                                      Theme.of(context).colorScheme.onSurface,
                                   contextMenuBuilder:
                                       _isDrawingMode
                                           ? null
@@ -504,12 +530,13 @@ class _CreateNoteViewState extends State<CreateNoteView> {
                               BuildContext context,
                               BoxConstraints constraints,
                             ) {
+                              // Wrap the drawing area with a GestureDetector for long-press
                               return IgnorePointer(
                                 ignoring:
                                     !_isDrawingMode, // Block drawing interaction when in text mode
                                 child: Stack(
                                   children: [
-                                    // Always show the drawing board with existing drawings
+                                    // Drawing board
                                     DrawingBoard(
                                       controller: _drawingController,
                                       background: SizedBox(
