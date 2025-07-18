@@ -4,10 +4,20 @@ import 'package:slote/src/model/note.dart';
 import 'package:slote/src/views/widgets/note_list_item.dart';
 
 class NotesList extends StatelessWidget {
-  const NotesList({super.key, required this.notes, this.onNoteLongPress});
+  const NotesList({
+    super.key,
+    required this.notes,
+    required this.onNoteLongPress,
+    required this.onNoteTap,
+    required this.selectionMode,
+    required this.selectedNoteIds,
+  });
 
   final List<Note> notes;
-  final VoidCallback? onNoteLongPress;
+  final void Function(int noteId) onNoteLongPress;
+  final void Function(int noteId) onNoteTap;
+  final bool selectionMode;
+  final Set<int> selectedNoteIds;
 
   @override
   Widget build(BuildContext context) {
@@ -17,7 +27,13 @@ class NotesList extends StatelessWidget {
       itemBuilder: (context, note, index, animation) {
         return SizeFadeTransition(
           animation: animation,
-          child: NoteListItem(note: notes[index], onLongPress: onNoteLongPress),
+          child: NoteListItem(
+            note: notes[index],
+            onLongPress: () => onNoteLongPress(notes[index].id),
+            onTap: () => onNoteTap(notes[index].id),
+            selectionMode: selectionMode,
+            selected: selectedNoteIds.contains(notes[index].id),
+          ),
         );
       },
     );
