@@ -4,51 +4,58 @@ import 'package:slote/src/model/note.dart';
 import 'package:slote/src/views/create_note.dart';
 
 class NoteGridItem extends StatelessWidget {
-  const NoteGridItem({super.key, required this.note});
+  const NoteGridItem({super.key, required this.note, this.onLongPress});
 
   final Note note;
+  final VoidCallback? onLongPress;
 
   @override
   Widget build(BuildContext context) {
-    return MaterialButton(
-      onPressed: () {
-        Navigator.of(context).push(
-          MaterialPageRoute(builder: (context) => CreateNoteView(note: note)),
-        );
-      },
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-      padding: EdgeInsets.zero,
-      color: Colors.white,
-      elevation: 0.0,
-      child: Container(
-        padding: const EdgeInsets.all(20.0),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: Colors.grey.shade300, width: 2),
-        ),
-        child: Row(
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    note.title,
-                    style: GoogleFonts.poppins(fontSize: 18),
-                    maxLines: 1,
-                  ),
-                  Flexible(
-                    child: Text(
-                      note.body,
-                      style: GoogleFonts.poppins(),
-                      maxLines: 5,
-                      overflow: TextOverflow.ellipsis,
+    return GestureDetector(
+      onLongPress: onLongPress,
+      child: MaterialButton(
+        onPressed: () {
+          Navigator.of(context).push(
+            MaterialPageRoute(builder: (context) => CreateNoteView(note: note)),
+          );
+        },
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        padding: EdgeInsets.zero,
+        color: Colors.white,
+        elevation: 0.0,
+        child: Container(
+          padding: const EdgeInsets.all(20.0),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+              color: Colors.grey.shade600,
+              width: 1,
+            ), // Darker border
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      note.title,
+                      style: GoogleFonts.poppins(fontSize: 18),
+                      maxLines: 1,
                     ),
-                  ),
-                ],
+                    Flexible(
+                      child: Text(
+                        note.body,
+                        style: GoogleFonts.poppins(),
+                        maxLines: 5,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

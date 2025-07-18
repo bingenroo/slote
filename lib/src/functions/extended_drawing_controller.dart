@@ -147,8 +147,9 @@ class ExtendedDrawingController {
             corners[(i + 1) % 4],
             eraserPath,
             eraserRadius,
-          ))
+          )) {
             return true;
+          }
         }
         return false;
       case 'Circle':

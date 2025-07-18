@@ -268,6 +268,8 @@ class _CreateNoteViewState extends State<CreateNoteView> {
           IconButton(
             icon: Icon(_isDrawingMode ? Icons.text_fields : Icons.draw),
             onPressed: () {
+              // Unfocus all text fields and dismiss keyboard
+              FocusScope.of(context).unfocus();
               setState(() {
                 _isDrawingMode = !_isDrawingMode;
                 if (_isDrawingMode) {

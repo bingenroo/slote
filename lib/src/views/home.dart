@@ -17,6 +17,7 @@ class HomeView extends StatefulWidget {
 
 class _HomeViewState extends State<HomeView> {
   bool islistView = true;
+  bool _selectionMode = false; // Add selection mode state
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -31,16 +32,45 @@ class _HomeViewState extends State<HomeView> {
                 AppStrings.appName,
                 style: GoogleFonts.poppins(fontSize: 28),
               ),
-              IconButton(
-                onPressed: () {
-                  setState(() {
-                    islistView = !islistView;
-                  });
-                },
-                icon: Icon(
-                  islistView ? Icons.splitscreen_outlined : Icons.grid_view,
+              SizedBox(width: 16), // Add space between title and button group
+              // Selection mode UI
+              if (_selectionMode) ...[
+                Row(
+                  children: [
+                    IconButton(
+                      onPressed: () {
+                        // TODO: Add delete logic
+                      },
+                      icon: Icon(
+                        Icons.delete,
+                        color: Theme.of(context).colorScheme.onPrimary,
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: () {
+                        setState(() {
+                          _selectionMode = false;
+                        });
+                      },
+                      icon: Icon(
+                        Icons.close,
+                        color: Theme.of(context).colorScheme.onPrimary,
+                      ),
+                    ),
+                  ],
                 ),
-              ),
+              ] else ...[
+                IconButton(
+                  onPressed: () {
+                    setState(() {
+                      islistView = !islistView;
+                    });
+                  },
+                  icon: Icon(
+                    islistView ? Icons.splitscreen_outlined : Icons.grid_view,
+                  ),
+                ),
+              ],
             ],
           ),
         ),
@@ -91,8 +121,22 @@ class _HomeViewState extends State<HomeView> {
                     duration: const Duration(milliseconds: 300),
                     child:
                         islistView
-                            ? NotesList(notes: notes)
-                            : NotesGrid(notes: notes),
+                            ? NotesList(
+                              notes: notes,
+                              onNoteLongPress: () {
+                                setState(() {
+                                  _selectionMode = true;
+                                });
+                              },
+                            )
+                            : NotesGrid(
+                              notes: notes,
+                              onNoteLongPress: () {
+                                setState(() {
+                                  _selectionMode = true;
+                                });
+                              },
+                            ),
                   );
                 },
               ),

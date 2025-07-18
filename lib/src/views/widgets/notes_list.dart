@@ -4,9 +4,10 @@ import 'package:slote/src/model/note.dart';
 import 'package:slote/src/views/widgets/note_list_item.dart';
 
 class NotesList extends StatelessWidget {
-  const NotesList({super.key, required this.notes});
+  const NotesList({super.key, required this.notes, this.onNoteLongPress});
 
   final List<Note> notes;
+  final VoidCallback? onNoteLongPress;
 
   @override
   Widget build(BuildContext context) {
@@ -16,7 +17,7 @@ class NotesList extends StatelessWidget {
       itemBuilder: (context, note, index, animation) {
         return SizeFadeTransition(
           animation: animation,
-          child: NoteListItem(note: notes[index]),
+          child: NoteListItem(note: notes[index], onLongPress: onNoteLongPress),
         );
       },
     );
