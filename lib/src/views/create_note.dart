@@ -12,6 +12,7 @@ import 'package:flutter_drawing_board/flutter_drawing_board.dart';
 import 'package:flutter_drawing_board/paint_contents.dart';
 import 'package:slote/src/functions/extended_drawing_controller.dart';
 import 'package:slote/src/functions/drawing_utils.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 
 class CreateNoteView extends StatefulWidget {
   const CreateNoteView({super.key, this.note});
@@ -243,7 +244,10 @@ class _CreateNoteViewState extends State<CreateNoteView> {
           onPressed: () {
             Navigator.pop(context);
           },
-          icon: Icon(Icons.arrow_back),
+          icon: FaIcon(
+            FontAwesomeIcons.arrowLeft,
+            color: Theme.of(context).colorScheme.onPrimary,
+          ),
         ),
         title: TextField(
           controller: _titleController,
@@ -270,7 +274,16 @@ class _CreateNoteViewState extends State<CreateNoteView> {
         ),
         actions: [
           IconButton(
-            icon: Icon(_isDrawingMode ? Icons.text_fields : Icons.draw),
+            icon:
+                _isDrawingMode
+                    ? FaIcon(
+                      FontAwesomeIcons.font,
+                      color: Theme.of(context).colorScheme.onPrimary,
+                    )
+                    : FaIcon(
+                      FontAwesomeIcons.pen,
+                      color: Theme.of(context).colorScheme.onPrimary,
+                    ),
             onPressed: () {
               // Unfocus all text fields and dismiss keyboard
               FocusScope.of(context).unfocus();
@@ -288,7 +301,10 @@ class _CreateNoteViewState extends State<CreateNoteView> {
           ),
           if (widget.note != null)
             IconButton(
-              icon: Icon(Icons.delete),
+              icon: FaIcon(
+                FontAwesomeIcons.trash,
+                color: Theme.of(context).colorScheme.onPrimary,
+              ),
               onPressed: () {
                 // show warnings
                 showDialog(
@@ -362,8 +378,8 @@ class _CreateNoteViewState extends State<CreateNoteView> {
                                 // ? _undoRedoTextController.undo
                                 ? _unifiedUndoRedoController.undo
                                 : null,
-                        icon: Icon(
-                          Icons.undo,
+                        icon: FaIcon(
+                          FontAwesomeIcons.arrowRotateLeft,
                           color:
                               _changeStack.canUndo
                                   ? Theme.of(context).colorScheme.onPrimary
@@ -384,8 +400,8 @@ class _CreateNoteViewState extends State<CreateNoteView> {
                                 // ? _undoRedoTextController.redo
                                 ? _unifiedUndoRedoController.redo
                                 : null,
-                        icon: Icon(
-                          Icons.redo,
+                        icon: FaIcon(
+                          FontAwesomeIcons.arrowRotateRight,
                           color:
                               _changeStack.canRedo
                                   ? Theme.of(context).colorScheme.onPrimary
@@ -415,10 +431,16 @@ class _CreateNoteViewState extends State<CreateNoteView> {
                         }
                         setState(() {}); // Refresh UI to show current tool
                       },
-                      icon: Icon(
-                        _isEraserStrokeMode ? Icons.brush : Icons.auto_fix_off,
-                        color: Theme.of(context).colorScheme.onPrimary,
-                      ),
+                      icon:
+                          _isEraserStrokeMode
+                              ? FaIcon(
+                                FontAwesomeIcons.pen,
+                                color: Theme.of(context).colorScheme.onPrimary,
+                              )
+                              : FaIcon(
+                                FontAwesomeIcons.eraser,
+                                color: Theme.of(context).colorScheme.onPrimary,
+                              ),
                       tooltip:
                           _isEraserStrokeMode ? 'Drawing Mode' : 'Eraser Mode',
                     ),
@@ -493,7 +515,7 @@ class _CreateNoteViewState extends State<CreateNoteView> {
                                     hintStyle: TextStyle(
                                       color: Theme.of(
                                         context,
-                                      ).colorScheme.onSurface.withOpacity(0.3),
+                                      ).colorScheme.onSurface.withAlpha(30),
                                     ),
                                   ),
                                   style: GoogleFonts.poppins(

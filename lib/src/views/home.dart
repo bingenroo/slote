@@ -10,6 +10,7 @@ import 'package:slote/src/views/widgets/notes_list.dart';
 import 'package:slote/src/views/widgets/app_checkmark.dart';
 import 'package:slote/src/res/assets.dart';
 import 'package:lottie/lottie.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 
 class HomeView extends StatefulWidget {
   const HomeView({super.key});
@@ -167,16 +168,18 @@ class _HomeViewState extends State<HomeView> {
                           });
                         }
                       },
-                      icon: Icon(
-                        Icons.delete,
+                      icon: FaIcon(
+                        FontAwesomeIcons.trash,
                         color: Theme.of(context).colorScheme.onPrimary,
+                        size: 24,
                       ),
                     ),
                     IconButton(
                       onPressed: _exitSelectionMode,
-                      icon: Icon(
-                        Icons.close,
+                      icon: FaIcon(
+                        FontAwesomeIcons.xmark,
                         color: Theme.of(context).colorScheme.onPrimary,
+                        size: 24,
                       ),
                     ),
                   ],
@@ -188,8 +191,12 @@ class _HomeViewState extends State<HomeView> {
                       islistView = !islistView;
                     });
                   },
-                  icon: Icon(
-                    islistView ? Icons.splitscreen_outlined : Icons.grid_view,
+                  icon: FaIcon(
+                    islistView
+                        ? FontAwesomeIcons.listUl
+                        : FontAwesomeIcons.tableCellsLarge,
+                    color: Theme.of(context).colorScheme.onPrimary,
+                    size: 24,
                   ),
                 ),
               ],

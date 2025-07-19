@@ -19,11 +19,10 @@ class App extends StatelessWidget {
         ),
         textSelectionTheme: TextSelectionThemeData(
           cursorColor: Colors.grey.shade900, // Match onSurface (body caret)
-          selectionColor: Colors.grey.shade900.withOpacity(
-            0.24,
+          selectionColor: Colors.grey.shade900.withAlpha(
+            24,
           ), // Slightly transparent for selection
-          selectionHandleColor:
-              Colors.grey.shade600, // Match onSurface (body caret and droplet)
+          selectionHandleColor: Colors.grey.shade400, // title droplet
         ),
         appBarTheme: AppBarTheme(
           backgroundColor: Colors.grey.shade700, // Set your preferred color
