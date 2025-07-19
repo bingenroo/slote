@@ -56,6 +56,21 @@ class _CreateNoteViewState extends State<CreateNoteView> {
   // bool _isStrokeEraserMode = false;
   bool _isEraserStrokeMode = false; // Add this flag
 
+  // Pen settings state
+  Color _penColor = Colors.black;
+  double _penStrokeWidth = 2.0;
+  final List<Color> _penColors = [
+    Colors.black,
+    Colors.red,
+    Colors.yellow,
+    Colors.blue,
+    Colors.green,
+    Colors.purple,
+    Colors.orange,
+  ];
+  final double _minStroke = 1.0;
+  final double _maxStroke = 12.0;
+
   // late UndoRedoTextController _undoRedoTextController;
   late UnifiedUndoRedoController _unifiedUndoRedoController;
   late ChangeStack _changeStack;
@@ -125,6 +140,156 @@ class _CreateNoteViewState extends State<CreateNoteView> {
   void _trackDrawingChanges() {
     final currentStrokes = _drawingController.getJsonList();
     _extendedDrawingController.trackNewStrokes(currentStrokes);
+  }
+
+  void _showPenSettingsPopup() async {
+    double tempStrokeWidth = _penStrokeWidth;
+    Color tempPenColor = _penColor;
+    await showDialog(
+      context: context,
+      builder: (context) {
+        return Dialog(
+          backgroundColor:
+              Theme.of(context).appBarTheme.backgroundColor ??
+              Theme.of(context).colorScheme.primary,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(20.0),
+            child: StatefulBuilder(
+              builder: (context, setStateDialog) {
+                return Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Stroke size slider
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        IconButton(
+                          icon: Icon(Icons.remove, color: Colors.white),
+                          onPressed: () {
+                            setStateDialog(() {
+                              tempStrokeWidth = (tempStrokeWidth - 1).clamp(
+                                _minStroke,
+                                _maxStroke,
+                              );
+                            });
+                            _drawingController.setStyle(
+                              strokeWidth: tempStrokeWidth,
+                            );
+                          },
+                        ),
+                        Expanded(
+                          child: Slider(
+                            value: tempStrokeWidth,
+                            min: _minStroke,
+                            max: _maxStroke,
+                            divisions: (_maxStroke - _minStroke).toInt(),
+                            // label: tempStrokeWidth.round().toString(), // Removed to hide droplet
+                            onChanged: (value) {
+                              setStateDialog(() {
+                                tempStrokeWidth = value;
+                              });
+                              _drawingController.setStyle(
+                                strokeWidth: tempStrokeWidth,
+                              );
+                            },
+                            activeColor: Colors.white,
+                            inactiveColor: Colors.white24,
+                          ),
+                        ),
+                        IconButton(
+                          icon: Icon(Icons.add, color: Colors.white),
+                          onPressed: () {
+                            setStateDialog(() {
+                              tempStrokeWidth = (tempStrokeWidth + 1).clamp(
+                                _minStroke,
+                                _maxStroke,
+                              );
+                            });
+                            _drawingController.setStyle(
+                              strokeWidth: tempStrokeWidth,
+                            );
+                          },
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    // Color swatches
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children:
+                          _penColors.map((color) {
+                            final isSelected = color == tempPenColor;
+                            return GestureDetector(
+                              onTap: () {
+                                setStateDialog(() {
+                                  tempPenColor = color;
+                                });
+                                _drawingController.setStyle(
+                                  color: tempPenColor,
+                                );
+                              },
+                              child: Container(
+                                margin: const EdgeInsets.symmetric(
+                                  horizontal: 6,
+                                ),
+                                width: isSelected ? 36 : 28,
+                                height: isSelected ? 36 : 28,
+                                decoration: BoxDecoration(
+                                  color: color,
+                                  shape: BoxShape.circle,
+                                  border:
+                                      isSelected
+                                          ? Border.all(
+                                            color: Colors.white,
+                                            width: 3,
+                                          )
+                                          : null,
+                                ),
+                                child:
+                                    isSelected
+                                        ? Icon(
+                                          Icons.check,
+                                          color: Colors.white,
+                                          size: 20,
+                                        )
+                                        : null,
+                              ),
+                            );
+                          }).toList(),
+                    ),
+                    const SizedBox(height: 8),
+                    // Done button
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: TextButton(
+                        onPressed: () {
+                          setState(() {
+                            _penStrokeWidth = tempStrokeWidth;
+                            _penColor = tempPenColor;
+                          });
+                          _drawingController.setStyle(
+                            color: _penColor,
+                            strokeWidth: _penStrokeWidth,
+                          );
+                          Navigator.of(context).pop();
+                        },
+                        child: Text(
+                          'Done',
+                          style: TextStyle(color: Colors.white),
+                        ),
+                      ),
+                    ),
+                  ],
+                );
+              },
+            ),
+          ),
+        );
+      },
+    );
   }
 
   @override
@@ -411,14 +576,18 @@ class _CreateNoteViewState extends State<CreateNoteView> {
                         size: 20,
                         color:
                             !_isEraserStrokeMode
-                                ? Colors.black
+                                ? _penColor
                                 : Colors.grey.shade300,
                       ),
                       onPressed: () {
-                        setState(() {
-                          _isEraserStrokeMode = false;
-                          _drawingController.setPaintContent(SimpleLine());
-                        });
+                        if (_isEraserStrokeMode) {
+                          setState(() {
+                            _isEraserStrokeMode = false;
+                            _drawingController.setPaintContent(SimpleLine());
+                          });
+                        } else {
+                          _showPenSettingsPopup();
+                        }
                       },
                       tooltip: 'Pen',
                     ),
