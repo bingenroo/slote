@@ -243,13 +243,14 @@ class _CreateNoteViewState extends State<CreateNoteView> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        toolbarHeight: 80,
+        toolbarHeight: 52, // Smaller height
         leading: IconButton(
           onPressed: () {
             Navigator.pop(context);
           },
           icon: FaIcon(
             FontAwesomeIcons.arrowLeft,
+            size: 20, // Smaller icon
             color: Theme.of(context).colorScheme.onPrimary,
           ),
         ),
@@ -265,36 +266,33 @@ class _CreateNoteViewState extends State<CreateNoteView> {
             ),
           ),
           style: GoogleFonts.poppins(
-            fontSize: 28,
+            fontSize: 20, // Smaller title font
             color: Theme.of(context).colorScheme.onPrimary,
-            decorationColor:
-                Theme.of(
-                  context,
-                ).colorScheme.onPrimary, // Ensures underline matches text color
+            decorationColor: Theme.of(context).colorScheme.onPrimary,
           ),
           textAlign: TextAlign.start,
           cursorColor: Theme.of(context).colorScheme.onPrimary,
-          // Remove showCursor: true to match body field
         ),
         actions: [
+          // Restore text/draw mode toggle
           IconButton(
             icon:
                 _isDrawingMode
                     ? FaIcon(
                       FontAwesomeIcons.font,
+                      size: 18,
                       color: Theme.of(context).colorScheme.onPrimary,
                     )
                     : FaIcon(
                       FontAwesomeIcons.pen,
+                      size: 18,
                       color: Theme.of(context).colorScheme.onPrimary,
                     ),
             onPressed: () {
-              // Unfocus all text fields and dismiss keyboard
               FocusScope.of(context).unfocus();
               setState(() {
                 _isDrawingMode = !_isDrawingMode;
                 if (_isDrawingMode) {
-                  // Clear any existing text selection
                   _bodyController.selection = TextSelection.collapsed(
                     offset: _bodyController.selection.baseOffset,
                   );
@@ -303,160 +301,148 @@ class _CreateNoteViewState extends State<CreateNoteView> {
             },
             tooltip: _isDrawingMode ? 'Text Mode' : 'Drawing Mode',
           ),
-          if (widget.note != null)
-            IconButton(
-              icon: FaIcon(
-                FontAwesomeIcons.trash,
-                color: Theme.of(context).colorScheme.onPrimary,
-              ),
-              onPressed: () {
-                // show warnings
-                showDialog(
-                  context: context,
-                  builder: (context) {
-                    return AlertDialog(
-                      title: Text(
-                        "Delete Note?",
-                        style: GoogleFonts.poppins(fontSize: 20),
-                      ),
-                      content: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        children: [
-                          Lottie.asset(AnimationAssets.delete),
-                          Text(
-                            "Are you sure you want to delete this note permernantly?",
-                            style: GoogleFonts.poppins(fontSize: 16),
-                          ),
-                        ],
-                      ),
-                      actions: [
-                        TextButton(
-                          onPressed: () {
-                            if (widget.note != null) {
-                              localDb.deleteNote(id: widget.note!.id);
-                            }
-                            Navigator.pop(context);
-                            Navigator.pop(context);
-                          },
-                          child: Text("Proceed"),
-                        ),
-                        TextButton(
-                          onPressed: () {
-                            Navigator.pop(context);
-                          },
-                          child: Text("Cancel"),
-                        ),
-                      ],
-                    );
-                  },
-                );
-              },
+          IconButton(
+            icon: FaIcon(
+              FontAwesomeIcons.trash,
+              size: 18,
+              color: Theme.of(context).colorScheme.onPrimary,
             ),
+            onPressed:
+                widget.note == null
+                    ? null
+                    : () {
+                      showDialog(
+                        context: context,
+                        builder: (context) {
+                          return AlertDialog(
+                            title: Text(
+                              "Delete Note?",
+                              style: GoogleFonts.poppins(fontSize: 18),
+                            ),
+                            content: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              crossAxisAlignment: CrossAxisAlignment.center,
+                              children: [
+                                Lottie.asset(AnimationAssets.delete),
+                                Text(
+                                  "Are you sure you want to delete this note permernantly?",
+                                  style: GoogleFonts.poppins(fontSize: 15),
+                                ),
+                              ],
+                            ),
+                            actions: [
+                              TextButton(
+                                onPressed: () {
+                                  if (widget.note != null) {
+                                    localDb.deleteNote(id: widget.note!.id);
+                                  }
+                                  Navigator.pop(context);
+                                  Navigator.pop(context);
+                                },
+                                child: Text("Proceed"),
+                              ),
+                              TextButton(
+                                onPressed: () {
+                                  Navigator.pop(context);
+                                },
+                                child: Text("Cancel"),
+                              ),
+                            ],
+                          );
+                        },
+                      );
+                    },
+            tooltip: 'Delete',
+          ),
         ],
         bottom: PreferredSize(
-          preferredSize: Size.fromHeight(48),
+          preferredSize: Size.fromHeight(38), // Slightly smaller than AppBar
           child: Material(
-            elevation: 4, // Shadow depth
+            elevation: 4,
             child: Container(
               decoration: BoxDecoration(
-                color: Colors.grey.shade700,
-                border: const Border(
-                  bottom: BorderSide(
-                    color: Colors.black12, // Border color
-                    width: 1,
-                  ),
-                ),
+                color: Colors.grey.shade100, // Set to grey
+                // Removed border
               ),
-              height: 48,
+              height: 38,
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
+                  // Undo
                   ListenableBuilder(
-                    // listenable: _undoRedoTextController,
                     listenable: _unifiedUndoRedoController,
                     builder: (context, child) {
+                      final bool enabled = _changeStack.canUndo;
                       return IconButton(
-                        onPressed:
-                            _changeStack.canUndo
-                                // ? _undoRedoTextController.undo
-                                ? _unifiedUndoRedoController.undo
-                                : null,
                         icon: FaIcon(
                           FontAwesomeIcons.arrowRotateLeft,
-                          color:
-                              _changeStack.canUndo
-                                  ? Theme.of(context).colorScheme.onPrimary
-                                  : Theme.of(context).colorScheme.onPrimary
-                                      .withValues(alpha: 0.3),
+                          size: 20,
+                          color: enabled ? Colors.black : Colors.grey.shade300,
                         ),
+                        onPressed:
+                            enabled ? _unifiedUndoRedoController.undo : null,
                         tooltip: 'Undo',
                       );
                     },
                   ),
+                  // Redo
                   ListenableBuilder(
-                    // listenable: _undoRedoTextController,
                     listenable: _unifiedUndoRedoController,
                     builder: (context, child) {
+                      final bool enabled = _changeStack.canRedo;
                       return IconButton(
-                        onPressed:
-                            _changeStack.canRedo
-                                // ? _undoRedoTextController.redo
-                                ? _unifiedUndoRedoController.redo
-                                : null,
                         icon: FaIcon(
                           FontAwesomeIcons.arrowRotateRight,
-                          color:
-                              _changeStack.canRedo
-                                  ? Theme.of(context).colorScheme.onPrimary
-                                  : Theme.of(context).colorScheme.onPrimary
-                                      .withValues(alpha: 0.3),
+                          size: 20,
+                          color: enabled ? Colors.black : Colors.grey.shade300,
                         ),
+                        onPressed:
+                            enabled ? _unifiedUndoRedoController.redo : null,
                         tooltip: 'Redo',
                       );
                     },
                   ),
-                  if (_isDrawingMode)
+                  // Only show Pen and Eraser in drawing mode
+                  if (_isDrawingMode) ...[
+                    // Pen
                     IconButton(
+                      icon: FaIcon(
+                        FontAwesomeIcons.pen,
+                        size: 20,
+                        color:
+                            !_isEraserStrokeMode
+                                ? Colors.black
+                                : Colors.grey.shade300,
+                      ),
                       onPressed: () {
-                        // Toggle eraser mode
-                        // if (_drawingController.drawConfig.value.contentType ==
-                        //     Eraser) {
-                        if (_isEraserStrokeMode) {
-                          // Switch back to drawing mode (SimpleLine)
+                        setState(() {
                           _isEraserStrokeMode = false;
                           _drawingController.setPaintContent(SimpleLine());
-                        } else {
+                        });
+                      },
+                      tooltip: 'Pen',
+                    ),
+                    // Eraser
+                    IconButton(
+                      icon: FaIcon(
+                        FontAwesomeIcons.eraser,
+                        size: 20,
+                        color:
+                            _isEraserStrokeMode
+                                ? Colors.black
+                                : Colors.grey.shade300,
+                      ),
+                      onPressed: () {
+                        setState(() {
                           _isEraserStrokeMode = true;
-                          // _drawingController.setPaintContent(Eraser());
                           _drawingController.setPaintContent(
                             NoOpPaintContent(),
                           );
-                        }
-                        setState(() {}); // Refresh UI to show current tool
+                        });
                       },
-                      icon:
-                          _isEraserStrokeMode
-                              ? FaIcon(
-                                FontAwesomeIcons.pen,
-                                color: Theme.of(context).colorScheme.onPrimary,
-                              )
-                              : FaIcon(
-                                FontAwesomeIcons.eraser,
-                                color: Theme.of(context).colorScheme.onPrimary,
-                              ),
-                      tooltip:
-                          _isEraserStrokeMode ? 'Drawing Mode' : 'Eraser Mode',
+                      tooltip: 'Eraser',
                     ),
-                  // IconButton(
-                  //   icon: Icon(Icons.adb_rounded),
-                  //   color: Theme.of(context).colorScheme.onPrimary,
-                  //   onPressed: () {
-                  //     log('button pressed');
-                  //     _drawingController.removeLastContent();
-                  //     // _loadDrawingFromJson(drawingData);
-                  //   },
-                  // ),
+                  ],
                 ],
               ),
             ),
@@ -483,11 +469,10 @@ class _CreateNoteViewState extends State<CreateNoteView> {
                           MediaQuery.of(context).padding.top -
                           kToolbarHeight -
                           48 -
-                          16, // Subtract AppBar, bottom bar, and safe area
+                          16,
                     ),
                     child: Stack(
                       children: [
-                        // Text field with padding
                         Padding(
                           padding: const EdgeInsets.symmetric(
                             horizontal: 16.0,
@@ -523,7 +508,7 @@ class _CreateNoteViewState extends State<CreateNoteView> {
                                     ),
                                   ),
                                   style: GoogleFonts.poppins(
-                                    fontSize: 18,
+                                    fontSize: 15, // Modern note app size
                                     color:
                                         Theme.of(context).colorScheme.onSurface,
                                     decorationColor:

@@ -66,13 +66,13 @@ class NoteGridItem extends StatelessWidget {
                       children: [
                         Text(
                           note.title,
-                          style: GoogleFonts.poppins(fontSize: 18),
+                          style: GoogleFonts.poppins(fontSize: 15),
                           maxLines: 1,
                         ),
                         Flexible(
                           child: Text(
                             note.body,
-                            style: GoogleFonts.poppins(),
+                            style: GoogleFonts.poppins(fontSize: 15),
                             maxLines: 5,
                             overflow: TextOverflow.ellipsis,
                           ),

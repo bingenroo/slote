@@ -58,7 +58,7 @@ class _HomeViewState extends State<HomeView> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        toolbarHeight: 80,
+        toolbarHeight: 52, // Match create_note
         title: Padding(
           padding: const EdgeInsets.all(5.0),
           child: Row(
@@ -66,14 +66,12 @@ class _HomeViewState extends State<HomeView> {
             children: [
               Text(
                 AppStrings.appName,
-                style: GoogleFonts.poppins(fontSize: 28),
+                style: GoogleFonts.poppins(fontSize: 20), // Match create_note
               ),
-              SizedBox(width: 16), // Add space between title and button group
-              // Selection mode UI
+              SizedBox(width: 16),
               if (_selectionMode) ...[
                 Row(
                   children: [
-                    // Select All Checkmark
                     GestureDetector(
                       onTap: () {
                         final allSelected =
@@ -84,7 +82,6 @@ class _HomeViewState extends State<HomeView> {
                             _selectedNoteIds = Set.from(_lastNoteIds ?? []);
                           } else {
                             _selectedNoteIds.clear();
-                            // Do not set _selectionMode = false here
                           }
                         });
                       },
@@ -93,12 +90,12 @@ class _HomeViewState extends State<HomeView> {
                                   _selectedNoteIds.isNotEmpty
                               ? AppCheckmark(
                                 color: Colors.grey,
-                                size: 26,
+                                size: 20, // Slightly smaller
                                 showShadow: false,
                               )
                               : Container(
-                                width: 26,
-                                height: 26,
+                                width: 20,
+                                height: 20,
                                 decoration: BoxDecoration(
                                   color: Colors.transparent,
                                   shape: BoxShape.circle,
@@ -116,7 +113,7 @@ class _HomeViewState extends State<HomeView> {
                                 ),
                               ),
                     ),
-                    const SizedBox(width: 12),
+                    const SizedBox(width: 8),
                     IconButton(
                       onPressed: () async {
                         final shouldDelete = await showDialog<bool>(
@@ -125,7 +122,7 @@ class _HomeViewState extends State<HomeView> {
                             return AlertDialog(
                               title: Text(
                                 "Delete Notes?",
-                                style: GoogleFonts.poppins(fontSize: 20),
+                                style: GoogleFonts.poppins(fontSize: 18),
                               ),
                               content: Column(
                                 mainAxisSize: MainAxisSize.min,
@@ -135,7 +132,7 @@ class _HomeViewState extends State<HomeView> {
                                   SizedBox(height: 16),
                                   Text(
                                     "Are you sure you want to delete the selected notes permanently?",
-                                    style: GoogleFonts.poppins(fontSize: 16),
+                                    style: GoogleFonts.poppins(fontSize: 15),
                                     textAlign: TextAlign.center,
                                   ),
                                 ],
@@ -171,7 +168,7 @@ class _HomeViewState extends State<HomeView> {
                       icon: FaIcon(
                         FontAwesomeIcons.trash,
                         color: Theme.of(context).colorScheme.onPrimary,
-                        size: 24,
+                        size: 18, // Match create_note
                       ),
                     ),
                     IconButton(
@@ -179,7 +176,7 @@ class _HomeViewState extends State<HomeView> {
                       icon: FaIcon(
                         FontAwesomeIcons.xmark,
                         color: Theme.of(context).colorScheme.onPrimary,
-                        size: 24,
+                        size: 18, // Match create_note
                       ),
                     ),
                   ],
@@ -196,15 +193,14 @@ class _HomeViewState extends State<HomeView> {
                         ? FontAwesomeIcons.listUl
                         : FontAwesomeIcons.tableCellsLarge,
                     color: Theme.of(context).colorScheme.onPrimary,
-                    size: 24,
+                    size: 18, // Match create_note
                   ),
                 ),
               ],
             ],
           ),
         ),
-        automaticallyImplyLeading:
-            false, // Removes default back button if needed
+        automaticallyImplyLeading: false,
       ),
       body: SafeArea(
         child: Column(
