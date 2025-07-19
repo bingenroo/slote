@@ -10,8 +10,6 @@ import 'package:slote/src/functions/undo_redo.dart';
 import 'package:undo/undo.dart';
 import 'package:flutter_drawing_board/flutter_drawing_board.dart';
 import 'package:flutter_drawing_board/paint_contents.dart';
-import 'package:slote/src/functions/extended_drawing_controller.dart';
-import 'package:slote/src/functions/drawing_utils.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 
 class CreateNoteView extends StatefulWidget {
@@ -162,9 +160,15 @@ class _CreateNoteViewState extends State<CreateNoteView> {
           final List<dynamic> drawingJson = json.decode(
             widget.note!.drawingData!,
           );
-          final List<PaintContent> contents = paintContentsFromJson(
-            drawingJson,
-          );
+          final List<PaintContent> contents =
+              drawingJson.map((json) {
+                if (json['type'] == 'SimpleLine') {
+                  return SimpleLine.fromJson(json);
+                } else if (json['type'] == 'Eraser') {
+                  return Eraser.fromJson(json);
+                }
+                return NoOpPaintContent(); // Fallback for unknown types
+              }).toList();
           if (contents.isNotEmpty) {
             _drawingController.addContents(contents);
           }
