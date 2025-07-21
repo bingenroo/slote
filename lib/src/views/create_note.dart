@@ -11,6 +11,9 @@ import 'package:undo/undo.dart';
 import 'package:flutter_drawing_board/flutter_drawing_board.dart';
 import 'package:flutter_drawing_board/paint_contents.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:slote/src/functions/drawing_utils.dart';
+import 'package:flutter/gestures.dart';
+import 'package:flutter/services.dart';
 
 class CreateNoteView extends StatefulWidget {
   const CreateNoteView({super.key, this.note});
@@ -55,6 +58,15 @@ class _CreateNoteViewState extends State<CreateNoteView> {
   bool _isDrawingMode = false;
   // bool _isStrokeEraserMode = false;
   bool _isEraserStrokeMode = false; // Add this flag
+
+  // Add for zoom/pan
+  final TransformationController _transformController =
+      TransformationController();
+  int _pointerCount = 0;
+  bool _isCtrlPressed = false;
+  final GlobalKey _painterKey = GlobalKey();
+
+  bool _isFrameLocked = true; // Start in editing mode
 
   // Pen settings state
   Color _penColor = Colors.black;
@@ -292,6 +304,12 @@ class _CreateNoteViewState extends State<CreateNoteView> {
     );
   }
 
+  // Helper to convert global to local coordinates (no matrix transform needed now)
+  Offset _globalToLocal(Offset global) {
+    final renderBox = context.findRenderObject() as RenderBox;
+    return renderBox.globalToLocal(global);
+  }
+
   @override
   void initState() {
     super.initState();
@@ -350,6 +368,7 @@ class _CreateNoteViewState extends State<CreateNoteView> {
         }
       }
     }
+    RawKeyboard.instance.addListener(_handleRawKeyEvent);
   }
 
   @override
@@ -357,6 +376,7 @@ class _CreateNoteViewState extends State<CreateNoteView> {
     _eraserThrottleTimer?.cancel();
     _saveNoteData();
     _drawingController.removeListener(_trackDrawingChanges);
+    RawKeyboard.instance.removeListener(_handleRawKeyEvent);
 
     _titleController.dispose();
     _bodyController.dispose();
@@ -366,6 +386,12 @@ class _CreateNoteViewState extends State<CreateNoteView> {
     _drawingController.dispose();
 
     super.dispose();
+  }
+
+  void _handleRawKeyEvent(RawKeyEvent event) {
+    setState(() {
+      _isCtrlPressed = event.isControlPressed;
+    });
   }
 
   void _saveNoteData() async {
@@ -640,130 +666,190 @@ class _CreateNoteViewState extends State<CreateNoteView> {
                           48 -
                           16,
                     ),
-                    child: Stack(
-                      children: [
-                        Padding(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 16.0,
-                            vertical: 8.0,
-                          ),
-                          child: Column(
-                            children: [
-                              AbsorbPointer(
-                                absorbing: _isDrawingMode,
-                                child: TextField(
-                                  controller: _bodyController,
-                                  decoration: InputDecoration(
-                                    border: UnderlineInputBorder(
-                                      borderSide: BorderSide(
-                                        color: Colors.transparent,
+                    // --- REPLACE Stack with InteractiveViewer ---
+                    child: InteractiveViewer(
+                      transformationController: _transformController,
+                      boundaryMargin: EdgeInsets.zero,
+                      constrained: true,
+                      minScale: 1.0,
+                      maxScale: 10.0,
+                      panEnabled:
+                          !_isFrameLocked, // Only allow pan when frame unlocked
+                      scaleEnabled:
+                          !_isFrameLocked, // Only allow zoom when frame unlocked
+                      onInteractionStart: (details) {
+                        setState(() {
+                          _pointerCount = details.pointerCount;
+                          _isFrameLocked =
+                              _pointerCount == 1; // Lock when only one finger
+                        });
+                      },
+                      onInteractionEnd: (details) {
+                        setState(() {
+                          _pointerCount = 0;
+                          _isFrameLocked =
+                              true; // Lock by default when no interaction
+                        });
+                      },
+                      child: Stack(
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16.0,
+                              vertical: 8.0,
+                            ),
+                            child: Column(
+                              children: [
+                                AbsorbPointer(
+                                  absorbing: _isDrawingMode,
+                                  child: TextField(
+                                    controller: _bodyController,
+                                    decoration: InputDecoration(
+                                      border: UnderlineInputBorder(
+                                        borderSide: BorderSide(
+                                          color: Colors.transparent,
+                                        ),
+                                      ),
+                                      enabledBorder: UnderlineInputBorder(
+                                        borderSide: BorderSide(
+                                          color: Colors.transparent,
+                                        ),
+                                      ),
+                                      focusedBorder: UnderlineInputBorder(
+                                        borderSide: BorderSide(
+                                          color: Colors.transparent,
+                                        ),
+                                      ),
+                                      hintText: "Description",
+                                      hintStyle: TextStyle(
+                                        color: Theme.of(
+                                          context,
+                                        ).colorScheme.onSurface.withAlpha(30),
                                       ),
                                     ),
-                                    enabledBorder: UnderlineInputBorder(
-                                      borderSide: BorderSide(
-                                        color: Colors.transparent,
-                                      ),
+                                    style: GoogleFonts.poppins(
+                                      fontSize: 15, // Modern note app size
+                                      color:
+                                          Theme.of(
+                                            context,
+                                          ).colorScheme.onSurface,
+                                      decorationColor:
+                                          Theme.of(
+                                            context,
+                                          ).colorScheme.onSurface,
                                     ),
-                                    focusedBorder: UnderlineInputBorder(
-                                      borderSide: BorderSide(
-                                        color: Colors.transparent,
-                                      ),
-                                    ),
-                                    hintText: "Description",
-                                    hintStyle: TextStyle(
-                                      color: Theme.of(
-                                        context,
-                                      ).colorScheme.onSurface.withAlpha(30),
-                                    ),
-                                  ),
-                                  style: GoogleFonts.poppins(
-                                    fontSize: 15, // Modern note app size
-                                    color:
+                                    maxLines: null,
+                                    minLines: 20,
+                                    readOnly: _isDrawingMode,
+                                    enableInteractiveSelection: !_isDrawingMode,
+                                    cursorColor:
                                         Theme.of(context).colorScheme.onSurface,
-                                    decorationColor:
-                                        Theme.of(context).colorScheme.onSurface,
+                                    contextMenuBuilder:
+                                        _isDrawingMode
+                                            ? null
+                                            : (context, editableTextState) {
+                                              return AdaptiveTextSelectionToolbar.editableText(
+                                                editableTextState:
+                                                    editableTextState,
+                                              );
+                                            },
                                   ),
-                                  maxLines: null,
-                                  minLines: 20,
-                                  readOnly: _isDrawingMode,
-                                  enableInteractiveSelection: !_isDrawingMode,
-                                  cursorColor:
-                                      Theme.of(context).colorScheme.onSurface,
-                                  contextMenuBuilder:
-                                      _isDrawingMode
-                                          ? null
-                                          : (context, editableTextState) {
-                                            return AdaptiveTextSelectionToolbar.editableText(
-                                              editableTextState:
-                                                  editableTextState,
-                                            );
-                                          },
                                 ),
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
-                        ),
-                        // Drawing board overlay - now part of scrollable content
-                        Positioned.fill(
-                          child: LayoutBuilder(
-                            builder: (
-                              BuildContext context,
-                              BoxConstraints constraints,
-                            ) {
-                              // Wrap the drawing area with a GestureDetector for long-press
-                              return IgnorePointer(
-                                ignoring:
-                                    !_isDrawingMode, // Block drawing interaction when in text mode
+                          // Drawing overlay
+                          Positioned.fill(
+                            child: IgnorePointer(
+                              ignoring: !_isDrawingMode,
+                              child: Listener(
+                                onPointerDown: (event) {
+                                  if (_isFrameLocked) {
+                                    final renderBox =
+                                        _painterKey.currentContext
+                                                ?.findRenderObject()
+                                            as RenderBox?;
+                                    if (renderBox == null) return;
+
+                                    // Get correct local position with transformation
+                                    final local = _getLocalPosition(
+                                      renderBox,
+                                      event.position,
+                                      _transformController,
+                                    );
+
+                                    if (_isDrawingMode) {
+                                      if (_isEraserStrokeMode) {
+                                        _handleEraserStart(local);
+                                      } else {
+                                        _drawingController.startDraw(local);
+                                      }
+                                    }
+                                  }
+                                },
+                                onPointerMove: (event) {
+                                  if (_isFrameLocked) {
+                                    final renderBox =
+                                        _painterKey.currentContext
+                                                ?.findRenderObject()
+                                            as RenderBox?;
+                                    if (renderBox == null) return;
+
+                                    final local = _getLocalPosition(
+                                      renderBox,
+                                      event.position,
+                                      _transformController,
+                                    );
+
+                                    if (_isDrawingMode) {
+                                      if (_isEraserStrokeMode) {
+                                        _handleEraserUpdate(local);
+                                      } else {
+                                        _drawingController.drawing(local);
+                                      }
+                                    }
+                                  }
+                                },
+                                onPointerUp: (event) {
+                                  if (_isFrameLocked) {
+                                    if (_isDrawingMode) {
+                                      if (_isEraserStrokeMode) {
+                                        _handleEraserEnd();
+                                      } else {
+                                        _drawingController.endDraw();
+                                      }
+                                    }
+                                  }
+                                },
                                 child: Stack(
                                   children: [
-                                    // Drawing board
-                                    DrawingBoard(
-                                      controller: _drawingController,
-                                      background: SizedBox(
-                                        width: constraints.maxWidth,
-                                        height: constraints.maxHeight,
+                                    // Drawing painter
+                                    RepaintBoundary(
+                                      key: _painterKey,
+                                      child: CustomPaint(
+                                        painter: _DrawingPainter(
+                                          controller: _drawingController,
+                                        ),
+                                        size: Size.infinite,
                                       ),
                                     ),
-                                    // Show eraser overlay only when in eraser mode
+                                    // Eraser cursor overlay
                                     if (_isEraserStrokeMode)
-                                      GestureDetector(
-                                        onPanStart: (details) {
-                                          final local = (context
-                                                      .findRenderObject()
-                                                  as RenderBox)
-                                              .globalToLocal(
-                                                details.globalPosition,
-                                              );
-                                          _handleEraserStart(local);
-                                        },
-                                        onPanUpdate: (details) {
-                                          final local = (context
-                                                      .findRenderObject()
-                                                  as RenderBox)
-                                              .globalToLocal(
-                                                details.globalPosition,
-                                              );
-                                          _handleEraserUpdate(local);
-                                        },
-                                        onPanEnd: (_) {
-                                          _handleEraserEnd();
-                                        },
-                                        child: CustomPaint(
-                                          painter: _EraserCursorPainter(
-                                            _eraserCursorPosition,
-                                            _eraserRadius,
-                                          ),
-                                          size: Size.infinite,
+                                      CustomPaint(
+                                        painter: _EraserCursorPainter(
+                                          _eraserCursorPosition,
+                                          _eraserRadius,
                                         ),
+                                        size: Size.infinite,
                                       ),
                                   ],
                                 ),
-                              );
-                            },
+                              ),
+                            ),
                           ),
-                        ),
-                      ],
-                    ),
+                        ],
+                      ),
+                    ), // end InteractiveViewer child
                   ),
                 ),
               ),
@@ -771,10 +857,25 @@ class _CreateNoteViewState extends State<CreateNoteView> {
           ],
         ),
       ),
-
-      // Remove the _buildTextMode() and _buildDrawingMode() methods
     );
   }
+}
+
+Offset _getLocalPosition(
+  RenderBox renderBox,
+  Offset globalPosition,
+  TransformationController transformController,
+) {
+  final local = renderBox.globalToLocal(globalPosition);
+
+  // Apply inverse transformation if InteractiveViewer is transformed
+  if (transformController.value != Matrix4.identity()) {
+    final inverseMatrix = Matrix4.tryInvert(transformController.value);
+    if (inverseMatrix != null) {
+      return MatrixUtils.transformPoint(inverseMatrix, local);
+    }
+  }
+  return local;
 }
 
 // New: Modern eraser cursor painter
@@ -805,4 +906,30 @@ class _EraserCursorPainter extends CustomPainter {
   bool shouldRepaint(covariant _EraserCursorPainter oldDelegate) {
     return oldDelegate.position != position || oldDelegate.radius != radius;
   }
+}
+
+// Add custom painter for drawing overlay
+class _DrawingPainter extends CustomPainter {
+  final DrawingController controller;
+  _DrawingPainter({required this.controller}) : super(repaint: controller);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    // Get all finished contents
+    final contents = paintContentsFromJson(controller.getJsonList());
+
+    // Draw all finished strokes
+    for (final content in contents) {
+      content.draw(canvas, size, false);
+    }
+
+    // Get current stroke if exists (this is the Flutter Drawing Board internal way)
+    final currentContent = controller.currentContent;
+    if (currentContent != null) {
+      currentContent.draw(canvas, size, false);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _DrawingPainter old) => true;
 }
