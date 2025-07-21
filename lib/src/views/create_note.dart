@@ -63,6 +63,7 @@ class _CreateNoteViewState extends State<CreateNoteView> {
   final TransformationController _transformController =
       TransformationController();
   int _pointerCount = 0;
+  int _activePointers = 0;
   bool _isCtrlPressed = false;
   final GlobalKey _painterKey = GlobalKey();
 
@@ -145,8 +146,8 @@ class _CreateNoteViewState extends State<CreateNoteView> {
     }
     _currentEraserPath.clear();
     _lastPointerPosition = null;
-    _eraserCursorPosition = null; // Clear visual
-    setState(() {});
+    _eraserCursorPosition = null;
+    setState(() {}); // Ensure UI updates
   }
 
   void _trackDrawingChanges() {
@@ -673,23 +674,32 @@ class _CreateNoteViewState extends State<CreateNoteView> {
                       constrained: true,
                       minScale: 1.0,
                       maxScale: 10.0,
-                      panEnabled:
-                          !_isFrameLocked, // Only allow pan when frame unlocked
-                      scaleEnabled:
-                          !_isFrameLocked, // Only allow zoom when frame unlocked
+                      panEnabled: true, // Always allow pan
+                      scaleEnabled: true, // Always allow zoom
                       onInteractionStart: (details) {
                         setState(() {
-                          _pointerCount = details.pointerCount;
+                          // Only lock frame if it's a single touch in drawing mode
                           _isFrameLocked =
-                              _pointerCount == 1; // Lock when only one finger
+                              _isDrawingMode && details.pointerCount == 1;
+
+                          // Immediately clear eraser state when multi-touch begins
+                          if (details.pointerCount > 1 && _isEraserStrokeMode) {
+                            _handleEraserEnd();
+                          }
                         });
                       },
                       onInteractionEnd: (details) {
                         setState(() {
-                          _pointerCount = 0;
-                          _isFrameLocked =
-                              true; // Lock by default when no interaction
+                          _isFrameLocked = true; // Always reset frame lock
                         });
+
+                        // Reset both drawing and eraser states
+                        if (_isDrawingMode) {
+                          _drawingController.endDraw();
+                          if (_isEraserStrokeMode) {
+                            _eraserCursorPosition = null;
+                          }
+                        }
                       },
                       child: Stack(
                         children: [
@@ -764,31 +774,29 @@ class _CreateNoteViewState extends State<CreateNoteView> {
                               ignoring: !_isDrawingMode,
                               child: Listener(
                                 onPointerDown: (event) {
-                                  if (_isFrameLocked) {
+                                  if (_isDrawingMode && _isFrameLocked) {
                                     final renderBox =
                                         _painterKey.currentContext
                                                 ?.findRenderObject()
                                             as RenderBox?;
                                     if (renderBox == null) return;
 
-                                    // Get correct local position with transformation
                                     final local = _getLocalPosition(
                                       renderBox,
                                       event.position,
                                       _transformController,
                                     );
 
-                                    if (_isDrawingMode) {
-                                      if (_isEraserStrokeMode) {
-                                        _handleEraserStart(local);
-                                      } else {
-                                        _drawingController.startDraw(local);
-                                      }
+                                    if (_isEraserStrokeMode) {
+                                      _handleEraserStart(local);
+                                    } else {
+                                      _drawingController.endDraw();
+                                      _drawingController.startDraw(local);
                                     }
                                   }
                                 },
                                 onPointerMove: (event) {
-                                  if (_isFrameLocked) {
+                                  if (_isDrawingMode && _isFrameLocked) {
                                     final renderBox =
                                         _painterKey.currentContext
                                                 ?.findRenderObject()
@@ -801,23 +809,27 @@ class _CreateNoteViewState extends State<CreateNoteView> {
                                       _transformController,
                                     );
 
-                                    if (_isDrawingMode) {
-                                      if (_isEraserStrokeMode) {
-                                        _handleEraserUpdate(local);
-                                      } else {
-                                        _drawingController.drawing(local);
-                                      }
+                                    if (_isEraserStrokeMode) {
+                                      _handleEraserUpdate(local);
+                                    } else {
+                                      _drawingController.drawing(local);
                                     }
                                   }
                                 },
                                 onPointerUp: (event) {
-                                  if (_isFrameLocked) {
-                                    if (_isDrawingMode) {
-                                      if (_isEraserStrokeMode) {
-                                        _handleEraserEnd();
-                                      } else {
-                                        _drawingController.endDraw();
-                                      }
+                                  if (_isDrawingMode) {
+                                    if (_isEraserStrokeMode) {
+                                      _handleEraserEnd();
+                                    } else {
+                                      _drawingController.endDraw();
+                                    }
+                                  }
+                                },
+                                onPointerCancel: (event) {
+                                  if (_isDrawingMode) {
+                                    _drawingController.endDraw();
+                                    if (_isEraserStrokeMode) {
+                                      _handleEraserEnd();
                                     }
                                   }
                                 },
@@ -866,9 +878,10 @@ Offset _getLocalPosition(
   Offset globalPosition,
   TransformationController transformController,
 ) {
+  // Get the position relative to the widget
   final local = renderBox.globalToLocal(globalPosition);
 
-  // Apply inverse transformation if InteractiveViewer is transformed
+  // Apply inverse transformation to account for zoom/pan
   if (transformController.value != Matrix4.identity()) {
     final inverseMatrix = Matrix4.tryInvert(transformController.value);
     if (inverseMatrix != null) {
