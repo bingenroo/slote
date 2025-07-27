@@ -796,19 +796,15 @@ class _CreateNoteViewState extends State<CreateNoteView> {
                                     if (_isDrawingMode &&
                                         _activeToolPointerId == null) {
                                       _activeToolPointerId = event.pointer;
-                                      log(
-                                        "activeToolPointerId: $_activeToolPointerId",
-                                      );
                                       final renderBox =
                                           _painterKey.currentContext
                                                   ?.findRenderObject()
                                               as RenderBox?;
                                       if (renderBox == null) return;
 
-                                      final local = _getLocalPosition(
+                                      final local = _globalToPainterLocal(
                                         renderBox,
                                         event.position,
-                                        _transformController,
                                       );
 
                                       if (_isEraserStrokeMode) {
@@ -828,10 +824,9 @@ class _CreateNoteViewState extends State<CreateNoteView> {
                                               as RenderBox?;
                                       if (renderBox == null) return;
 
-                                      final local = _getLocalPosition(
+                                      final local = _globalToPainterLocal(
                                         renderBox,
                                         event.position,
-                                        _transformController,
                                       );
 
                                       if (_isEraserStrokeMode) {
@@ -909,22 +904,8 @@ class _CreateNoteViewState extends State<CreateNoteView> {
   }
 }
 
-Offset _getLocalPosition(
-  RenderBox renderBox,
-  Offset globalPosition,
-  TransformationController transformController,
-) {
-  // Get the position relative to the widget
-  final local = renderBox.globalToLocal(globalPosition);
-
-  // Apply inverse transformation to account for zoom/pan
-  if (transformController.value != Matrix4.identity()) {
-    final inverseMatrix = Matrix4.tryInvert(transformController.value);
-    if (inverseMatrix != null) {
-      return MatrixUtils.transformPoint(inverseMatrix, local);
-    }
-  }
-  return local;
+Offset _globalToPainterLocal(RenderBox renderBox, Offset globalPosition) {
+  return renderBox.globalToLocal(globalPosition);
 }
 
 // New: Modern eraser cursor painter
