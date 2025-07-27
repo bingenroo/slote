@@ -12,8 +12,8 @@ import 'package:flutter_drawing_board/flutter_drawing_board.dart';
 import 'package:flutter_drawing_board/paint_contents.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:slote/src/functions/drawing_utils.dart';
-import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
+// import 'dart:developer';
 
 class CreateNoteView extends StatefulWidget {
   const CreateNoteView({super.key, this.note});
@@ -62,12 +62,9 @@ class _CreateNoteViewState extends State<CreateNoteView> {
   // Add for zoom/pan
   final TransformationController _transformController =
       TransformationController();
-  int _pointerCount = 0;
   int _activePointers = 0;
   bool _isCtrlPressed = false;
   final GlobalKey _painterKey = GlobalKey();
-
-  bool _isFrameLocked = true; // Start in editing mode
 
   // Pen settings state
   Color _penColor = Colors.black;
@@ -668,200 +665,219 @@ class _CreateNoteViewState extends State<CreateNoteView> {
                           16,
                     ),
                     // --- REPLACE Stack with InteractiveViewer ---
-                    child: InteractiveViewer(
-                      transformationController: _transformController,
-                      boundaryMargin: EdgeInsets.zero,
-                      constrained: true,
-                      minScale: 1.0,
-                      maxScale: 10.0,
-                      panEnabled: true, // Always allow pan
-                      scaleEnabled: true, // Always allow zoom
-                      onInteractionStart: (details) {
+                    child: Listener(
+                      onPointerDown: (event) {
                         setState(() {
-                          // Only lock frame if it's a single touch in drawing mode
-                          _isFrameLocked =
-                              _isDrawingMode && details.pointerCount == 1;
-
-                          // Immediately clear eraser state when multi-touch begins
-                          if (details.pointerCount > 1 && _isEraserStrokeMode) {
-                            _handleEraserEnd();
-                          }
+                          _activePointers += 1;
                         });
                       },
-                      onInteractionEnd: (details) {
+                      onPointerUp: (event) {
                         setState(() {
-                          _isFrameLocked = true; // Always reset frame lock
+                          _activePointers -= 1;
                         });
-
-                        // Reset both drawing and eraser states
-                        if (_isDrawingMode) {
-                          _drawingController.endDraw();
-                          if (_isEraserStrokeMode) {
-                            _eraserCursorPosition = null;
-                          }
-                        }
                       },
-                      child: Stack(
-                        children: [
-                          Padding(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 16.0,
-                              vertical: 8.0,
-                            ),
-                            child: Column(
-                              children: [
-                                AbsorbPointer(
-                                  absorbing: _isDrawingMode,
-                                  child: TextField(
-                                    controller: _bodyController,
-                                    decoration: InputDecoration(
-                                      border: UnderlineInputBorder(
-                                        borderSide: BorderSide(
-                                          color: Colors.transparent,
+                      // onPointerCancel: (event) {
+                      //   setState(() {
+                      //     _activePointers =
+                      //         0; // Or decrement if you want, but usually reset
+                      //   });
+                      // },
+                      child: InteractiveViewer(
+                        transformationController: _transformController,
+                        boundaryMargin: EdgeInsets.zero,
+                        constrained: true,
+                        minScale: 1.0,
+                        maxScale: 10.0,
+                        panEnabled: (_activePointers == 2), // Always allow pan
+                        scaleEnabled:
+                            (_activePointers == 2), // Always allow zoom
+                        onInteractionStart: (details) {
+                          setState(() {
+                            // Immediately clear eraser state when multi-touch begins
+                            if (details.pointerCount > 1 &&
+                                _isEraserStrokeMode) {
+                              _handleEraserEnd();
+                            }
+                          });
+                        },
+                        onInteractionEnd: (details) {
+                          // Reset both drawing and eraser states
+                          if (_isDrawingMode) {
+                            _drawingController.endDraw();
+                            if (_isEraserStrokeMode) {
+                              _eraserCursorPosition = null;
+                            }
+                          }
+                        },
+                        child: Stack(
+                          children: [
+                            Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16.0,
+                                vertical: 8.0,
+                              ),
+                              child: Column(
+                                children: [
+                                  AbsorbPointer(
+                                    absorbing: _isDrawingMode,
+                                    child: TextField(
+                                      controller: _bodyController,
+                                      decoration: InputDecoration(
+                                        border: UnderlineInputBorder(
+                                          borderSide: BorderSide(
+                                            color: Colors.transparent,
+                                          ),
+                                        ),
+                                        enabledBorder: UnderlineInputBorder(
+                                          borderSide: BorderSide(
+                                            color: Colors.transparent,
+                                          ),
+                                        ),
+                                        focusedBorder: UnderlineInputBorder(
+                                          borderSide: BorderSide(
+                                            color: Colors.transparent,
+                                          ),
+                                        ),
+                                        hintText: "Description",
+                                        hintStyle: TextStyle(
+                                          color: Theme.of(
+                                            context,
+                                          ).colorScheme.onSurface.withAlpha(30),
                                         ),
                                       ),
-                                      enabledBorder: UnderlineInputBorder(
-                                        borderSide: BorderSide(
-                                          color: Colors.transparent,
-                                        ),
+                                      style: GoogleFonts.poppins(
+                                        fontSize: 15, // Modern note app size
+                                        color:
+                                            Theme.of(
+                                              context,
+                                            ).colorScheme.onSurface,
+                                        decorationColor:
+                                            Theme.of(
+                                              context,
+                                            ).colorScheme.onSurface,
                                       ),
-                                      focusedBorder: UnderlineInputBorder(
-                                        borderSide: BorderSide(
-                                          color: Colors.transparent,
-                                        ),
-                                      ),
-                                      hintText: "Description",
-                                      hintStyle: TextStyle(
-                                        color: Theme.of(
-                                          context,
-                                        ).colorScheme.onSurface.withAlpha(30),
-                                      ),
-                                    ),
-                                    style: GoogleFonts.poppins(
-                                      fontSize: 15, // Modern note app size
-                                      color:
+                                      maxLines: null,
+                                      minLines: 20,
+                                      readOnly: _isDrawingMode,
+                                      enableInteractiveSelection:
+                                          !_isDrawingMode,
+                                      cursorColor:
                                           Theme.of(
                                             context,
                                           ).colorScheme.onSurface,
-                                      decorationColor:
-                                          Theme.of(
-                                            context,
-                                          ).colorScheme.onSurface,
+                                      contextMenuBuilder:
+                                          _isDrawingMode
+                                              ? null
+                                              : (context, editableTextState) {
+                                                return AdaptiveTextSelectionToolbar.editableText(
+                                                  editableTextState:
+                                                      editableTextState,
+                                                );
+                                              },
                                     ),
-                                    maxLines: null,
-                                    minLines: 20,
-                                    readOnly: _isDrawingMode,
-                                    enableInteractiveSelection: !_isDrawingMode,
-                                    cursorColor:
-                                        Theme.of(context).colorScheme.onSurface,
-                                    contextMenuBuilder:
-                                        _isDrawingMode
-                                            ? null
-                                            : (context, editableTextState) {
-                                              return AdaptiveTextSelectionToolbar.editableText(
-                                                editableTextState:
-                                                    editableTextState,
-                                              );
-                                            },
                                   ),
-                                ),
-                              ],
+                                ],
+                              ),
                             ),
-                          ),
-                          // Drawing overlay
-                          Positioned.fill(
-                            child: IgnorePointer(
-                              ignoring: !_isDrawingMode,
-                              child: Listener(
-                                onPointerDown: (event) {
-                                  if (_isDrawingMode && _isFrameLocked) {
-                                    final renderBox =
-                                        _painterKey.currentContext
-                                                ?.findRenderObject()
-                                            as RenderBox?;
-                                    if (renderBox == null) return;
+                            // Drawing overlay
+                            Positioned.fill(
+                              child: IgnorePointer(
+                                ignoring: !_isDrawingMode,
+                                child: Listener(
+                                  onPointerDown: (event) {
+                                    if (_isDrawingMode &&
+                                        _activePointers == 1) {
+                                      final renderBox =
+                                          _painterKey.currentContext
+                                                  ?.findRenderObject()
+                                              as RenderBox?;
+                                      if (renderBox == null) return;
 
-                                    final local = _getLocalPosition(
-                                      renderBox,
-                                      event.position,
-                                      _transformController,
-                                    );
+                                      final local = _getLocalPosition(
+                                        renderBox,
+                                        event.position,
+                                        _transformController,
+                                      );
 
-                                    if (_isEraserStrokeMode) {
-                                      _handleEraserStart(local);
-                                    } else {
+                                      if (_isEraserStrokeMode) {
+                                        _handleEraserStart(local);
+                                      } else {
+                                        _drawingController.endDraw();
+                                        _drawingController.startDraw(local);
+                                      }
+                                    }
+                                  },
+                                  onPointerMove: (event) {
+                                    if (_isDrawingMode &&
+                                        _activePointers == 1) {
+                                      final renderBox =
+                                          _painterKey.currentContext
+                                                  ?.findRenderObject()
+                                              as RenderBox?;
+                                      if (renderBox == null) return;
+
+                                      final local = _getLocalPosition(
+                                        renderBox,
+                                        event.position,
+                                        _transformController,
+                                      );
+
+                                      if (_isEraserStrokeMode) {
+                                        _handleEraserUpdate(local);
+                                      } else {
+                                        _drawingController.drawing(local);
+                                      }
+                                    }
+                                  },
+                                  onPointerUp: (event) {
+                                    if (_isDrawingMode) {
+                                      if (_isEraserStrokeMode) {
+                                        _handleEraserEnd();
+                                      } else {
+                                        _drawingController.endDraw();
+                                      }
+                                    }
+                                  },
+                                  onPointerCancel: (event) {
+                                    if (_isDrawingMode) {
                                       _drawingController.endDraw();
-                                      _drawingController.startDraw(local);
+                                      if (_isEraserStrokeMode) {
+                                        _handleEraserEnd();
+                                      }
                                     }
-                                  }
-                                },
-                                onPointerMove: (event) {
-                                  if (_isDrawingMode && _isFrameLocked) {
-                                    final renderBox =
-                                        _painterKey.currentContext
-                                                ?.findRenderObject()
-                                            as RenderBox?;
-                                    if (renderBox == null) return;
-
-                                    final local = _getLocalPosition(
-                                      renderBox,
-                                      event.position,
-                                      _transformController,
-                                    );
-
-                                    if (_isEraserStrokeMode) {
-                                      _handleEraserUpdate(local);
-                                    } else {
-                                      _drawingController.drawing(local);
-                                    }
-                                  }
-                                },
-                                onPointerUp: (event) {
-                                  if (_isDrawingMode) {
-                                    if (_isEraserStrokeMode) {
-                                      _handleEraserEnd();
-                                    } else {
-                                      _drawingController.endDraw();
-                                    }
-                                  }
-                                },
-                                onPointerCancel: (event) {
-                                  if (_isDrawingMode) {
-                                    _drawingController.endDraw();
-                                    if (_isEraserStrokeMode) {
-                                      _handleEraserEnd();
-                                    }
-                                  }
-                                },
-                                child: Stack(
-                                  children: [
-                                    // Drawing painter
-                                    RepaintBoundary(
-                                      key: _painterKey,
-                                      child: CustomPaint(
-                                        painter: _DrawingPainter(
-                                          controller: _drawingController,
+                                  },
+                                  child: Stack(
+                                    children: [
+                                      // Drawing painter
+                                      RepaintBoundary(
+                                        key: _painterKey,
+                                        child: CustomPaint(
+                                          painter: _DrawingPainter(
+                                            controller: _drawingController,
+                                          ),
+                                          size: Size.infinite,
                                         ),
-                                        size: Size.infinite,
                                       ),
-                                    ),
-                                    // Eraser cursor overlay
-                                    if (_isEraserStrokeMode)
-                                      CustomPaint(
-                                        painter: _EraserCursorPainter(
-                                          _eraserCursorPosition,
-                                          _eraserRadius,
+                                      // Eraser cursor overlay
+                                      if (_isEraserStrokeMode)
+                                        CustomPaint(
+                                          painter: _EraserCursorPainter(
+                                            _eraserCursorPosition,
+                                            _eraserRadius,
+                                          ),
+                                          size: Size.infinite,
                                         ),
-                                        size: Size.infinite,
-                                      ),
-                                  ],
+                                    ],
+                                  ),
                                 ),
                               ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
-                    ), // end InteractiveViewer child
+                    ),
+
+                    // end InteractiveViewer child
                   ),
                 ),
               ),
