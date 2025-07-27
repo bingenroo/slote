@@ -13,7 +13,7 @@ import 'package:flutter_drawing_board/paint_contents.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:slote/src/functions/drawing_utils.dart';
 import 'package:flutter/services.dart';
-// import 'dart:developer';
+import 'dart:developer';
 
 class CreateNoteView extends StatefulWidget {
   const CreateNoteView({super.key, this.note});
@@ -63,6 +63,7 @@ class _CreateNoteViewState extends State<CreateNoteView> {
   final TransformationController _transformController =
       TransformationController();
   int _activePointers = 0;
+  int? _activeToolPointerId;
   bool _isCtrlPressed = false;
   final GlobalKey _painterKey = GlobalKey();
 
@@ -669,28 +670,35 @@ class _CreateNoteViewState extends State<CreateNoteView> {
                       onPointerDown: (event) {
                         setState(() {
                           _activePointers += 1;
+                          // If more than one finger is down, forcibly cancel any drawing/erasing
+                          if (_activePointers > 1) {
+                            _activeToolPointerId = null;
+                          }
                         });
                       },
                       onPointerUp: (event) {
                         setState(() {
                           _activePointers -= 1;
+                          // Optionally, also cancel if all fingers are lifted
+                          if (_activePointers == 0) {
+                            _activeToolPointerId = null;
+                          }
                         });
                       },
-                      // onPointerCancel: (event) {
-                      //   setState(() {
-                      //     _activePointers =
-                      //         0; // Or decrement if you want, but usually reset
-                      //   });
-                      // },
+                      onPointerCancel: (event) {
+                        setState(() {
+                          _activePointers = 0;
+                          _activeToolPointerId = null;
+                        });
+                      },
                       child: InteractiveViewer(
                         transformationController: _transformController,
                         boundaryMargin: EdgeInsets.zero,
                         constrained: true,
                         minScale: 1.0,
                         maxScale: 10.0,
-                        panEnabled: (_activePointers == 2), // Always allow pan
-                        scaleEnabled:
-                            (_activePointers == 2), // Always allow zoom
+                        panEnabled: (_activePointers == 2),
+                        scaleEnabled: (_activePointers == 2),
                         onInteractionStart: (details) {
                           setState(() {
                             // Immediately clear eraser state when multi-touch begins
@@ -786,7 +794,11 @@ class _CreateNoteViewState extends State<CreateNoteView> {
                                 child: Listener(
                                   onPointerDown: (event) {
                                     if (_isDrawingMode &&
-                                        _activePointers == 1) {
+                                        _activeToolPointerId == null) {
+                                      _activeToolPointerId = event.pointer;
+                                      log(
+                                        "activeToolPointerId: $_activeToolPointerId",
+                                      );
                                       final renderBox =
                                           _painterKey.currentContext
                                                   ?.findRenderObject()
@@ -809,7 +821,7 @@ class _CreateNoteViewState extends State<CreateNoteView> {
                                   },
                                   onPointerMove: (event) {
                                     if (_isDrawingMode &&
-                                        _activePointers == 1) {
+                                        event.pointer == _activeToolPointerId) {
                                       final renderBox =
                                           _painterKey.currentContext
                                                   ?.findRenderObject()
@@ -830,20 +842,28 @@ class _CreateNoteViewState extends State<CreateNoteView> {
                                     }
                                   },
                                   onPointerUp: (event) {
-                                    if (_isDrawingMode) {
-                                      if (_isEraserStrokeMode) {
-                                        _handleEraserEnd();
-                                      } else {
-                                        _drawingController.endDraw();
+                                    if (_isDrawingMode &&
+                                        event.pointer == _activeToolPointerId) {
+                                      if (_isDrawingMode) {
+                                        if (_isEraserStrokeMode) {
+                                          _handleEraserEnd();
+                                        } else {
+                                          _drawingController.endDraw();
+                                        }
                                       }
+                                      _activeToolPointerId = null;
                                     }
                                   },
                                   onPointerCancel: (event) {
-                                    if (_isDrawingMode) {
-                                      _drawingController.endDraw();
-                                      if (_isEraserStrokeMode) {
-                                        _handleEraserEnd();
+                                    if (_isDrawingMode &&
+                                        event.pointer == _activeToolPointerId) {
+                                      if (_isDrawingMode) {
+                                        _drawingController.endDraw();
+                                        if (_isEraserStrokeMode) {
+                                          _handleEraserEnd();
+                                        }
                                       }
+                                      _activeToolPointerId = null;
                                     }
                                   },
                                   child: Stack(
