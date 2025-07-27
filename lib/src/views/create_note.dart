@@ -879,6 +879,8 @@ class _CreateNoteViewState extends State<CreateNoteView> {
                                           painter: _EraserCursorPainter(
                                             _eraserCursorPosition,
                                             _eraserRadius,
+                                            _transformController.value
+                                                .getMaxScaleOnAxis(),
                                           ),
                                           size: Size.infinite,
                                         ),
@@ -912,11 +914,13 @@ Offset _globalToPainterLocal(RenderBox renderBox, Offset globalPosition) {
 class _EraserCursorPainter extends CustomPainter {
   final Offset? position;
   final double radius;
-  _EraserCursorPainter(this.position, this.radius);
+  final double scale;
+  _EraserCursorPainter(this.position, this.radius, this.scale);
   @override
   void paint(Canvas canvas, Size size) {
     if (position == null) return;
-    final eraserRadius = radius * 0.7;
+    // final eraserRadius = radius * 0.7;
+    final eraserRadius = (radius * 0.7) / scale;
     // Draw shadow (blurred dark circle)
     final shadowPaint =
         Paint()
