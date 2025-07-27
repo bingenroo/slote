@@ -13,7 +13,7 @@ import 'package:flutter_drawing_board/paint_contents.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:slote/src/functions/drawing_utils.dart';
 import 'package:flutter/services.dart';
-import 'dart:developer';
+// import 'dart:developer';
 
 class CreateNoteView extends StatefulWidget {
   const CreateNoteView({super.key, this.note});
@@ -104,6 +104,7 @@ class _CreateNoteViewState extends State<CreateNoteView> {
   }
 
   void _handleEraserStart(Offset pos) {
+    if (_activePointers > 1) return;
     _currentEraserPath = [pos];
     _lastPointerPosition = pos;
     _eraserCursorPosition = pos; // Track for visual
@@ -112,6 +113,7 @@ class _CreateNoteViewState extends State<CreateNoteView> {
 
   Timer? _processTimer;
   void _handleEraserUpdate(Offset pos) {
+    if (_activePointers > 1) return;
     if (_lastPointerPosition == null ||
         (pos - _lastPointerPosition!).distance > _eraserSampleDistance) {
       _currentEraserPath.add(pos);
@@ -134,6 +136,7 @@ class _CreateNoteViewState extends State<CreateNoteView> {
   }
 
   void _handleEraserEnd() {
+    if (_activePointers > 1) return;
     if (_currentEraserPath.isNotEmpty) {
       final pointsAsString =
           _currentEraserPath.map((e) => '(${e.dx},${e.dy})').toList();
