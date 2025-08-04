@@ -45,10 +45,13 @@ dependencies:
   auto_animated_list: ^2.0.0
 
   undo: ^1.5.0
-  flutter_drawing_board:
-    path: ../flutter_drawing_board
+  # flutter_drawing_board:
+  #   path: ../flutter_drawing_board
   path_drawing: ^1.0.1
   font_awesome_flutter: ^10.8.0
+  scribble:
+    path: ../scribble
+  value_notifier_tools: ^0.1.2
 
 dev_dependencies:
   flutter_test:

@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lottie/lottie.dart';
@@ -7,13 +6,9 @@ import 'package:slote/src/model/note.dart';
 import 'package:slote/src/res/assets.dart';
 import 'package:slote/src/services/local_db.dart';
 import 'package:slote/src/functions/undo_redo.dart';
-import 'package:undo/undo.dart';
-import 'package:flutter_drawing_board/flutter_drawing_board.dart';
-import 'package:flutter_drawing_board/paint_contents.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
-import 'package:slote/src/functions/drawing_utils.dart';
-import 'package:flutter/services.dart';
 // import 'dart:developer';
+import 'package:scribble/scribble.dart';
 
 class CreateNoteView extends StatefulWidget {
   const CreateNoteView({super.key, this.note});
@@ -24,52 +19,43 @@ class CreateNoteView extends StatefulWidget {
   State<CreateNoteView> createState() => _CreateNoteViewState();
 }
 
-class NoOpPaintContent extends PaintContent {
-  @override
-  void startDraw(Offset startPoint) {
-    // Do nothing
-  }
-
-  @override
-  void drawing(Offset nowPoint) {
-    // Do nothing
-  }
-
-  @override
-  void draw(Canvas canvas, Size size, bool deeper) {
-    // Do nothing - don't draw anything
-  }
-
-  @override
-  PaintContent copy() => NoOpPaintContent();
-
-  @override
-  Map<String, dynamic> toJson() => {'type': 'NoOp'};
-
-  @override
-  Map<String, dynamic> toContentJson() => {'type': 'NoOp'};
-}
-
 class _CreateNoteViewState extends State<CreateNoteView> {
   final _titleController = TextEditingController();
   final _bodyController = TextEditingController();
-  final _drawingController = DrawingController();
-  late final ExtendedDrawingController _extendedDrawingController;
-  bool _isDrawingMode = false;
-  // bool _isStrokeEraserMode = false;
-  bool _isEraserStrokeMode = false; // Add this flag
+  final _scrollController = ScrollController();
 
-  // Add for zoom/pan
+  // Drawing mode state and flags
+  bool _isDrawingMode = false;
+  // bool _isEraserStrokeMode = false;
+  bool _isZoomed = false;
+  bool _isDrawingActive = false;
+
+  int _activePointers = 0;
+  // int? _activeToolPointerId;
+  // final GlobalKey _painterKey = GlobalKey();
+
   final TransformationController _transformController =
       TransformationController();
-  int _activePointers = 0;
-  int? _activeToolPointerId;
-  bool _isCtrlPressed = false;
-  final GlobalKey _painterKey = GlobalKey();
+
+  // Zoom and pan state
+  final double _scale = 1.0;
+  final double _minScale = 0.5;
+  final double _maxScale = 3.0;
+
+  // Undo/Redo state
+  late UnifiedUndoRedoController _unifiedUndoRedoController;
+
+  late ScribbleNotifier _scribbleNotifier;
+  String get drawingData {
+    return json.encode(_scribbleNotifier.currentSketch.toJson());
+  }
+
+  // bool get _isEraserMode => _scribbleNotifier.value is Erasing;
 
   // Pen settings state
   Color _penColor = Colors.black;
   double _penStrokeWidth = 2.0;
+  final double _eraserStrokeWidth = 15.0;
   final List<Color> _penColors = [
     Colors.black,
     Colors.red,
@@ -82,79 +68,7 @@ class _CreateNoteViewState extends State<CreateNoteView> {
   final double _minStroke = 1.0;
   final double _maxStroke = 12.0;
 
-  // late UndoRedoTextController _undoRedoTextController;
-  late UnifiedUndoRedoController _unifiedUndoRedoController;
-  late ChangeStack _changeStack;
-
   final localDb = LocalDBService();
-
-  Timer? _eraserThrottleTimer;
-  // List<String>? _pendingEraserPoints;
-  List<Offset> _currentEraserPath = [];
-  Offset? _lastPointerPosition;
-  static const double _eraserRadius = 16.0;
-  static const double _eraserSampleDistance = 5.0;
-
-  // New: Track only the current eraser cursor position for visualization
-  Offset? _eraserCursorPosition;
-
-  String _getDrawingDataAsJson() {
-    final contents = _drawingController.getJsonList();
-    return json.encode(contents);
-  }
-
-  void _handleEraserStart(Offset pos) {
-    if (_activePointers > 1) return;
-    _currentEraserPath = [pos];
-    _lastPointerPosition = pos;
-    _eraserCursorPosition = pos; // Track for visual
-    setState(() {});
-  }
-
-  Timer? _processTimer;
-  void _handleEraserUpdate(Offset pos) {
-    if (_activePointers > 1) return;
-    if (_lastPointerPosition == null ||
-        (pos - _lastPointerPosition!).distance > _eraserSampleDistance) {
-      _currentEraserPath.add(pos);
-      _lastPointerPosition = pos;
-      _eraserCursorPosition = pos; // Track for visual
-
-      // Throttle processing to every 16ms (~60fps)
-      _processTimer?.cancel();
-      _processTimer = Timer(const Duration(milliseconds: 16), () {
-        final points =
-            _currentEraserPath.map((e) => '(${e.dx},${e.dy})').toList();
-        _extendedDrawingController.processEraserPoints(
-          points,
-          eraserRadius: _eraserRadius,
-        );
-      });
-
-      setState(() {});
-    }
-  }
-
-  void _handleEraserEnd() {
-    if (_activePointers > 1) return;
-    if (_currentEraserPath.isNotEmpty) {
-      final pointsAsString =
-          _currentEraserPath.map((e) => '(${e.dx},${e.dy})').toList();
-      _extendedDrawingController.processEraserPoints(
-        pointsAsString,
-        eraserRadius: _eraserRadius,
-      );
-    }
-    _currentEraserPath.clear();
-    _lastPointerPosition = null;
-    _eraserCursorPosition = null;
-    setState(() {}); // Ensure UI updates
-  }
-
-  void _trackDrawingChanges() {
-    final currentStrokes = _drawingController.getJsonList();
-    _extendedDrawingController.trackNewStrokes(currentStrokes);
-  }
 
   void _showPenSettingsPopup() async {
     double tempStrokeWidth = _penStrokeWidth;
@@ -189,9 +103,7 @@ class _CreateNoteViewState extends State<CreateNoteView> {
                                 _maxStroke,
                               );
                             });
-                            _drawingController.setStyle(
-                              strokeWidth: tempStrokeWidth,
-                            );
+                            _scribbleNotifier.setStrokeWidth(tempStrokeWidth);
                           },
                         ),
                         Expanded(
@@ -205,9 +117,7 @@ class _CreateNoteViewState extends State<CreateNoteView> {
                               setStateDialog(() {
                                 tempStrokeWidth = value;
                               });
-                              _drawingController.setStyle(
-                                strokeWidth: tempStrokeWidth,
-                              );
+                              _scribbleNotifier.setStrokeWidth(tempStrokeWidth);
                             },
                             activeColor: Colors.white,
                             inactiveColor: Colors.white24,
@@ -222,9 +132,7 @@ class _CreateNoteViewState extends State<CreateNoteView> {
                                 _maxStroke,
                               );
                             });
-                            _drawingController.setStyle(
-                              strokeWidth: tempStrokeWidth,
-                            );
+                            _scribbleNotifier.setStrokeWidth(tempStrokeWidth);
                           },
                         ),
                       ],
@@ -241,9 +149,7 @@ class _CreateNoteViewState extends State<CreateNoteView> {
                                 setStateDialog(() {
                                   tempPenColor = color;
                                 });
-                                _drawingController.setStyle(
-                                  color: tempPenColor,
-                                );
+                                _scribbleNotifier.setColor(tempPenColor);
                               },
                               child: Container(
                                 margin: const EdgeInsets.symmetric(
@@ -284,10 +190,8 @@ class _CreateNoteViewState extends State<CreateNoteView> {
                             _penStrokeWidth = tempStrokeWidth;
                             _penColor = tempPenColor;
                           });
-                          _drawingController.setStyle(
-                            color: _penColor,
-                            strokeWidth: _penStrokeWidth,
-                          );
+                          _scribbleNotifier.setStrokeWidth(tempStrokeWidth);
+                          _scribbleNotifier.setColor(tempPenColor);
                           Navigator.of(context).pop();
                         },
                         child: Text(
@@ -306,100 +210,14 @@ class _CreateNoteViewState extends State<CreateNoteView> {
     );
   }
 
-  // Helper to convert global to local coordinates (no matrix transform needed now)
-  Offset _globalToLocal(Offset global) {
-    final renderBox = context.findRenderObject() as RenderBox;
-    return renderBox.globalToLocal(global);
-  }
-
-  @override
-  void initState() {
-    super.initState();
-
-    _drawingController.setStyle(color: Colors.black);
-    _extendedDrawingController = ExtendedDrawingController(_drawingController);
-
-    _drawingController.addListener(_trackDrawingChanges);
-
-    // undo redo
-    _changeStack = ChangeStack();
-    // _undoRedoTextController = UndoRedoTextController(
-    //   _changeStack,
-    //   _bodyController,
-    // );
-
-    _unifiedUndoRedoController = UnifiedUndoRedoController(
-      _changeStack,
-      _bodyController,
-      _drawingController,
-    );
-
-    if (widget.note != null) {
-      _titleController.text = widget.note!.title;
-      _bodyController.text = widget.note!.body;
-
-      // Load drawing data if it exists
-      if (widget.note!.drawingData != null &&
-          widget.note!.drawingData!.isNotEmpty) {
-        try {
-          final List<dynamic> drawingJson = json.decode(
-            widget.note!.drawingData!,
-          );
-          final List<PaintContent> contents =
-              drawingJson.map((json) {
-                if (json['type'] == 'SimpleLine') {
-                  return SimpleLine.fromJson(json);
-                } else if (json['type'] == 'Eraser') {
-                  return Eraser.fromJson(json);
-                }
-                return NoOpPaintContent(); // Fallback for unknown types
-              }).toList();
-          if (contents.isNotEmpty) {
-            _drawingController.addContents(contents);
-          }
-
-          // Initialize the undo/redo controller with the loaded state
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            _unifiedUndoRedoController.initializeWithCurrentState();
-            _extendedDrawingController.initialize(
-              _drawingController.getJsonList(),
-            );
-          });
-        } catch (e) {
-          // log('Error loading drawing data: $e');
-        }
-      }
-    }
-    RawKeyboard.instance.addListener(_handleRawKeyEvent);
-  }
-
-  @override
-  void dispose() {
-    _eraserThrottleTimer?.cancel();
-    _saveNoteData();
-    _drawingController.removeListener(_trackDrawingChanges);
-    RawKeyboard.instance.removeListener(_handleRawKeyEvent);
-
-    _titleController.dispose();
-    _bodyController.dispose();
-    // _undoRedoTextController.dispose();
-
-    _unifiedUndoRedoController.dispose();
-    _drawingController.dispose();
-
-    super.dispose();
-  }
-
-  void _handleRawKeyEvent(RawKeyEvent event) {
-    setState(() {
-      _isCtrlPressed = event.isControlPressed;
-    });
-  }
-
   void _saveNoteData() async {
     final title = _titleController.text;
     final body = _bodyController.text;
-    final drawingData = _getDrawingDataAsJson();
+    final hasDrawing = drawingData.isNotEmpty && drawingData != '[]';
+
+    if (title.isEmpty && body.isEmpty && !hasDrawing) {
+      return;
+    }
 
     if (widget.note != null) {
       if (title.isEmpty &&
@@ -430,6 +248,64 @@ class _CreateNoteViewState extends State<CreateNoteView> {
         await localDb.saveNote(note: newNote);
       }
     }
+  }
+
+  @override
+  void initState() {
+    super.initState();
+
+    _scribbleNotifier = ScribbleNotifier();
+
+    // Initialize with default pen settings
+    _scribbleNotifier.setColor(_penColor);
+    _scribbleNotifier.setStrokeWidth(_penStrokeWidth);
+
+    // _scribbleNotifier = ScribbleNotifier(
+    //   // Only allow single finger touches for drawing
+    //   allowedPointersMode: ScribblePointerMode.penOnly,
+    // );
+
+    // undo redo
+    _unifiedUndoRedoController = UnifiedUndoRedoController(
+      textController: _bodyController,
+      scribbleNotifier: _scribbleNotifier,
+      maxHistoryLength: 50,
+    );
+
+    if (widget.note != null) {
+      _titleController.text = widget.note!.title;
+      _bodyController.text = widget.note!.body;
+
+      try {
+        // Load drawing data if it exists
+        if (widget.note!.drawingData != null &&
+            widget.note!.drawingData!.isNotEmpty) {
+          final sketchData = json.decode(widget.note!.drawingData!);
+          final sketch = Sketch.fromJson(sketchData);
+          _scribbleNotifier.setSketch(sketch: sketch, addToUndoHistory: false);
+        }
+      } catch (e) {
+        // Handle error silently - invalid drawing data
+      }
+
+      // Initialize the undo/redo controller with the loaded state
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _unifiedUndoRedoController.initializeWithCurrentState();
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _saveNoteData();
+
+    _titleController.dispose();
+    _bodyController.dispose();
+    _scrollController.dispose();
+    _unifiedUndoRedoController.dispose();
+    _scribbleNotifier.dispose();
+
+    super.dispose();
   }
 
   @override
@@ -562,82 +438,104 @@ class _CreateNoteViewState extends State<CreateNoteView> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   // Undo
-                  ListenableBuilder(
-                    listenable: _unifiedUndoRedoController,
-                    builder: (context, child) {
-                      final bool enabled = _changeStack.canUndo;
-                      return IconButton(
-                        icon: FaIcon(
-                          FontAwesomeIcons.arrowRotateLeft,
-                          size: 20,
-                          color: enabled ? Colors.black : Colors.grey.shade300,
+                  ValueListenableBuilder(
+                    valueListenable: _scribbleNotifier,
+                    builder:
+                        (context, value, child) => IconButton(
+                          icon: FaIcon(
+                            FontAwesomeIcons.arrowRotateLeft,
+                            size: 20,
+                            color:
+                                _scribbleNotifier.canUndo
+                                    ? Colors.black
+                                    : Colors.grey.shade300,
+                          ),
+                          onPressed:
+                              _scribbleNotifier.canUndo
+                                  ? _scribbleNotifier.undo
+                                  : null,
+                          tooltip: 'Undo',
                         ),
-                        onPressed:
-                            enabled ? _unifiedUndoRedoController.undo : null,
-                        tooltip: 'Undo',
-                      );
-                    },
                   ),
                   // Redo
-                  ListenableBuilder(
-                    listenable: _unifiedUndoRedoController,
-                    builder: (context, child) {
-                      final bool enabled = _changeStack.canRedo;
-                      return IconButton(
-                        icon: FaIcon(
-                          FontAwesomeIcons.arrowRotateRight,
-                          size: 20,
-                          color: enabled ? Colors.black : Colors.grey.shade300,
+                  ValueListenableBuilder(
+                    valueListenable: _scribbleNotifier,
+                    builder:
+                        (context, value, child) => IconButton(
+                          icon: FaIcon(
+                            FontAwesomeIcons.arrowRotateRight,
+                            size: 20,
+                            color:
+                                _scribbleNotifier.canRedo
+                                    ? Colors.black
+                                    : Colors.grey.shade300,
+                          ),
+                          onPressed:
+                              _scribbleNotifier.canRedo
+                                  ? _scribbleNotifier.redo
+                                  : null,
+                          tooltip: 'Redo',
                         ),
-                        onPressed:
-                            enabled ? _unifiedUndoRedoController.redo : null,
-                        tooltip: 'Redo',
-                      );
-                    },
                   ),
                   // Only show Pen and Eraser in drawing mode
                   if (_isDrawingMode) ...[
                     // Pen
-                    IconButton(
-                      icon: FaIcon(
-                        FontAwesomeIcons.pen,
-                        size: 20,
-                        color:
-                            !_isEraserStrokeMode
-                                ? _penColor
-                                : Colors.grey.shade300,
-                      ),
-                      onPressed: () {
-                        if (_isEraserStrokeMode) {
-                          setState(() {
-                            _isEraserStrokeMode = false;
-                            _drawingController.setPaintContent(SimpleLine());
-                          });
-                        } else {
-                          _showPenSettingsPopup();
-                        }
-                      },
-                      tooltip: 'Pen',
+                    ValueListenableBuilder(
+                      valueListenable: _scribbleNotifier,
+                      builder:
+                          (context, value, child) => IconButton(
+                            icon: FaIcon(
+                              FontAwesomeIcons.pen,
+                              size: 20,
+                              color:
+                                  value is Erasing
+                                      ? Colors.grey.shade300
+                                      : _penColor,
+                            ),
+                            onPressed: () {
+                              if (value is Erasing) {
+                                _scribbleNotifier.setColor(_penColor);
+                                _scribbleNotifier.setStrokeWidth(
+                                  _penStrokeWidth,
+                                );
+                              } else {
+                                _showPenSettingsPopup();
+                              }
+                            },
+                            tooltip: 'Pen',
+                          ),
                     ),
                     // Eraser
-                    IconButton(
-                      icon: FaIcon(
-                        FontAwesomeIcons.eraser,
-                        size: 20,
-                        color:
-                            _isEraserStrokeMode
-                                ? Colors.black
-                                : Colors.grey.shade300,
-                      ),
-                      onPressed: () {
-                        setState(() {
-                          _isEraserStrokeMode = true;
-                          _drawingController.setPaintContent(
-                            NoOpPaintContent(),
-                          );
-                        });
-                      },
-                      tooltip: 'Eraser',
+                    ValueListenableBuilder(
+                      valueListenable: _scribbleNotifier,
+                      builder:
+                          (context, value, child) => IconButton(
+                            icon: FaIcon(
+                              FontAwesomeIcons.eraser,
+                              size: 20,
+                              color:
+                                  value is Erasing
+                                      ? Colors.black
+                                      : Colors.grey.shade300,
+                            ),
+                            onPressed: () {
+                              if (_scribbleNotifier.value is Erasing) return;
+                              if (value is Erasing) {
+                                // Switch back to drawing mode
+                                _scribbleNotifier.setColor(_penColor);
+                                _scribbleNotifier.setStrokeWidth(
+                                  _penStrokeWidth,
+                                );
+                              } else {
+                                // Switch to eraser mode
+                                _scribbleNotifier.setEraser();
+                                _scribbleNotifier.setStrokeWidth(
+                                  _eraserStrokeWidth,
+                                );
+                              }
+                            },
+                            tooltip: 'Eraser',
+                          ),
                     ),
                   ],
                 ],
@@ -649,255 +547,130 @@ class _CreateNoteViewState extends State<CreateNoteView> {
       body: SafeArea(
         child: Column(
           children: [
+            // Zoomable and pannable content area
             Expanded(
-              child: Scrollbar(
-                interactive: true,
-                notificationPredicate: (ScrollNotification notification) {
-                  // Show scrollbar during any scroll activity
-                  return notification.depth == 0;
+              child: InteractiveViewer(
+                panEnabled: !_isDrawingActive || _activePointers > 1,
+                scaleEnabled: !_isDrawingActive || _activePointers > 1,
+                transformationController: _transformController,
+                minScale: _minScale,
+                maxScale: _maxScale,
+                scaleFactor: 1000.0,
+                onInteractionStart: (details) {
+                  setState(() {
+                    _activePointers = details.pointerCount;
+                    // Reset drawing when multi-touch starts
+                    if (details.pointerCount > 1) _isDrawingActive = false;
+                  });
                 },
-                child: SingleChildScrollView(
-                  physics:
-                      _isDrawingMode ? NeverScrollableScrollPhysics() : null,
-                  child: Container(
-                    constraints: BoxConstraints(
-                      minHeight:
-                          MediaQuery.of(context).size.height -
-                          MediaQuery.of(context).padding.top -
-                          kToolbarHeight -
-                          48 -
-                          16,
-                    ),
-                    // --- REPLACE Stack with InteractiveViewer ---
-                    child: Listener(
-                      onPointerDown: (event) {
-                        setState(() {
-                          _activePointers += 1;
-                          // If more than one finger is down, forcibly cancel any drawing/erasing
-                          if (_activePointers > 1) {
-                            _activeToolPointerId = null;
-                          }
-                        });
-                      },
-                      onPointerUp: (event) {
-                        setState(() {
-                          _activePointers -= 1;
-                          // Optionally, also cancel if all fingers are lifted
-                          if (_activePointers == 0) {
-                            _activeToolPointerId = null;
-                          }
-                        });
-                      },
-                      onPointerCancel: (event) {
-                        setState(() {
-                          _activePointers = 0;
-                          _activeToolPointerId = null;
-                        });
-                      },
-                      child: InteractiveViewer(
-                        transformationController: _transformController,
-                        boundaryMargin: EdgeInsets.zero,
-                        constrained: true,
-                        minScale: 1.0,
-                        maxScale: 10.0,
-                        panEnabled: (_activePointers == 2),
-                        scaleEnabled: (_activePointers == 2),
-                        onInteractionStart: (details) {
-                          setState(() {
-                            // Immediately clear eraser state when multi-touch begins
-                            if (details.pointerCount > 1 &&
-                                _isEraserStrokeMode) {
-                              _handleEraserEnd();
-                            }
-                          });
-                        },
-                        onInteractionEnd: (details) {
-                          // Reset both drawing and eraser states
-                          if (_isDrawingMode) {
-                            _drawingController.endDraw();
-                            if (_isEraserStrokeMode) {
-                              _eraserCursorPosition = null;
-                            }
-                          }
-                        },
-                        child: Stack(
-                          children: [
-                            Padding(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 16.0,
-                                vertical: 8.0,
-                              ),
-                              child: Column(
-                                children: [
-                                  AbsorbPointer(
-                                    absorbing: _isDrawingMode,
-                                    child: TextField(
-                                      controller: _bodyController,
-                                      decoration: InputDecoration(
-                                        border: UnderlineInputBorder(
-                                          borderSide: BorderSide(
-                                            color: Colors.transparent,
-                                          ),
-                                        ),
-                                        enabledBorder: UnderlineInputBorder(
-                                          borderSide: BorderSide(
-                                            color: Colors.transparent,
-                                          ),
-                                        ),
-                                        focusedBorder: UnderlineInputBorder(
-                                          borderSide: BorderSide(
-                                            color: Colors.transparent,
-                                          ),
-                                        ),
-                                        hintText: "Description",
-                                        hintStyle: TextStyle(
-                                          color: Theme.of(
-                                            context,
-                                          ).colorScheme.onSurface.withAlpha(30),
-                                        ),
-                                      ),
-                                      style: GoogleFonts.poppins(
-                                        fontSize: 15, // Modern note app size
-                                        color:
-                                            Theme.of(
-                                              context,
-                                            ).colorScheme.onSurface,
-                                        decorationColor:
-                                            Theme.of(
-                                              context,
-                                            ).colorScheme.onSurface,
-                                      ),
-                                      maxLines: null,
-                                      minLines: 20,
-                                      readOnly: _isDrawingMode,
-                                      enableInteractiveSelection:
-                                          !_isDrawingMode,
-                                      cursorColor:
-                                          Theme.of(
-                                            context,
-                                          ).colorScheme.onSurface,
-                                      contextMenuBuilder:
-                                          _isDrawingMode
-                                              ? null
-                                              : (context, editableTextState) {
-                                                return AdaptiveTextSelectionToolbar.editableText(
-                                                  editableTextState:
-                                                      editableTextState,
-                                                );
-                                              },
+                onInteractionUpdate: (details) {
+                  setState(() {
+                    _activePointers = details.pointerCount;
+                    _isZoomed =
+                        _transformController.value.getMaxScaleOnAxis() > 1.0;
+                  });
+                },
+                onInteractionEnd: (details) {
+                  setState(() {
+                    _activePointers = 0;
+                    _isDrawingActive = false;
+                    _isZoomed =
+                        _transformController.value.getMaxScaleOnAxis() > 1.0;
+                  });
+                },
+                child: Scrollbar(
+                  controller: _scrollController,
+                  thumbVisibility: !_isZoomed && !_isDrawingMode,
+                  trackVisibility: false,
+                  thickness: 6,
+                  radius: const Radius.circular(10),
+                  child: SingleChildScrollView(
+                    controller: _scrollController,
+                    physics:
+                        (_isZoomed || _isDrawingMode) && _activePointers < 2
+                            ? const NeverScrollableScrollPhysics()
+                            : const AlwaysScrollableScrollPhysics(),
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: Transform.scale(
+                      scale: _scale,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const SizedBox(height: 10),
+                          // Combined text and drawing area
+                          Stack(
+                            children: [
+                              // Text field (always visible) - with minimum height
+                              Container(
+                                constraints: BoxConstraints(
+                                  minHeight:
+                                      MediaQuery.of(context).size.height -
+                                      MediaQuery.of(context).padding.top -
+                                      kToolbarHeight -
+                                      38 - // toolbar bottom height
+                                      20, // padding
+                                ),
+                                child: TextFormField(
+                                  controller: _bodyController,
+                                  decoration: InputDecoration(
+                                    border: InputBorder.none,
+                                    hintText: "Start Sloting...",
+                                    hintStyle: TextStyle(
+                                      color: Colors.grey.shade300,
+                                      fontSize: 16,
+                                      fontStyle: FontStyle.italic,
                                     ),
                                   ),
-                                ],
+                                  style: GoogleFonts.poppins(fontSize: 20),
+                                  maxLines: null,
+                                  textInputAction: TextInputAction.newline,
+                                  keyboardType: TextInputType.multiline,
+                                ),
                               ),
-                            ),
-                            // Drawing overlay
-                            Positioned.fill(
-                              child: IgnorePointer(
-                                ignoring: !_isDrawingMode,
-                                child: Listener(
-                                  onPointerDown: (event) {
-                                    if (_isDrawingMode &&
-                                        _activeToolPointerId == null) {
-                                      _activeToolPointerId = event.pointer;
-                                      final renderBox =
-                                          _painterKey.currentContext
-                                                  ?.findRenderObject()
-                                              as RenderBox?;
-                                      if (renderBox == null) return;
 
-                                      final local = _globalToPainterLocal(
-                                        renderBox,
-                                        event.position,
-                                      );
-
-                                      if (_isEraserStrokeMode) {
-                                        _handleEraserStart(local);
-                                      } else {
-                                        _drawingController.endDraw();
-                                        _drawingController.startDraw(local);
+                              // Drawing layer (always visible) - on top
+                              Positioned.fill(
+                                child: IgnorePointer(
+                                  // Only ignore when:
+                                  // 1. Not in drawing mode AND single pointer (normal text editing)
+                                  // OR
+                                  // 2. Multi-touch (zoom/pan)
+                                  ignoring:
+                                      (!_isDrawingMode &&
+                                          _activePointers < 2) ||
+                                      _activePointers > 1,
+                                  child: Listener(
+                                    behavior: HitTestBehavior.translucent,
+                                    onPointerDown: (event) {
+                                      if (_isDrawingMode &&
+                                          _activePointers < 2) {
+                                        setState(() => _isDrawingActive = true);
                                       }
-                                    }
-                                  },
-                                  onPointerMove: (event) {
-                                    if (_isDrawingMode &&
-                                        event.pointer == _activeToolPointerId) {
-                                      final renderBox =
-                                          _painterKey.currentContext
-                                                  ?.findRenderObject()
-                                              as RenderBox?;
-                                      if (renderBox == null) return;
-
-                                      final local = _globalToPainterLocal(
-                                        renderBox,
-                                        event.position,
-                                      );
-
-                                      if (_isEraserStrokeMode) {
-                                        _handleEraserUpdate(local);
-                                      } else {
-                                        _drawingController.drawing(local);
+                                    },
+                                    onPointerUp: (event) {
+                                      if (_activePointers <= 1) {
+                                        setState(
+                                          () => _isDrawingActive = false,
+                                        );
                                       }
-                                    }
-                                  },
-                                  onPointerUp: (event) {
-                                    if (_isDrawingMode &&
-                                        event.pointer == _activeToolPointerId) {
-                                      if (_isDrawingMode) {
-                                        if (_isEraserStrokeMode) {
-                                          _handleEraserEnd();
-                                        } else {
-                                          _drawingController.endDraw();
-                                        }
-                                      }
-                                      _activeToolPointerId = null;
-                                    }
-                                  },
-                                  onPointerCancel: (event) {
-                                    if (_isDrawingMode &&
-                                        event.pointer == _activeToolPointerId) {
-                                      if (_isDrawingMode) {
-                                        _drawingController.endDraw();
-                                        if (_isEraserStrokeMode) {
-                                          _handleEraserEnd();
-                                        }
-                                      }
-                                      _activeToolPointerId = null;
-                                    }
-                                  },
-                                  child: Stack(
-                                    children: [
-                                      // Drawing painter
-                                      RepaintBoundary(
-                                        key: _painterKey,
-                                        child: CustomPaint(
-                                          painter: _DrawingPainter(
-                                            controller: _drawingController,
-                                          ),
-                                          size: Size.infinite,
-                                        ),
-                                      ),
-                                      // Eraser cursor overlay
-                                      if (_isEraserStrokeMode)
-                                        CustomPaint(
-                                          painter: _EraserCursorPainter(
-                                            _eraserCursorPosition,
-                                            _eraserRadius,
-                                            _transformController.value
-                                                .getMaxScaleOnAxis(),
-                                          ),
-                                          size: Size.infinite,
-                                        ),
-                                    ],
+                                    },
+                                    child: Scribble(
+                                      notifier: _scribbleNotifier,
+                                      drawPen:
+                                          _isDrawingActive && _isDrawingMode,
+                                      enableGestureCatcher:
+                                          false, // Disable gesture catcher for InteractiveViewer integration
+                                    ),
                                   ),
                                 ),
                               ),
-                            ),
-                          ],
-                        ),
+                            ],
+                          ),
+                          // Add some bottom padding for better scrolling
+                          const SizedBox(height: 10),
+                        ],
                       ),
                     ),
-
-                    // end InteractiveViewer child
                   ),
                 ),
               ),
@@ -907,66 +680,4 @@ class _CreateNoteViewState extends State<CreateNoteView> {
       ),
     );
   }
-}
-
-Offset _globalToPainterLocal(RenderBox renderBox, Offset globalPosition) {
-  return renderBox.globalToLocal(globalPosition);
-}
-
-// New: Modern eraser cursor painter
-class _EraserCursorPainter extends CustomPainter {
-  final Offset? position;
-  final double radius;
-  final double scale;
-  _EraserCursorPainter(this.position, this.radius, this.scale);
-  @override
-  void paint(Canvas canvas, Size size) {
-    if (position == null) return;
-    // final eraserRadius = radius * 0.7;
-    final eraserRadius = (radius * 0.7) / scale;
-    // Draw shadow (blurred dark circle)
-    final shadowPaint =
-        Paint()
-          ..color = Colors.black.withValues(alpha: 0.25)
-          ..maskFilter = MaskFilter.blur(BlurStyle.normal, eraserRadius * 0.7);
-    canvas.drawCircle(position!, eraserRadius, shadowPaint);
-    // Draw solid gray eraser
-    canvas.drawCircle(
-      position!,
-      eraserRadius,
-      Paint()..color = Colors.grey[400]!.withValues(alpha: 0.85),
-    );
-    // No white center, no halo
-  }
-
-  @override
-  bool shouldRepaint(covariant _EraserCursorPainter oldDelegate) {
-    return oldDelegate.position != position || oldDelegate.radius != radius;
-  }
-}
-
-// Add custom painter for drawing overlay
-class _DrawingPainter extends CustomPainter {
-  final DrawingController controller;
-  _DrawingPainter({required this.controller}) : super(repaint: controller);
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    // Get all finished contents
-    final contents = paintContentsFromJson(controller.getJsonList());
-
-    // Draw all finished strokes
-    for (final content in contents) {
-      content.draw(canvas, size, false);
-    }
-
-    // Get current stroke if exists (this is the Flutter Drawing Board internal way)
-    final currentContent = controller.currentContent;
-    if (currentContent != null) {
-      currentContent.draw(canvas, size, false);
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant _DrawingPainter old) => true;
 }

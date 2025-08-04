@@ -1,107 +1,109 @@
 import 'package:flutter/material.dart';
-import 'package:undo/undo.dart';
-import 'package:flutter_drawing_board/flutter_drawing_board.dart';
-import 'package:flutter_drawing_board/paint_contents.dart';
+import 'package:value_notifier_tools/value_notifier_tools.dart';
 import 'dart:async';
-import 'package:slote/src/functions/drawing_utils.dart';
+import 'package:scribble/scribble.dart';
 
-enum ActionType { text, drawing }
-
-class TextState {
+class NoteState {
   final String text;
-  final TextSelection selection;
+  final TextSelection textSelection;
+  final Sketch scribbleSketch;
 
-  TextState(this.text, this.selection);
-}
-
-class UnifiedAction {
-  final ActionType type;
-  final dynamic oldState;
-  final dynamic newState;
-
-  UnifiedAction({
-    required this.type,
-    required this.oldState,
-    required this.newState,
+  NoteState({
+    required this.text,
+    required this.textSelection,
+    required this.scribbleSketch,
   });
+
+  NoteState copyWith({
+    String? text,
+    TextSelection? textSelection,
+    Sketch? scribbleSketch,
+  }) {
+    return NoteState(
+      text: text ?? this.text,
+      textSelection: textSelection ?? this.textSelection,
+      scribbleSketch: scribbleSketch ?? this.scribbleSketch,
+    );
+  }
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    return other is NoteState &&
+        other.text == text &&
+        other.textSelection == textSelection &&
+        other.scribbleSketch.toString() == scribbleSketch.toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(text, textSelection, scribbleSketch);
 }
 
-class UnifiedUndoRedoController extends ChangeNotifier {
+class UnifiedUndoRedoController extends HistoryValueNotifier<NoteState> {
   final TextEditingController _textController;
-  final DrawingController _drawingController;
-  final ChangeStack _changeStack;
+  final ScribbleNotifier _scribbleNotifier;
 
-  bool _isUpdatingFromStack = false;
+  bool _isUpdatingFromHistory = false;
   bool _isInitialState = true;
   Timer? _debounceTimer;
   static const Duration _debounceDuration = Duration(milliseconds: 300);
 
-  TextState _lastTextState = TextState(
-    '',
-    const TextSelection.collapsed(offset: 0),
-  );
-  List<dynamic> _lastDrawingState = [];
+  UnifiedUndoRedoController({
+    required TextEditingController textController,
+    required ScribbleNotifier scribbleNotifier,
+    int? maxHistoryLength,
+  }) : _textController = textController,
+       _scribbleNotifier = scribbleNotifier,
+       super(
+         NoteState(
+           text: textController.text,
+           textSelection: textController.selection,
+           scribbleSketch: scribbleNotifier.currentSketch,
+         ),
+       ) {
+    // Set max history length if provided
+    if (maxHistoryLength != null) {
+      this.maxHistoryLength = maxHistoryLength;
+    }
 
-  TextState? _pendingTextState;
-  List<dynamic>? _pendingDrawingState;
-
-  UnifiedUndoRedoController(
-    this._changeStack,
-    this._textController,
-    this._drawingController,
-  ) {
+    // Add listeners
     _textController.addListener(_onTextChanged);
-    _drawingController.addListener(_onDrawingChanged);
-
-    // Initialize with current states
-    _lastTextState = TextState(_textController.text, _textController.selection);
-    _lastDrawingState = List.from(_drawingController.getJsonList());
-  }
-
-  void initializeWithCurrentState() {
-    _lastTextState = TextState(_textController.text, _textController.selection);
-    _lastDrawingState = List.from(_drawingController.getJsonList());
-    _isInitialState = false;
+    _scribbleNotifier.addListener(_onDrawingChanged);
   }
 
   TextEditingController get textController => _textController;
-  DrawingController get drawingController => _drawingController;
-  bool get canUndo => _changeStack.canUndo;
-  bool get canRedo => _changeStack.canRedo;
+  ScribbleNotifier get scribbleNotifier => _scribbleNotifier;
 
-  void undo() {
-    if (_changeStack.canUndo) {
-      _cancelDebounce();
-      _changeStack.undo();
-      notifyListeners(); // Add this to update UI
-    }
-  }
+  void initializeWithCurrentState() {
+    final currentState = NoteState(
+      text: _textController.text,
+      textSelection: _textController.selection,
+      scribbleSketch: _scribbleNotifier.currentSketch,
+    );
 
-  void redo() {
-    if (_changeStack.canRedo) {
-      _cancelDebounce();
-      _changeStack.redo();
-      notifyListeners(); // Add this to update UI
-    }
+    // Set initial state without adding to history
+    // Use the value setter directly to avoid adding to history
+    _isUpdatingFromHistory = true;
+    value = currentState;
+    _isUpdatingFromHistory = false;
+    _isInitialState = false;
   }
 
   void _onTextChanged() {
-    if (_isUpdatingFromStack) return;
+    if (_isUpdatingFromHistory) return;
 
     final newText = _textController.text;
     final newSelection = _textController.selection;
-    final oldState = _lastTextState;
+    final currentState = value;
 
-    // Skip adding to stack if this is the initial state setup
+    // Skip if this is the initial state setup
     if (_isInitialState) {
-      _lastTextState = TextState(newText, newSelection);
       _isInitialState = false;
       return;
     }
 
     // Skip if text hasn't actually changed
-    if (oldState.text == newText) {
-      _lastTextState = TextState(newText, newSelection);
+    if (currentState.text == newText) {
       return;
     }
 
@@ -111,81 +113,49 @@ class UnifiedUndoRedoController extends ChangeNotifier {
             ? newSelection
             : TextSelection.collapsed(offset: newText.length);
 
-    final newState = TextState(newText, capturedSelection);
-    _pendingTextState = newState;
+    final newState = currentState.copyWith(
+      text: newText,
+      textSelection: capturedSelection,
+    );
 
+    _pendingState = newState;
     _startDebounceTimer();
   }
 
   void _onDrawingChanged() {
-    if (_isUpdatingFromStack) return;
+    if (_isUpdatingFromHistory) return;
 
-    final newDrawingData = _drawingController.getJsonList();
-    final oldDrawingData = _lastDrawingState;
+    final newScribbleSketch = _scribbleNotifier.currentSketch;
+    final currentState = value;
 
     // Skip if drawing hasn't actually changed
-    if (_areDrawingStatesEqual(oldDrawingData, newDrawingData)) {
+    if (currentState.scribbleSketch.toString() ==
+        newScribbleSketch.toString()) {
       return;
     }
 
-    _pendingDrawingState = List.from(newDrawingData);
+    final newState = currentState.copyWith(scribbleSketch: newScribbleSketch);
+    _pendingState = newState;
     _startDebounceTimer();
   }
 
-  void _startDebounceTimer() {
-    // Cancel existing timer
-    _debounceTimer?.cancel();
+  NoteState? _pendingState;
 
-    // Start new debounce timer
+  void _startDebounceTimer() {
+    _debounceTimer?.cancel();
     _debounceTimer = Timer(_debounceDuration, () {
-      _addPendingChangesToStack();
+      _addPendingStateToHistory();
     });
   }
 
-  void _addPendingChangesToStack() {
-    // Handle text changes
-    if (_pendingTextState != null) {
-      final oldTextState = _lastTextState;
-      final newTextState = _pendingTextState!;
+  void _addPendingStateToHistory() {
+    if (_pendingState != null) {
+      final newState = _pendingState!;
 
-      _changeStack.add(
-        Change<UnifiedAction>(
-          UnifiedAction(
-            type: ActionType.text,
-            oldState: oldTextState,
-            newState: newTextState,
-          ),
-          () => _restoreTextState(newTextState),
-          (action) => _restoreTextState(action.oldState as TextState),
-        ),
-      );
-
-      _lastTextState = newTextState;
-      _pendingTextState = null;
+      // Add to history
+      value = newState;
+      _pendingState = null;
     }
-
-    // Handle drawing changes
-    if (_pendingDrawingState != null) {
-      final oldDrawingState = _lastDrawingState;
-      final newDrawingState = _pendingDrawingState!;
-
-      _changeStack.add(
-        Change<UnifiedAction>(
-          UnifiedAction(
-            type: ActionType.drawing,
-            oldState: List.from(oldDrawingState),
-            newState: List.from(newDrawingState),
-          ),
-          () => _restoreDrawingState(newDrawingState),
-          (action) => _restoreDrawingState(action.oldState as List<dynamic>),
-        ),
-      );
-
-      _lastDrawingState = List.from(newDrawingState);
-      _pendingDrawingState = null;
-    }
-
-    notifyListeners();
   }
 
   void _cancelDebounce() {
@@ -193,16 +163,18 @@ class UnifiedUndoRedoController extends ChangeNotifier {
     _debounceTimer = null;
 
     // If there are pending changes, add them immediately
-    if (_pendingTextState != null || _pendingDrawingState != null) {
-      _addPendingChangesToStack();
+    if (_pendingState != null) {
+      _addPendingStateToHistory();
     }
   }
 
-  void _restoreTextState(TextState state) {
-    _isUpdatingFromStack = true;
+  NoteState transformHistoryState(NoteState newState, NoteState currentState) {
+    // Apply the state changes
+    _isUpdatingFromHistory = true;
 
-    final textLength = state.text.length;
-    final restoredSelection = state.selection;
+    // Update text controller
+    final textLength = newState.text.length;
+    final restoredSelection = newState.textSelection;
 
     // Ensure we don't go beyond text bounds
     final safeStart = restoredSelection.start.clamp(0, textLength);
@@ -214,60 +186,63 @@ class UnifiedUndoRedoController extends ChangeNotifier {
     );
 
     _textController.value = TextEditingValue(
-      text: state.text,
+      text: newState.text,
       selection: newSelection,
     );
 
-    _lastTextState = TextState(state.text, newSelection);
-    _isUpdatingFromStack = false;
+    // Update drawing by restoring the sketch
+    _restoreScribbleSketch(newState.scribbleSketch);
+
+    _isUpdatingFromHistory = false;
+    return newState;
   }
 
-  void _restoreDrawingState(List<dynamic> drawingData) {
-    _isUpdatingFromStack = true;
-
-    // Clear current drawing
-    _drawingController.clear();
-
-    // Restore drawing data if not empty
-    if (drawingData.isNotEmpty) {
-      // Convert JSON data back to PaintContent objects
-      final List<PaintContent> contents = paintContentsFromJson(drawingData);
-      if (contents.isNotEmpty) {
-        _drawingController.addContents(contents);
-      }
-    }
-
-    _lastDrawingState = List.from(drawingData);
-    _isUpdatingFromStack = false;
-  }
-
-  bool _areDrawingStatesEqual(List<dynamic> state1, List<dynamic> state2) {
-    if (state1.length != state2.length) return false;
-
-    for (int i = 0; i < state1.length; i++) {
-      if (state1[i].toString() != state2[i].toString()) {
-        return false;
-      }
-    }
-    return true;
+  void _restoreScribbleSketch(Sketch sketch) {
+    _scribbleNotifier.setSketch(sketch: sketch, addToUndoHistory: false);
   }
 
   void clearHistory() {
     _cancelDebounce();
-    _changeStack.clearHistory();
-    notifyListeners();
+    // Clear the history by resetting to initial state
+    final initialState = NoteState(
+      text: _textController.text,
+      textSelection: _textController.selection,
+      scribbleSketch: _scribbleNotifier.currentSketch,
+    );
+    value = initialState;
   }
 
   void setText(String text) {
     _cancelDebounce();
+    final newState = value.copyWith(
+      text: text,
+      textSelection: TextSelection.collapsed(offset: text.length),
+    );
+    // Set state without adding to history
+    _isUpdatingFromHistory = true;
+    value = newState;
+    _isUpdatingFromHistory = false;
     _textController.text = text;
+  }
+
+  void clearDrawing() {
+    _cancelDebounce();
+    final newState = value.copyWith(
+      scribbleSketch:
+          _scribbleNotifier.currentSketch, // Use current empty sketch
+    );
+    // Set state without adding to history
+    _isUpdatingFromHistory = true;
+    value = newState;
+    _isUpdatingFromHistory = false;
+    _scribbleNotifier.clear();
   }
 
   @override
   void dispose() {
     _debounceTimer?.cancel();
     _textController.removeListener(_onTextChanged);
-    _drawingController.removeListener(_onDrawingChanged);
+    _scribbleNotifier.removeListener(_onDrawingChanged);
     super.dispose();
   }
 }
