@@ -304,7 +304,6 @@ class _CreateNoteViewState extends State<CreateNoteView> {
     _unifiedUndoRedoController = UnifiedUndoRedoController(
       textController: _bodyController,
       scribbleNotifier: _scribbleNotifier,
-      maxHistoryLength: 50,
     );
 
     if (widget.note != null) {
@@ -481,41 +480,41 @@ class _CreateNoteViewState extends State<CreateNoteView> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   // Undo
-                  ValueListenableBuilder(
-                    valueListenable: _scribbleNotifier,
+                  ListenableBuilder(
+                    listenable: _unifiedUndoRedoController,
                     builder:
-                        (context, value, child) => IconButton(
+                        (context, child) => IconButton(
                           icon: FaIcon(
                             FontAwesomeIcons.arrowRotateLeft,
                             size: 20,
                             color:
-                                _scribbleNotifier.canUndo
+                                _unifiedUndoRedoController.canUndo
                                     ? Colors.black
                                     : Colors.grey.shade300,
                           ),
                           onPressed:
-                              _scribbleNotifier.canUndo
-                                  ? _scribbleNotifier.undo
+                              _unifiedUndoRedoController.canUndo
+                                  ? _unifiedUndoRedoController.undo
                                   : null,
                           tooltip: 'Undo',
                         ),
                   ),
                   // Redo
-                  ValueListenableBuilder(
-                    valueListenable: _scribbleNotifier,
+                  ListenableBuilder(
+                    listenable: _unifiedUndoRedoController,
                     builder:
-                        (context, value, child) => IconButton(
+                        (context, child) => IconButton(
                           icon: FaIcon(
                             FontAwesomeIcons.arrowRotateRight,
                             size: 20,
                             color:
-                                _scribbleNotifier.canRedo
+                                _unifiedUndoRedoController.canRedo
                                     ? Colors.black
                                     : Colors.grey.shade300,
                           ),
                           onPressed:
-                              _scribbleNotifier.canRedo
-                                  ? _scribbleNotifier.redo
+                              _unifiedUndoRedoController.canRedo
+                                  ? _unifiedUndoRedoController.redo
                                   : null,
                           tooltip: 'Redo',
                         ),

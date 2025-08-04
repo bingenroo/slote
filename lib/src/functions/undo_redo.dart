@@ -1,6 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:value_notifier_tools/value_notifier_tools.dart';
-import 'dart:async';
 import 'package:scribble/scribble.dart';
 
 class NoteState {
@@ -32,40 +30,39 @@ class NoteState {
     return other is NoteState &&
         other.text == text &&
         other.textSelection == textSelection &&
-        other.scribbleSketch.toString() == scribbleSketch.toString();
+        _sketchesEqual(other.scribbleSketch, scribbleSketch);
+  }
+
+  bool _sketchesEqual(Sketch a, Sketch b) {
+    try {
+      final aJson = a.toJson();
+      final bJson = b.toJson();
+      return aJson.toString() == bJson.toString();
+    } catch (e) {
+      return false;
+    }
   }
 
   @override
   int get hashCode => Object.hash(text, textSelection, scribbleSketch);
 }
 
-class UnifiedUndoRedoController extends HistoryValueNotifier<NoteState> {
+class UnifiedUndoRedoController extends ChangeNotifier {
   final TextEditingController _textController;
   final ScribbleNotifier _scribbleNotifier;
 
+  final List<NoteState> _history = [];
+  int _currentIndex = -1;
   bool _isUpdatingFromHistory = false;
   bool _isInitialState = true;
-  Timer? _debounceTimer;
-  static const Duration _debounceDuration = Duration(milliseconds: 300);
+
+  static const int _maxHistoryLength = 50;
 
   UnifiedUndoRedoController({
     required TextEditingController textController,
     required ScribbleNotifier scribbleNotifier,
-    int? maxHistoryLength,
   }) : _textController = textController,
-       _scribbleNotifier = scribbleNotifier,
-       super(
-         NoteState(
-           text: textController.text,
-           textSelection: textController.selection,
-           scribbleSketch: scribbleNotifier.currentSketch,
-         ),
-       ) {
-    // Set max history length if provided
-    if (maxHistoryLength != null) {
-      this.maxHistoryLength = maxHistoryLength;
-    }
-
+       _scribbleNotifier = scribbleNotifier {
     // Add listeners
     _textController.addListener(_onTextChanged);
     _scribbleNotifier.addListener(_onDrawingChanged);
@@ -74,6 +71,9 @@ class UnifiedUndoRedoController extends HistoryValueNotifier<NoteState> {
   TextEditingController get textController => _textController;
   ScribbleNotifier get scribbleNotifier => _scribbleNotifier;
 
+  bool get canUndo => _currentIndex > 0;
+  bool get canRedo => _currentIndex < _history.length - 1;
+
   void initializeWithCurrentState() {
     final currentState = NoteState(
       text: _textController.text,
@@ -81,12 +81,12 @@ class UnifiedUndoRedoController extends HistoryValueNotifier<NoteState> {
       scribbleSketch: _scribbleNotifier.currentSketch,
     );
 
-    // Set initial state without adding to history
-    // Use the value setter directly to avoid adding to history
-    _isUpdatingFromHistory = true;
-    value = currentState;
-    _isUpdatingFromHistory = false;
+    // Set initial state
+    _history.clear();
+    _history.add(currentState);
+    _currentIndex = 0;
     _isInitialState = false;
+    notifyListeners();
   }
 
   void _onTextChanged() {
@@ -94,7 +94,7 @@ class UnifiedUndoRedoController extends HistoryValueNotifier<NoteState> {
 
     final newText = _textController.text;
     final newSelection = _textController.selection;
-    final currentState = value;
+    final currentState = _getCurrentState();
 
     // Skip if this is the initial state setup
     if (_isInitialState) {
@@ -118,63 +118,86 @@ class UnifiedUndoRedoController extends HistoryValueNotifier<NoteState> {
       textSelection: capturedSelection,
     );
 
-    _pendingState = newState;
-    _startDebounceTimer();
+    _addToHistory(newState);
   }
 
   void _onDrawingChanged() {
     if (_isUpdatingFromHistory) return;
 
     final newScribbleSketch = _scribbleNotifier.currentSketch;
-    final currentState = value;
+    final currentState = _getCurrentState();
 
     // Skip if drawing hasn't actually changed
-    if (currentState.scribbleSketch.toString() ==
-        newScribbleSketch.toString()) {
+    if (_sketchesEqual(currentState.scribbleSketch, newScribbleSketch)) {
       return;
     }
 
     final newState = currentState.copyWith(scribbleSketch: newScribbleSketch);
-    _pendingState = newState;
-    _startDebounceTimer();
+    _addToHistory(newState);
   }
 
-  NoteState? _pendingState;
-
-  void _startDebounceTimer() {
-    _debounceTimer?.cancel();
-    _debounceTimer = Timer(_debounceDuration, () {
-      _addPendingStateToHistory();
-    });
-  }
-
-  void _addPendingStateToHistory() {
-    if (_pendingState != null) {
-      final newState = _pendingState!;
-
-      // Add to history
-      value = newState;
-      _pendingState = null;
+  bool _sketchesEqual(Sketch a, Sketch b) {
+    try {
+      final aJson = a.toJson();
+      final bJson = b.toJson();
+      return aJson.toString() == bJson.toString();
+    } catch (e) {
+      return false;
     }
   }
 
-  void _cancelDebounce() {
-    _debounceTimer?.cancel();
-    _debounceTimer = null;
-
-    // If there are pending changes, add them immediately
-    if (_pendingState != null) {
-      _addPendingStateToHistory();
+  NoteState _getCurrentState() {
+    if (_currentIndex >= 0 && _currentIndex < _history.length) {
+      return _history[_currentIndex];
     }
+    return NoteState(
+      text: _textController.text,
+      textSelection: _textController.selection,
+      scribbleSketch: _scribbleNotifier.currentSketch,
+    );
   }
 
-  NoteState transformHistoryState(NoteState newState, NoteState currentState) {
-    // Apply the state changes
+  void _addToHistory(NoteState newState) {
+    // Remove any states after current index (when we're not at the end)
+    if (_currentIndex < _history.length - 1) {
+      _history.removeRange(_currentIndex + 1, _history.length);
+    }
+
+    // Add new state
+    _history.add(newState);
+    _currentIndex++;
+
+    // Limit history length
+    if (_history.length > _maxHistoryLength) {
+      _history.removeAt(0);
+      _currentIndex--;
+    }
+
+    notifyListeners();
+  }
+
+  void undo() {
+    if (!canUndo) return;
+
+    _currentIndex--;
+    _restoreState(_history[_currentIndex]);
+    notifyListeners();
+  }
+
+  void redo() {
+    if (!canRedo) return;
+
+    _currentIndex++;
+    _restoreState(_history[_currentIndex]);
+    notifyListeners();
+  }
+
+  void _restoreState(NoteState state) {
     _isUpdatingFromHistory = true;
 
     // Update text controller
-    final textLength = newState.text.length;
-    final restoredSelection = newState.textSelection;
+    final textLength = state.text.length;
+    final restoredSelection = state.textSelection;
 
     // Ensure we don't go beyond text bounds
     final safeStart = restoredSelection.start.clamp(0, textLength);
@@ -186,61 +209,60 @@ class UnifiedUndoRedoController extends HistoryValueNotifier<NoteState> {
     );
 
     _textController.value = TextEditingValue(
-      text: newState.text,
+      text: state.text,
       selection: newSelection,
     );
 
     // Update drawing by restoring the sketch
-    _restoreScribbleSketch(newState.scribbleSketch);
+    _scribbleNotifier.setSketch(
+      sketch: state.scribbleSketch,
+      addToUndoHistory: false,
+    );
 
     _isUpdatingFromHistory = false;
-    return newState;
-  }
-
-  void _restoreScribbleSketch(Sketch sketch) {
-    _scribbleNotifier.setSketch(sketch: sketch, addToUndoHistory: false);
   }
 
   void clearHistory() {
-    _cancelDebounce();
-    // Clear the history by resetting to initial state
-    final initialState = NoteState(
-      text: _textController.text,
-      textSelection: _textController.selection,
-      scribbleSketch: _scribbleNotifier.currentSketch,
-    );
-    value = initialState;
+    final currentState = _getCurrentState();
+    _history.clear();
+    _history.add(currentState);
+    _currentIndex = 0;
+    notifyListeners();
   }
 
   void setText(String text) {
-    _cancelDebounce();
-    final newState = value.copyWith(
+    final newState = _getCurrentState().copyWith(
       text: text,
       textSelection: TextSelection.collapsed(offset: text.length),
     );
-    // Set state without adding to history
+
     _isUpdatingFromHistory = true;
-    value = newState;
-    _isUpdatingFromHistory = false;
     _textController.text = text;
+    _isUpdatingFromHistory = false;
+
+    // Update current state without adding to history
+    if (_currentIndex >= 0 && _currentIndex < _history.length) {
+      _history[_currentIndex] = newState;
+    }
   }
 
   void clearDrawing() {
-    _cancelDebounce();
-    final newState = value.copyWith(
-      scribbleSketch:
-          _scribbleNotifier.currentSketch, // Use current empty sketch
+    final newState = _getCurrentState().copyWith(
+      scribbleSketch: _scribbleNotifier.currentSketch,
     );
-    // Set state without adding to history
+
     _isUpdatingFromHistory = true;
-    value = newState;
-    _isUpdatingFromHistory = false;
     _scribbleNotifier.clear();
+    _isUpdatingFromHistory = false;
+
+    // Update current state without adding to history
+    if (_currentIndex >= 0 && _currentIndex < _history.length) {
+      _history[_currentIndex] = newState;
+    }
   }
 
   @override
   void dispose() {
-    _debounceTimer?.cancel();
     _textController.removeListener(_onTextChanged);
     _scribbleNotifier.removeListener(_onDrawingChanged);
     super.dispose();
