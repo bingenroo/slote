@@ -284,7 +284,10 @@ class _CreateNoteViewState extends State<CreateNoteView> {
     // Initialize current note from widget
     _currentNote = widget.note;
 
-    _scribbleNotifier = ScribbleNotifier();
+    _scribbleNotifier = ScribbleNotifier(
+      // Enable straight line detection with 500ms hold duration
+      straightLineHoldDuration: const Duration(milliseconds: 1000),
+    );
 
     // Initialize with default pen settings
     _scribbleNotifier.setColor(_penColor);
@@ -547,6 +550,7 @@ class _CreateNoteViewState extends State<CreateNoteView> {
                             tooltip: 'Pen',
                           ),
                     ),
+
                     // Eraser
                     ValueListenableBuilder(
                       valueListenable: _scribbleNotifier,
