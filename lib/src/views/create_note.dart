@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -20,9 +21,16 @@ class CreateNoteView extends StatefulWidget {
 }
 
 class _CreateNoteViewState extends State<CreateNoteView> {
+  Note? _currentNote;
+
   final _titleController = TextEditingController();
   final _bodyController = TextEditingController();
   final _scrollController = ScrollController();
+
+  // save settings
+  Timer? _autoSaveTimer;
+  bool _hasUnsavedChanges = false;
+  static const Duration _autoSaveDelay = Duration(seconds: 2);
 
   // Drawing mode state and flags
   bool _isDrawingMode = false;
@@ -210,24 +218,41 @@ class _CreateNoteViewState extends State<CreateNoteView> {
     );
   }
 
+  void _scheduleAutoSave() {
+    _hasUnsavedChanges = true;
+
+    // Cancel existing timer
+    _autoSaveTimer?.cancel();
+
+    // Schedule new auto-save
+    _autoSaveTimer = Timer(_autoSaveDelay, () {
+      if (_hasUnsavedChanges) {
+        _saveNoteData();
+        _hasUnsavedChanges = false;
+      }
+    });
+  }
+
   void _saveNoteData() async {
     final title = _titleController.text;
     final body = _bodyController.text;
     final hasDrawing = drawingData.isNotEmpty && drawingData != '[]';
 
+    // Don't save if there's no content at all
     if (title.isEmpty && body.isEmpty && !hasDrawing) {
       return;
     }
 
-    if (widget.note != null) {
-      if (title.isEmpty &&
-          body.isEmpty &&
-          (drawingData.isEmpty || drawingData == '[]')) {
-        await localDb.deleteNote(id: widget.note!.id);
-      } else if (widget.note!.title != title ||
-          widget.note!.body != body ||
-          widget.note!.drawingData != drawingData) {
-        final newNote = widget.note!.copyWith(
+    if (_currentNote != null) {
+      // For existing notes
+      if (title.isEmpty && body.isEmpty && !hasDrawing) {
+        // Delete if no content at all
+        await localDb.deleteNote(id: _currentNote!.id);
+      } else if (_currentNote!.title != title ||
+          _currentNote!.body != body ||
+          _currentNote!.drawingData != drawingData) {
+        // Save if content has changed
+        final newNote = _currentNote!.copyWith(
           title: title,
           body: body,
           drawingData: drawingData,
@@ -235,9 +260,8 @@ class _CreateNoteViewState extends State<CreateNoteView> {
         await localDb.saveNote(note: newNote);
       }
     } else {
-      if (title.isNotEmpty ||
-          body.isNotEmpty ||
-          (drawingData.isNotEmpty && drawingData != '[]')) {
+      // For new notes - save if there's any content
+      if (title.isNotEmpty || body.isNotEmpty || hasDrawing) {
         final newNote = Note(
           id: DateTime.now().millisecondsSinceEpoch & 0xFFFFFFFF,
           title: title,
@@ -246,6 +270,9 @@ class _CreateNoteViewState extends State<CreateNoteView> {
           lastMod: DateTime.now(),
         );
         await localDb.saveNote(note: newNote);
+
+        // Update the current note reference for future saves
+        _currentNote = newNote;
       }
     }
   }
@@ -254,11 +281,19 @@ class _CreateNoteViewState extends State<CreateNoteView> {
   void initState() {
     super.initState();
 
+    // Initialize current note from widget
+    _currentNote = widget.note;
+
     _scribbleNotifier = ScribbleNotifier();
 
     // Initialize with default pen settings
     _scribbleNotifier.setColor(_penColor);
     _scribbleNotifier.setStrokeWidth(_penStrokeWidth);
+
+    // Listeners for auto-save
+    _titleController.addListener(_scheduleAutoSave);
+    _bodyController.addListener(_scheduleAutoSave);
+    _scribbleNotifier.addListener(_scheduleAutoSave);
 
     // _scribbleNotifier = ScribbleNotifier(
     //   // Only allow single finger touches for drawing
@@ -297,7 +332,15 @@ class _CreateNoteViewState extends State<CreateNoteView> {
 
   @override
   void dispose() {
-    _saveNoteData();
+    // Save immediately on dispose
+    if (_hasUnsavedChanges) {
+      _saveNoteData();
+    }
+
+    _autoSaveTimer?.cancel();
+    _titleController.removeListener(_scheduleAutoSave);
+    _bodyController.removeListener(_scheduleAutoSave);
+    _scribbleNotifier.removeListener(_scheduleAutoSave);
 
     _titleController.dispose();
     _bodyController.dispose();
