@@ -286,7 +286,7 @@ class _CreateNoteViewState extends State<CreateNoteView> {
 
     _scribbleNotifier = ScribbleNotifier(
       // Enable straight line detection with 500ms hold duration
-      straightLineHoldDuration: const Duration(milliseconds: 500),
+      straightLineHoldDuration: const Duration(milliseconds: 1000),
       enableStraightLineConversion: true,
     );
 
