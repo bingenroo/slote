@@ -37,8 +37,8 @@ class _CreateNoteViewState extends State<CreateNoteView> {
   // bool _isEraserStrokeMode = false;
   bool _isZoomed = false;
   bool _isDrawingActive = false;
+  int _pointerCount = 0;
 
-  int _activePointers = 0;
   // int? _activeToolPointerId;
   // final GlobalKey _painterKey = GlobalKey();
 
@@ -610,126 +610,132 @@ class _CreateNoteViewState extends State<CreateNoteView> {
           children: [
             // Zoomable and pannable content area
             Expanded(
-              child: InteractiveViewer(
-                panEnabled: !_isDrawingActive || _activePointers > 1,
-                scaleEnabled: !_isDrawingActive || _activePointers > 1,
-                transformationController: _transformController,
-                minScale: _minScale,
-                maxScale: _maxScale,
-                scaleFactor: 1000.0,
-                onInteractionStart: (details) {
-                  setState(() {
-                    _activePointers = details.pointerCount;
-                    // Reset drawing when multi-touch starts
-                    if (details.pointerCount > 1) _isDrawingActive = false;
-                  });
-                },
-                onInteractionUpdate: (details) {
-                  setState(() {
-                    _activePointers = details.pointerCount;
-                    _isZoomed =
-                        _transformController.value.getMaxScaleOnAxis() > 1.0;
-                  });
-                },
-                onInteractionEnd: (details) {
-                  setState(() {
-                    _activePointers = 0;
-                    _isDrawingActive = false;
-                    _isZoomed =
-                        _transformController.value.getMaxScaleOnAxis() > 1.0;
-                  });
-                },
-                child: Scrollbar(
-                  controller: _scrollController,
-                  thumbVisibility: !_isZoomed && !_isDrawingMode,
-                  trackVisibility: false,
-                  thickness: 6,
-                  radius: const Radius.circular(10),
-                  child: SingleChildScrollView(
+              child: Listener(
+                onPointerDown: (_) => setState(() => _pointerCount++),
+                onPointerUp:
+                    (_) => setState(
+                      () => _pointerCount = (_pointerCount - 1).clamp(0, 10),
+                    ),
+                child: InteractiveViewer(
+                  panEnabled: !_isDrawingActive || _pointerCount >= 2,
+                  scaleEnabled: !_isDrawingActive || _pointerCount >= 2,
+                  transformationController: _transformController,
+                  minScale: _minScale,
+                  maxScale: _maxScale,
+                  scaleFactor: 1000.0,
+                  onInteractionStart: (details) {
+                    setState(() {
+                      // Reset drawing when multi-touch starts
+                      if (_pointerCount >= 2) _isDrawingActive = false;
+                    });
+                  },
+                  onInteractionUpdate: (details) {
+                    setState(() {
+                      _isZoomed =
+                          _transformController.value.getMaxScaleOnAxis() > 1.0;
+                    });
+                  },
+                  onInteractionEnd: (details) {
+                    setState(() {
+                      _isDrawingActive = false;
+                      _isZoomed =
+                          _transformController.value.getMaxScaleOnAxis() > 1.0;
+                    });
+                  },
+                  child: Scrollbar(
                     controller: _scrollController,
-                    physics:
-                        (_isZoomed || _isDrawingMode) && _activePointers < 2
-                            ? const NeverScrollableScrollPhysics()
-                            : const AlwaysScrollableScrollPhysics(),
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                    child: Transform.scale(
-                      scale: _scale,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const SizedBox(height: 10),
-                          // Combined text and drawing area
-                          Stack(
-                            children: [
-                              // Text field (always visible) - with minimum height
-                              Container(
-                                constraints: BoxConstraints(
-                                  minHeight:
-                                      MediaQuery.of(context).size.height -
-                                      MediaQuery.of(context).padding.top -
-                                      kToolbarHeight -
-                                      38 - // toolbar bottom height
-                                      20, // padding
-                                ),
-                                child: TextFormField(
-                                  controller: _bodyController,
-                                  decoration: InputDecoration(
-                                    border: InputBorder.none,
-                                    hintText: "Start Sloting...",
-                                    hintStyle: TextStyle(
-                                      color: Colors.grey.shade300,
-                                      fontSize: 16,
-                                      fontStyle: FontStyle.italic,
-                                    ),
+                    thumbVisibility: !_isZoomed && !_isDrawingMode,
+                    trackVisibility: false,
+                    thickness: 6,
+                    radius: const Radius.circular(10),
+                    child: SingleChildScrollView(
+                      controller: _scrollController,
+                      physics:
+                          (_isZoomed || _isDrawingMode) && _pointerCount < 2
+                              ? const NeverScrollableScrollPhysics()
+                              : const AlwaysScrollableScrollPhysics(),
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      child: Transform.scale(
+                        scale: _scale,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const SizedBox(height: 10),
+                            // Combined text and drawing area
+                            Stack(
+                              children: [
+                                // Text field (always visible) - with minimum height
+                                Container(
+                                  constraints: BoxConstraints(
+                                    minHeight:
+                                        MediaQuery.of(context).size.height -
+                                        MediaQuery.of(context).padding.top -
+                                        kToolbarHeight -
+                                        38 - // toolbar bottom height
+                                        20, // padding
                                   ),
-                                  style: GoogleFonts.poppins(fontSize: 20),
-                                  maxLines: null,
-                                  textInputAction: TextInputAction.newline,
-                                  keyboardType: TextInputType.multiline,
+                                  child: TextFormField(
+                                    controller: _bodyController,
+                                    decoration: InputDecoration(
+                                      border: InputBorder.none,
+                                      hintText: "Start Sloting...",
+                                      hintStyle: TextStyle(
+                                        color: Colors.grey.shade300,
+                                        fontSize: 16,
+                                        fontStyle: FontStyle.italic,
+                                      ),
+                                    ),
+                                    style: GoogleFonts.poppins(fontSize: 20),
+                                    maxLines: null,
+                                    textInputAction: TextInputAction.newline,
+                                    keyboardType: TextInputType.multiline,
+                                  ),
                                 ),
-                              ),
 
-                              // Drawing layer (always visible) - on top
-                              Positioned.fill(
-                                child: IgnorePointer(
-                                  // Only ignore when:
-                                  // 1. Not in drawing mode AND single pointer (normal text editing)
-                                  // OR
-                                  // 2. Multi-touch (zoom/pan)
-                                  ignoring:
-                                      (!_isDrawingMode &&
-                                          _activePointers < 2) ||
-                                      _activePointers > 1,
-                                  child: Listener(
-                                    behavior: HitTestBehavior.translucent,
-                                    onPointerDown: (event) {
-                                      if (_isDrawingMode &&
-                                          _activePointers < 2) {
-                                        setState(() => _isDrawingActive = true);
-                                      }
-                                    },
-                                    onPointerUp: (event) {
-                                      if (_activePointers <= 1) {
-                                        setState(
-                                          () => _isDrawingActive = false,
-                                        );
-                                      }
-                                    },
-                                    child: Scribble(
-                                      notifier: _scribbleNotifier,
-                                      drawPen:
-                                          _isDrawingActive && _isDrawingMode,
-                                      enableGestureCatcher:
-                                          false, // Disable gesture catcher for InteractiveViewer integration
+                                // Drawing layer (always visible) - on top
+                                Positioned.fill(
+                                  child: IgnorePointer(
+                                    // Only ignore when:
+                                    // 1. Not in drawing mode AND single pointer (normal text editing)
+                                    // OR
+                                    // 2. Multi-touch (zoom/pan)
+                                    ignoring:
+                                        (!_isDrawingMode &&
+                                            _pointerCount < 2) ||
+                                        _pointerCount >= 2,
+                                    child: Listener(
+                                      behavior: HitTestBehavior.translucent,
+                                      onPointerDown: (event) {
+                                        if (_isDrawingMode &&
+                                            _pointerCount < 2) {
+                                          setState(
+                                            () => _isDrawingActive = true,
+                                          );
+                                        }
+                                      },
+                                      onPointerUp: (event) {
+                                        if (_pointerCount <= 1) {
+                                          setState(
+                                            () => _isDrawingActive = false,
+                                          );
+                                        }
+                                      },
+                                      child: Scribble(
+                                        notifier: _scribbleNotifier,
+                                        drawPen:
+                                            _isDrawingActive && _isDrawingMode,
+                                        enableGestureCatcher:
+                                            false, // Disable gesture catcher for InteractiveViewer integration
+                                      ),
                                     ),
                                   ),
                                 ),
-                              ),
-                            ],
-                          ),
-                          // Add some bottom padding for better scrolling
-                          const SizedBox(height: 10),
-                        ],
+                              ],
+                            ),
+                            // Add some bottom padding for better scrolling
+                            const SizedBox(height: 10),
+                          ],
+                        ),
                       ),
                     ),
                   ),
