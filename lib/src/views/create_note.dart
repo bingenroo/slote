@@ -277,6 +277,20 @@ class _CreateNoteViewState extends State<CreateNoteView> {
     }
   }
 
+  void _handleBackNavigation() {
+    // Cancel any pending auto-save timer
+    _autoSaveTimer?.cancel();
+
+    // Save immediately if there are unsaved changes
+    if (_hasUnsavedChanges) {
+      _saveNoteData();
+      _hasUnsavedChanges = false;
+    }
+
+    // Navigate back
+    Navigator.pop(context);
+  }
+
   @override
   void initState() {
     super.initState();
@@ -361,7 +375,7 @@ class _CreateNoteViewState extends State<CreateNoteView> {
         toolbarHeight: 52, // Smaller height
         leading: IconButton(
           onPressed: () {
-            Navigator.pop(context);
+            _handleBackNavigation;
           },
           icon: FaIcon(
             FontAwesomeIcons.arrowLeft,
