@@ -59,12 +59,29 @@ class _CreateNoteViewState extends State<CreateNoteView> {
     return json.encode(_scribbleNotifier.currentSketch.toJson());
   }
 
+  bool get hasDrawingContent {
+    try {
+      final sketch = _scribbleNotifier.currentSketch;
+      final jsonData = sketch.toJson();
+      // Check if the sketch has any lines (drawing strokes)
+      final hasLines =
+          jsonData['lines'] != null &&
+          jsonData['lines'] is List &&
+          (jsonData['lines'] as List).isNotEmpty;
+
+      return hasLines;
+    } catch (e) {
+      return false;
+    }
+  }
+
   // bool get _isEraserMode => _scribbleNotifier.value is Erasing;
 
   // Pen settings state
   late Color _penColor;
   double _penStrokeWidth = 2.0;
   final double _eraserStrokeWidth = 15.0;
+  bool _hasUserSetColor = false; // Track if user has manually set a color
 
   List<Color> get _penColors {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -188,7 +205,6 @@ class _CreateNoteViewState extends State<CreateNoteView> {
                     // Color swatches
                     SizedBox(
                       height: 40,
-
                       child: SingleChildScrollView(
                         scrollDirection: Axis.horizontal,
                         physics: const BouncingScrollPhysics(),
@@ -202,7 +218,10 @@ class _CreateNoteViewState extends State<CreateNoteView> {
                                     setStateDialog(() {
                                       tempPenColor = color;
                                     });
-                                    _scribbleNotifier.setColor(tempPenColor);
+                                    // Apply the color immediately to the scribble notifier
+                                    _scribbleNotifier.setColor(color);
+                                    // Mark that user has set a color
+                                    _hasUserSetColor = true;
                                   },
                                   child: Container(
                                     margin: const EdgeInsets.symmetric(
@@ -244,7 +263,10 @@ class _CreateNoteViewState extends State<CreateNoteView> {
                           setState(() {
                             _penStrokeWidth = tempStrokeWidth;
                             _penColor = tempPenColor;
+                            _hasUserSetColor =
+                                true; // Mark that user has set a color
                           });
+                          // Ensure the scribble notifier has the final settings
                           _scribbleNotifier.setStrokeWidth(tempStrokeWidth);
                           _scribbleNotifier.setColor(tempPenColor);
                           Navigator.of(context).pop();
@@ -266,24 +288,31 @@ class _CreateNoteViewState extends State<CreateNoteView> {
   }
 
   void _scheduleAutoSave() {
-    _hasUnsavedChanges = true;
+    final title = _titleController.text;
+    final body = _bodyController.text;
+    final hasDrawing = hasDrawingContent;
 
-    // Cancel existing timer
-    _autoSaveTimer?.cancel();
+    // Only set unsaved changes if there's actual content
+    if (title.isNotEmpty || body.isNotEmpty || hasDrawing) {
+      _hasUnsavedChanges = true;
 
-    // Schedule new auto-save
-    _autoSaveTimer = Timer(_autoSaveDelay, () {
-      if (_hasUnsavedChanges) {
-        _saveNoteData();
-        _hasUnsavedChanges = false;
-      }
-    });
+      // Cancel existing timer
+      _autoSaveTimer?.cancel();
+
+      // Schedule new auto-save
+      _autoSaveTimer = Timer(_autoSaveDelay, () {
+        if (_hasUnsavedChanges) {
+          _saveNoteData();
+          _hasUnsavedChanges = false;
+        }
+      });
+    }
   }
 
   void _saveNoteData() async {
     final title = _titleController.text;
     final body = _bodyController.text;
-    final hasDrawing = drawingData.isNotEmpty && drawingData != '[]';
+    final hasDrawing = hasDrawingContent;
 
     // Don't save if there's no content at all
     if (title.isEmpty && body.isEmpty && !hasDrawing) {
@@ -328,7 +357,7 @@ class _CreateNoteViewState extends State<CreateNoteView> {
     // Cancel any pending auto-save timer
     _autoSaveTimer?.cancel();
 
-    // Save immediately if there are unsaved changes
+    // Save immediately if there are unsaved changes and there's actual content
     if (_hasUnsavedChanges) {
       _saveNoteData();
       _hasUnsavedChanges = false;
@@ -382,30 +411,32 @@ class _CreateNoteViewState extends State<CreateNoteView> {
       } catch (e) {
         // Handle error silently - invalid drawing data
       }
-
-      // Initialize the undo/redo controller with the loaded state
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        _unifiedUndoRedoController.initializeWithCurrentState();
-      });
     }
+
+    // Initialize the undo/redo controller with the current state (for both new and existing notes)
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _unifiedUndoRedoController.initializeWithCurrentState();
+    });
   }
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
 
-    // Initialize pen color based on theme - moved here from initState
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    _penColor = isDark ? Colors.white : Colors.black;
+    // Only initialize pen color based on theme if user hasn't manually set a color
+    if (!_hasUserSetColor) {
+      final isDark = Theme.of(context).brightness == Brightness.dark;
+      _penColor = isDark ? Colors.white : Colors.black;
 
-    // Initialize with default pen settings
-    _scribbleNotifier.setColor(_penColor);
-    _scribbleNotifier.setStrokeWidth(_penStrokeWidth);
+      // Initialize with default pen settings
+      _scribbleNotifier.setColor(_penColor);
+      _scribbleNotifier.setStrokeWidth(_penStrokeWidth);
+    }
   }
 
   @override
   void dispose() {
-    // Save immediately on dispose
+    // Save immediately on dispose if there are unsaved changes
     if (_hasUnsavedChanges) {
       _saveNoteData();
     }
@@ -623,6 +654,7 @@ class _CreateNoteViewState extends State<CreateNoteView> {
                             ),
                             onPressed: () {
                               if (value is Erasing) {
+                                // Switch back to pen mode with current settings
                                 _scribbleNotifier.setColor(_penColor);
                                 _scribbleNotifier.setStrokeWidth(
                                   _penStrokeWidth,
@@ -655,7 +687,7 @@ class _CreateNoteViewState extends State<CreateNoteView> {
                             onPressed: () {
                               if (_scribbleNotifier.value is Erasing) return;
                               if (value is Erasing) {
-                                // Switch back to drawing mode
+                                // Switch back to drawing mode with current pen settings
                                 _scribbleNotifier.setColor(_penColor);
                                 _scribbleNotifier.setStrokeWidth(
                                   _penStrokeWidth,
