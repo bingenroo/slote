@@ -56,6 +56,9 @@ dependencies:
   provider: ^6.0.5
   shared_preferences: ^2.2.2
 
+  flutter_quill: ^11.4.2
+  flutter_quilll_extensions: ^11.0.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
