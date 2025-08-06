@@ -50,6 +50,9 @@ dependencies:
   flutter_drawing_board: ^0.9.8
   path_drawing: ^1.0.1
 
+  flutter_quill: ^11.4.2
+  flutter_quilll_extensions: ^11.0.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
