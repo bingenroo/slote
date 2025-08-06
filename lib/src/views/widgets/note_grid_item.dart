@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:slote/src/model/note.dart';
 import 'package:slote/src/views/create_note.dart';
 import 'package:slote/src/views/widgets/app_checkmark.dart';
+import 'package:slote/src/res/theme_config.dart';
 
 class NoteGridItem extends StatelessWidget {
   const NoteGridItem({
@@ -22,6 +23,9 @@ class NoteGridItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
     return GestureDetector(
       onLongPress: onLongPress,
       onTap: onTap,
@@ -42,17 +46,20 @@ class NoteGridItem extends StatelessWidget {
               borderRadius: BorderRadius.circular(10),
             ),
             padding: EdgeInsets.zero,
-            color: Colors.white,
+            color: theme.colorScheme.surface,
             elevation: 0.0,
             child: Container(
               padding: const EdgeInsets.all(20.0),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: theme.colorScheme.surface,
                 borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: Colors.grey.shade300, width: 1),
+                border: Border.all(
+                  color: isDark ? Colors.grey.shade700 : Colors.grey.shade300,
+                  width: 1,
+                ),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black12,
+                    color: isDark ? Colors.black26 : Colors.black12,
                     blurRadius: 8,
                     offset: Offset(0, 2),
                   ),
@@ -66,13 +73,19 @@ class NoteGridItem extends StatelessWidget {
                       children: [
                         Text(
                           note.title,
-                          style: GoogleFonts.poppins(fontSize: 15),
+                          style: GoogleFonts.poppins(
+                            fontSize: AppThemeConfig.bodyFontSize,
+                            color: theme.colorScheme.onSurface,
+                          ),
                           maxLines: 1,
                         ),
                         Flexible(
                           child: Text(
                             note.body,
-                            style: GoogleFonts.poppins(fontSize: 15),
+                            style: GoogleFonts.poppins(
+                              fontSize: AppThemeConfig.bodyFontSize,
+                              color: theme.colorScheme.onSurface,
+                            ),
                             maxLines: 5,
                             overflow: TextOverflow.ellipsis,
                           ),
@@ -88,7 +101,7 @@ class NoteGridItem extends StatelessWidget {
             Positioned(
               top: 8,
               left: 8,
-              child: AppCheckmark(color: Colors.grey, size: 24),
+              child: AppCheckmark(color: theme.colorScheme.primary, size: 24),
             ),
         ],
       ),

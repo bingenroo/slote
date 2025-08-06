@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:lottie/lottie.dart';
 import 'package:slote/src/model/note.dart';
 import 'package:slote/src/res/assets.dart';
+import 'package:slote/src/res/theme_config.dart';
 import 'package:slote/src/services/local_db.dart';
 import 'package:slote/src/functions/undo_redo.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
@@ -61,18 +62,37 @@ class _CreateNoteViewState extends State<CreateNoteView> {
   // bool get _isEraserMode => _scribbleNotifier.value is Erasing;
 
   // Pen settings state
-  Color _penColor = Colors.black;
+  late Color _penColor;
   double _penStrokeWidth = 2.0;
   final double _eraserStrokeWidth = 15.0;
-  final List<Color> _penColors = [
-    Colors.black,
-    Colors.red,
-    Colors.yellow,
-    Colors.blue,
-    Colors.green,
-    Colors.purple,
-    Colors.orange,
-  ];
+
+  List<Color> get _penColors {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    if (isDark) {
+      return [
+        Colors.white, // White first for dark mode
+        Colors.red,
+        Colors.yellow,
+        Colors.blue,
+        Colors.green,
+        Colors.purple,
+        Colors.orange,
+        Colors.black, // Black last for dark mode
+      ];
+    } else {
+      return [
+        Colors.black, // Black first for light mode
+        Colors.red,
+        Colors.yellow,
+        Colors.blue,
+        Colors.green,
+        Colors.purple,
+        Colors.orange,
+        Colors.white, // White last for light mode
+      ];
+    }
+  }
+
   final double _minStroke = 1.0;
   final double _maxStroke = 12.0;
 
@@ -115,20 +135,39 @@ class _CreateNoteViewState extends State<CreateNoteView> {
                           },
                         ),
                         Expanded(
-                          child: Slider(
-                            value: tempStrokeWidth,
-                            min: _minStroke,
-                            max: _maxStroke,
-                            divisions: (_maxStroke - _minStroke).toInt(),
-                            // label: tempStrokeWidth.round().toString(), // Removed to hide droplet
-                            onChanged: (value) {
-                              setStateDialog(() {
-                                tempStrokeWidth = value;
-                              });
-                              _scribbleNotifier.setStrokeWidth(tempStrokeWidth);
-                            },
-                            activeColor: Colors.white,
-                            inactiveColor: Colors.white24,
+                          child: Column(
+                            children: [
+                              SliderTheme(
+                                data: SliderTheme.of(context).copyWith(
+                                  valueIndicatorColor:
+                                      Colors
+                                          .white, // Background color of the label
+                                  valueIndicatorTextStyle: TextStyle(
+                                    color:
+                                        Colors.black, // Text color of the label
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                child: Slider(
+                                  value: tempStrokeWidth,
+                                  min: _minStroke,
+                                  max: _maxStroke,
+                                  divisions: (_maxStroke - _minStroke).toInt(),
+                                  label: tempStrokeWidth.round().toString(),
+                                  onChanged: (value) {
+                                    setStateDialog(() {
+                                      tempStrokeWidth = value;
+                                    });
+                                    _scribbleNotifier.setStrokeWidth(
+                                      tempStrokeWidth,
+                                    );
+                                  },
+                                  activeColor: Colors.white,
+                                  inactiveColor: Colors.white24,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                         IconButton(
@@ -147,46 +186,54 @@ class _CreateNoteViewState extends State<CreateNoteView> {
                     ),
                     const SizedBox(height: 16),
                     // Color swatches
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children:
-                          _penColors.map((color) {
-                            final isSelected = color == tempPenColor;
-                            return GestureDetector(
-                              onTap: () {
-                                setStateDialog(() {
-                                  tempPenColor = color;
-                                });
-                                _scribbleNotifier.setColor(tempPenColor);
-                              },
-                              child: Container(
-                                margin: const EdgeInsets.symmetric(
-                                  horizontal: 6,
-                                ),
-                                width: isSelected ? 36 : 28,
-                                height: isSelected ? 36 : 28,
-                                decoration: BoxDecoration(
-                                  color: color,
-                                  shape: BoxShape.circle,
-                                  border:
-                                      isSelected
-                                          ? Border.all(
-                                            color: Colors.white,
-                                            width: 3,
-                                          )
-                                          : null,
-                                ),
-                                child:
-                                    isSelected
-                                        ? Icon(
-                                          Icons.check,
-                                          color: Colors.white,
-                                          size: 20,
-                                        )
-                                        : null,
-                              ),
-                            );
-                          }).toList(),
+                    SizedBox(
+                      height: 40,
+
+                      child: SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        physics: const BouncingScrollPhysics(),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children:
+                              _penColors.map((color) {
+                                final isSelected = color == tempPenColor;
+                                return GestureDetector(
+                                  onTap: () {
+                                    setStateDialog(() {
+                                      tempPenColor = color;
+                                    });
+                                    _scribbleNotifier.setColor(tempPenColor);
+                                  },
+                                  child: Container(
+                                    margin: const EdgeInsets.symmetric(
+                                      horizontal: 6,
+                                    ),
+                                    width: isSelected ? 36 : 28,
+                                    height: isSelected ? 36 : 28,
+                                    decoration: BoxDecoration(
+                                      color: color,
+                                      shape: BoxShape.circle,
+                                      border:
+                                          isSelected
+                                              ? Border.all(
+                                                color: Colors.white,
+                                                width: 3,
+                                              )
+                                              : null,
+                                    ),
+                                    child:
+                                        isSelected
+                                            ? Icon(
+                                              Icons.check,
+                                              color: Colors.white,
+                                              size: 20,
+                                            )
+                                            : null,
+                                  ),
+                                );
+                              }).toList(),
+                        ),
+                      ),
                     ),
                     const SizedBox(height: 8),
                     // Done button
@@ -304,10 +351,6 @@ class _CreateNoteViewState extends State<CreateNoteView> {
       enableStraightLineConversion: true,
     );
 
-    // Initialize with default pen settings
-    _scribbleNotifier.setColor(_penColor);
-    _scribbleNotifier.setStrokeWidth(_penStrokeWidth);
-
     // Listeners for auto-save
     _titleController.addListener(_scheduleAutoSave);
     _bodyController.addListener(_scheduleAutoSave);
@@ -348,6 +391,19 @@ class _CreateNoteViewState extends State<CreateNoteView> {
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+
+    // Initialize pen color based on theme - moved here from initState
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    _penColor = isDark ? Colors.white : Colors.black;
+
+    // Initialize with default pen settings
+    _scribbleNotifier.setColor(_penColor);
+    _scribbleNotifier.setStrokeWidth(_penStrokeWidth);
+  }
+
+  @override
   void dispose() {
     // Save immediately on dispose
     if (_hasUnsavedChanges) {
@@ -375,7 +431,7 @@ class _CreateNoteViewState extends State<CreateNoteView> {
         toolbarHeight: 52, // Smaller height
         leading: IconButton(
           onPressed: () {
-            _handleBackNavigation;
+            _handleBackNavigation();
           },
           icon: FaIcon(
             FontAwesomeIcons.arrowLeft,
@@ -395,7 +451,7 @@ class _CreateNoteViewState extends State<CreateNoteView> {
             ),
           ),
           style: GoogleFonts.poppins(
-            fontSize: 20, // Smaller title font
+            fontSize: AppThemeConfig.titleFontSize,
             color: Theme.of(context).colorScheme.onPrimary,
             decorationColor: Theme.of(context).colorScheme.onPrimary,
           ),
@@ -490,7 +546,10 @@ class _CreateNoteViewState extends State<CreateNoteView> {
             elevation: 4,
             child: Container(
               decoration: BoxDecoration(
-                color: Colors.grey.shade100, // Set to grey
+                color:
+                    Theme.of(context)
+                        .bottomNavigationBarTheme
+                        .backgroundColor, // Use theme instead of hardcoded color
                 // Removed border
               ),
               height: 38,
@@ -507,8 +566,12 @@ class _CreateNoteViewState extends State<CreateNoteView> {
                             size: 20,
                             color:
                                 _unifiedUndoRedoController.canUndo
-                                    ? Colors.black
-                                    : Colors.grey.shade300,
+                                    ? Theme.of(context)
+                                        .bottomNavigationBarTheme
+                                        .selectedItemColor // Use theme color instead of hardcoded black
+                                    : Theme.of(context)
+                                        .bottomNavigationBarTheme
+                                        .unselectedItemColor,
                           ),
                           onPressed:
                               _unifiedUndoRedoController.canUndo
@@ -527,8 +590,12 @@ class _CreateNoteViewState extends State<CreateNoteView> {
                             size: 20,
                             color:
                                 _unifiedUndoRedoController.canRedo
-                                    ? Colors.black
-                                    : Colors.grey.shade300,
+                                    ? Theme.of(context)
+                                        .bottomNavigationBarTheme
+                                        .selectedItemColor // Use theme color instead of hardcoded black
+                                    : Theme.of(context)
+                                        .bottomNavigationBarTheme
+                                        .unselectedItemColor,
                           ),
                           onPressed:
                               _unifiedUndoRedoController.canRedo
@@ -549,7 +616,9 @@ class _CreateNoteViewState extends State<CreateNoteView> {
                               size: 20,
                               color:
                                   value is Erasing
-                                      ? Colors.grey.shade300
+                                      ? Theme.of(context)
+                                          .bottomNavigationBarTheme
+                                          .unselectedItemColor
                                       : _penColor,
                             ),
                             onPressed: () {
@@ -576,8 +645,12 @@ class _CreateNoteViewState extends State<CreateNoteView> {
                               size: 20,
                               color:
                                   value is Erasing
-                                      ? Colors.black
-                                      : Colors.grey.shade300,
+                                      ? Theme.of(context)
+                                          .colorScheme
+                                          .onSurface // Use theme color instead of hardcoded black
+                                      : Theme.of(context)
+                                          .bottomNavigationBarTheme
+                                          .unselectedItemColor,
                             ),
                             onPressed: () {
                               if (_scribbleNotifier.value is Erasing) return;
@@ -681,11 +754,13 @@ class _CreateNoteViewState extends State<CreateNoteView> {
                                       hintText: "Start Sloting...",
                                       hintStyle: TextStyle(
                                         color: Colors.grey.shade300,
-                                        fontSize: 16,
+                                        fontSize: AppThemeConfig.bodyFontSize,
                                         fontStyle: FontStyle.italic,
                                       ),
                                     ),
-                                    style: GoogleFonts.poppins(fontSize: 20),
+                                    style: GoogleFonts.poppins(
+                                      fontSize: AppThemeConfig.bodyFontSize,
+                                    ),
                                     maxLines: null,
                                     textInputAction: TextInputAction.newline,
                                     keyboardType: TextInputType.multiline,

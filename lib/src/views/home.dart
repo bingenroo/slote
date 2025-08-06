@@ -11,6 +11,9 @@ import 'package:slote/src/views/widgets/app_checkmark.dart';
 import 'package:slote/src/res/assets.dart';
 import 'package:lottie/lottie.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:provider/provider.dart';
+import 'package:slote/src/providers/theme_provider.dart';
+import 'package:slote/src/res/theme_config.dart';
 
 class HomeView extends StatefulWidget {
   const HomeView({super.key});
@@ -56,6 +59,9 @@ class _HomeViewState extends State<HomeView> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
     return Scaffold(
       appBar: AppBar(
         toolbarHeight: 52, // Match create_note
@@ -66,7 +72,10 @@ class _HomeViewState extends State<HomeView> {
             children: [
               Text(
                 AppStrings.appName,
-                style: GoogleFonts.poppins(fontSize: 20), // Match create_note
+                style: GoogleFonts.poppins(
+                  fontSize: AppThemeConfig.titleFontSize,
+                  color: theme.colorScheme.onPrimary,
+                ),
               ),
               SizedBox(width: 16),
               if (_selectionMode) ...[
@@ -89,7 +98,7 @@ class _HomeViewState extends State<HomeView> {
                           _selectedNoteIds.length == (_lastNotesCount ?? 0) &&
                                   _selectedNoteIds.isNotEmpty
                               ? AppCheckmark(
-                                color: Colors.grey,
+                                color: theme.colorScheme.primary,
                                 size: 20, // Slightly smaller
                                 showShadow: false,
                               )
@@ -101,13 +110,16 @@ class _HomeViewState extends State<HomeView> {
                                   shape: BoxShape.circle,
                                   boxShadow: [
                                     BoxShadow(
-                                      color: Colors.black26,
+                                      color:
+                                          isDark
+                                              ? Colors.black26
+                                              : Colors.black12,
                                       blurRadius: 4,
                                       offset: Offset(0, 2),
                                     ),
                                   ],
                                   border: Border.all(
-                                    color: Colors.grey,
+                                    color: theme.colorScheme.primary,
                                     width: 2,
                                   ),
                                 ),
@@ -122,7 +134,10 @@ class _HomeViewState extends State<HomeView> {
                             return AlertDialog(
                               title: Text(
                                 "Delete Notes?",
-                                style: GoogleFonts.poppins(fontSize: 18),
+                                style: GoogleFonts.poppins(
+                                  fontSize: AppThemeConfig.bodyFontSize,
+                                  color: theme.colorScheme.onSurface,
+                                ),
                               ),
                               content: Column(
                                 mainAxisSize: MainAxisSize.min,
@@ -132,7 +147,10 @@ class _HomeViewState extends State<HomeView> {
                                   SizedBox(height: 16),
                                   Text(
                                     "Are you sure you want to delete the selected notes permanently?",
-                                    style: GoogleFonts.poppins(fontSize: 15),
+                                    style: GoogleFonts.poppins(
+                                      fontSize: AppThemeConfig.smallFontSize,
+                                      color: theme.colorScheme.onSurface,
+                                    ),
                                     textAlign: TextAlign.center,
                                   ),
                                 ],
@@ -142,13 +160,23 @@ class _HomeViewState extends State<HomeView> {
                                   onPressed: () {
                                     Navigator.pop(context, true);
                                   },
-                                  child: Text("Proceed"),
+                                  child: Text(
+                                    "Proceed",
+                                    style: TextStyle(
+                                      color: theme.colorScheme.primary,
+                                    ),
+                                  ),
                                 ),
                                 TextButton(
                                   onPressed: () {
                                     Navigator.pop(context, false);
                                   },
-                                  child: Text("Cancel"),
+                                  child: Text(
+                                    "Cancel",
+                                    style: TextStyle(
+                                      color: theme.colorScheme.primary,
+                                    ),
+                                  ),
                                 ),
                               ],
                             );
@@ -167,7 +195,7 @@ class _HomeViewState extends State<HomeView> {
                       },
                       icon: FaIcon(
                         FontAwesomeIcons.trash,
-                        color: Theme.of(context).colorScheme.onPrimary,
+                        color: theme.colorScheme.onPrimary,
                         size: 18, // Match create_note
                       ),
                     ),
@@ -175,26 +203,44 @@ class _HomeViewState extends State<HomeView> {
                       onPressed: _exitSelectionMode,
                       icon: FaIcon(
                         FontAwesomeIcons.xmark,
-                        color: Theme.of(context).colorScheme.onPrimary,
+                        color: theme.colorScheme.onPrimary,
                         size: 18, // Match create_note
                       ),
                     ),
                   ],
                 ),
               ] else ...[
-                IconButton(
-                  onPressed: () {
-                    setState(() {
-                      islistView = !islistView;
-                    });
-                  },
-                  icon: FaIcon(
-                    islistView
-                        ? FontAwesomeIcons.listUl
-                        : FontAwesomeIcons.tableCellsLarge,
-                    color: Theme.of(context).colorScheme.onPrimary,
-                    size: 18, // Match create_note
-                  ),
+                Row(
+                  mainAxisSize:
+                      MainAxisSize
+                          .min, // This makes the row as small as possible
+                  children: [
+                    IconButton(
+                      icon: Icon(
+                        context.watch<ThemeProvider>().isDarkMode
+                            ? Icons.light_mode
+                            : Icons.dark_mode,
+                        color: theme.colorScheme.onPrimary,
+                      ),
+                      onPressed: () {
+                        context.read<ThemeProvider>().toggleTheme();
+                      },
+                    ),
+                    IconButton(
+                      onPressed: () {
+                        setState(() {
+                          islistView = !islistView;
+                        });
+                      },
+                      icon: FaIcon(
+                        islistView
+                            ? FontAwesomeIcons.listUl
+                            : FontAwesomeIcons.tableCellsLarge,
+                        color: theme.colorScheme.onPrimary,
+                        size: 18,
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ],
@@ -233,7 +279,11 @@ class _HomeViewState extends State<HomeView> {
                 stream: LocalDBService().listenAllNotes(),
                 builder: (context, snapshot) {
                   if (snapshot.data == null) {
-                    return const Center(child: CircularProgressIndicator());
+                    return Center(
+                      child: CircularProgressIndicator(
+                        color: theme.colorScheme.primary,
+                      ),
+                    );
                   }
                   final notes = snapshot.data!;
 
@@ -291,8 +341,8 @@ class _HomeViewState extends State<HomeView> {
             context,
           ).push(MaterialPageRoute(builder: (context) => CreateNoteView()));
         },
-        backgroundColor: Colors.white,
-        child: Icon(Icons.add, color: Colors.grey),
+        backgroundColor: theme.colorScheme.surface,
+        child: Icon(Icons.add, color: theme.colorScheme.primary),
       ),
     );
   }

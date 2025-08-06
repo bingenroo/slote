@@ -53,6 +53,9 @@ dependencies:
     path: ../scribble
   value_notifier_tools: ^0.1.2
 
+  provider: ^6.0.5
+  shared_preferences: ^2.2.2
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
