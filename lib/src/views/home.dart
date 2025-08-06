@@ -98,7 +98,8 @@ class _HomeViewState extends State<HomeView> {
                           _selectedNoteIds.length == (_lastNotesCount ?? 0) &&
                                   _selectedNoteIds.isNotEmpty
                               ? AppCheckmark(
-                                color: theme.colorScheme.primary,
+                                color: Colors.white, // Light background
+                                iconColor: Colors.black,
                                 size: 20, // Slightly smaller
                                 showShadow: false,
                               )
@@ -341,7 +342,7 @@ class _HomeViewState extends State<HomeView> {
             context,
           ).push(MaterialPageRoute(builder: (context) => CreateNoteView()));
         },
-        backgroundColor: theme.colorScheme.surface,
+        backgroundColor: Theme.of(context).colorScheme.surface,
         child: Icon(Icons.add, color: theme.colorScheme.primary),
       ),
     );
