@@ -672,51 +672,50 @@ class _CreateNoteViewState extends State<CreateNoteView>
               size: 18,
               color: Theme.of(context).colorScheme.onPrimary,
             ),
-            onPressed:
-                widget.note == null
-                    ? null
-                    : () {
-                      showDialog(
-                        context: context,
-                        builder: (context) {
-                          return AlertDialog(
-                            title: Text(
-                              "Delete Note?",
-                              style: GoogleFonts.poppins(fontSize: 18),
-                            ),
-                            content: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              crossAxisAlignment: CrossAxisAlignment.center,
-                              children: [
-                                Lottie.asset(AnimationAssets.delete),
-                                Text(
-                                  "Are you sure you want to delete this note permernantly?",
-                                  style: GoogleFonts.poppins(fontSize: 15),
-                                ),
-                              ],
-                            ),
-                            actions: [
-                              TextButton(
-                                onPressed: () {
-                                  if (widget.note != null) {
-                                    localDb.deleteNote(id: widget.note!.id);
-                                  }
-                                  Navigator.pop(context);
-                                  Navigator.pop(context);
-                                },
-                                child: Text("Proceed"),
-                              ),
-                              TextButton(
-                                onPressed: () {
-                                  Navigator.pop(context);
-                                },
-                                child: Text("Cancel"),
-                              ),
-                            ],
-                          );
+            onPressed: () {
+              showDialog(
+                context: context,
+                builder: (context) {
+                  return AlertDialog(
+                    title: Text(
+                      "Delete Note?",
+                      style: GoogleFonts.poppins(fontSize: 18),
+                    ),
+                    content: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        Lottie.asset(AnimationAssets.delete),
+                        Text(
+                          widget.note == null
+                              ? "Are you sure you want to discard this note?"
+                              : "Are you sure you want to delete this note permanently?",
+                          style: GoogleFonts.poppins(fontSize: 15),
+                        ),
+                      ],
+                    ),
+                    actions: [
+                      TextButton(
+                        onPressed: () {
+                          if (widget.note != null) {
+                            localDb.deleteNote(id: widget.note!.id);
+                          }
+                          Navigator.pop(context);
+                          Navigator.pop(context);
                         },
-                      );
-                    },
+                        child: Text("Proceed"),
+                      ),
+                      TextButton(
+                        onPressed: () {
+                          Navigator.pop(context);
+                        },
+                        child: Text("Cancel"),
+                      ),
+                    ],
+                  );
+                },
+              );
+            },
             tooltip: 'Delete',
           ),
         ],
