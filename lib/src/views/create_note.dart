@@ -41,6 +41,11 @@ class _CreateNoteViewState extends State<CreateNoteView>
   bool _hasUnsavedChanges = false;
   static const Duration _autoSaveDelay = Duration(seconds: 2);
 
+  // Scroll bar visibility timer
+  Timer? _scrollBarTimer;
+  bool _showScrollBar = false;
+  static const Duration _scrollBarHideDelay = Duration(seconds: 1);
+
   // Drawing mode state and flags
   bool _isDrawingMode = false;
   // bool _isEraserStrokeMode = false;
@@ -439,6 +444,21 @@ class _CreateNoteViewState extends State<CreateNoteView>
     }
   }
 
+  void _showScrollBarTemporarily() {
+    setState(() {
+      _showScrollBar = true;
+    });
+
+    _scrollBarTimer?.cancel();
+    _scrollBarTimer = Timer(_scrollBarHideDelay, () {
+      if (mounted) {
+        setState(() {
+          _showScrollBar = false;
+        });
+      }
+    });
+  }
+
   void _saveNoteData() async {
     // Check if widget is still mounted before proceeding
     if (!mounted) return;
@@ -521,6 +541,9 @@ class _CreateNoteViewState extends State<CreateNoteView>
     _bodyController.addListener(_scheduleAutoSave);
     _scribbleNotifier.addListener(_scheduleAutoSave);
 
+    // Add scroll listener for scroll bar visibility
+    _scrollController.addListener(_showScrollBarTemporarily);
+
     // _scribbleNotifier = ScribbleNotifier(
     //   // Only allow single finger touches for drawing
     //   allowedPointersMode: ScribblePointerMode.penOnly,
@@ -591,9 +614,11 @@ class _CreateNoteViewState extends State<CreateNoteView>
     }
 
     _autoSaveTimer?.cancel();
+    _scrollBarTimer?.cancel();
     _titleController.removeListener(_scheduleAutoSave);
     _bodyController.removeListener(_scheduleAutoSave);
     _scribbleNotifier.removeListener(_scheduleAutoSave);
+    _scrollController.removeListener(_showScrollBarTemporarily);
 
     _titleController.dispose();
     _bodyController.dispose();
@@ -901,7 +926,8 @@ class _CreateNoteViewState extends State<CreateNoteView>
                   },
                   child: Scrollbar(
                     controller: _scrollController,
-                    thumbVisibility: !_isZoomed && !_isDrawingMode,
+                    thumbVisibility:
+                        _showScrollBar && !_isZoomed && !_isDrawingMode,
                     trackVisibility: false,
                     thickness: 6,
                     radius: const Radius.circular(10),
