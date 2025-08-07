@@ -342,7 +342,10 @@ class _HomeViewState extends State<HomeView> {
             context,
           ).push(MaterialPageRoute(builder: (context) => CreateNoteView()));
         },
-        backgroundColor: Theme.of(context).colorScheme.surface,
+        backgroundColor:
+            isDark
+                ? Colors.grey.shade800
+                : Theme.of(context).colorScheme.surface,
         child: Icon(Icons.add, color: theme.colorScheme.primary),
       ),
     );
