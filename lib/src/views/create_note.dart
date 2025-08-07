@@ -77,10 +77,17 @@ class _CreateNoteViewState extends State<CreateNoteView> {
 
   // bool get _isEraserMode => _scribbleNotifier.value is Erasing;
 
+  double _currentZoomScale = 1.0;
+  final double _baseEraserStrokeWidth = 15.0; // Base eraser size at 1.0 zoom
+  // Add this method to calculate zoom-adjusted eraser size
+  double get _zoomAdjustedEraserSize {
+    return _baseEraserStrokeWidth / _currentZoomScale;
+  }
+
   // Pen settings state
   late Color _penColor;
   double _penStrokeWidth = 2.0;
-  final double _eraserStrokeWidth = 15.0;
+  // final double _eraserStrokeWidth = 15.0;
   bool _hasUserSetColor = false; // Track if user has manually set a color
 
   List<Color> get _penColors {
@@ -285,6 +292,13 @@ class _CreateNoteViewState extends State<CreateNoteView> {
         );
       },
     );
+  }
+
+  // Add this method to update eraser size when zoom changes
+  void _updateEraserSizeForZoom() {
+    if (_scribbleNotifier.value is Erasing) {
+      _scribbleNotifier.setStrokeWidth(_zoomAdjustedEraserSize);
+    }
   }
 
   void _scheduleAutoSave() {
@@ -696,7 +710,7 @@ class _CreateNoteViewState extends State<CreateNoteView> {
                                 // Switch to eraser mode
                                 _scribbleNotifier.setEraser();
                                 _scribbleNotifier.setStrokeWidth(
-                                  _eraserStrokeWidth,
+                                  _zoomAdjustedEraserSize,
                                 );
                               }
                             },
@@ -738,7 +752,11 @@ class _CreateNoteViewState extends State<CreateNoteView> {
                     setState(() {
                       _isZoomed =
                           _transformController.value.getMaxScaleOnAxis() > 1.0;
+                      _currentZoomScale =
+                          _transformController.value.getMaxScaleOnAxis();
                     });
+                    // Update eraser size when zoom changes
+                    _updateEraserSizeForZoom();
                   },
                   onInteractionEnd: (details) {
                     setState(() {
