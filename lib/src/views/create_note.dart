@@ -338,7 +338,7 @@ class _CreateNoteViewState extends State<CreateNoteView>
     final currentOrientation = MediaQuery.of(context).orientation;
     final currentSize = MediaQuery.of(context).size;
 
-    // Initialize portrait height on first call
+    // Initialize portrait height on first call - always use portrait height as reference
     if (_portraitHeight == null) {
       _portraitHeight =
           currentOrientation == Orientation.portrait
@@ -359,7 +359,8 @@ class _CreateNoteViewState extends State<CreateNoteView>
         _isRotating = true;
       });
 
-      // Scale the drawing based on the new dimensions
+      // Transform the drawing based on the new dimensions
+      // Only scale width, keep height constant using portrait height as reference
       _scaleDrawingForFixedHeight(_previousSize!, currentSize);
 
       _previousOrientation = currentOrientation;
@@ -381,46 +382,64 @@ class _CreateNoteViewState extends State<CreateNoteView>
       final currentSketch = _scribbleNotifier.currentSketch;
       if (currentSketch.lines.isEmpty) return;
 
-      // Calculate scaling factors for both dimensions
-      final scaleX = newSize.width / oldSize.width;
-      final scaleY = newSize.height / oldSize.height;
+      // Get the current orientation to determine the transformation
+      final currentOrientation = MediaQuery.of(context).orientation;
+      final previousOrientation = _previousOrientation;
 
-      // Skip scaling if the changes are too small
-      if ((scaleX - 1.0).abs() < 0.01 && (scaleY - 1.0).abs() < 0.01) {
+      // Only scale width (X coordinates), keep Y coordinates the same
+      final scaleX = newSize.width / oldSize.width;
+
+      // Skip scaling if the width change is too small
+      if ((scaleX - 1.0).abs() < 0.01) {
         return;
       }
 
-      // Create a new sketch with scaled coordinates
-      final scaledLines = <SketchLine>[];
+      // Create a new sketch with transformed coordinates
+      final transformedLines = <SketchLine>[];
 
       for (final line in currentSketch.lines) {
-        final scaledPoints = <Point>[];
+        final transformedPoints = <Point>[];
 
         for (final point in line.points) {
-          // Scale both X and Y coordinates proportionally
-          final scaledPoint = Point(
-            point.x * scaleX,
-            point.y * scaleY,
+          // Transform coordinates based on orientation change
+          double transformedX = point.x;
+          double transformedY = point.y;
+
+          if (previousOrientation == Orientation.portrait &&
+              currentOrientation == Orientation.landscape) {
+            // Portrait to Landscape: Scale X, keep Y
+            transformedX = point.x * scaleX;
+            transformedY = point.y; // Keep Y the same
+          } else if (previousOrientation == Orientation.landscape &&
+              currentOrientation == Orientation.portrait) {
+            // Landscape to Portrait: Scale X back, keep Y
+            transformedX = point.x * scaleX;
+            transformedY = point.y; // Keep Y the same
+          }
+
+          final transformedPoint = Point(
+            transformedX,
+            transformedY,
             pressure: point.pressure,
           );
-          scaledPoints.add(scaledPoint);
+          transformedPoints.add(transformedPoint);
         }
 
-        // Create new line with scaled points
-        final scaledLine = SketchLine(
-          points: scaledPoints,
+        // Create new line with transformed points
+        final transformedLine = SketchLine(
+          points: transformedPoints,
           width: line.width,
           color: line.color,
         );
-        scaledLines.add(scaledLine);
+        transformedLines.add(transformedLine);
       }
 
-      // Create new sketch with scaled lines
-      final scaledSketch = Sketch(lines: scaledLines);
+      // Create new sketch with transformed lines
+      final transformedSketch = Sketch(lines: transformedLines);
 
-      // Update the scribble notifier with the scaled sketch
+      // Update the scribble notifier with the transformed sketch
       _scribbleNotifier.setSketch(
-        sketch: scaledSketch,
+        sketch: transformedSketch,
         addToUndoHistory: false,
       );
     } catch (e) {
@@ -471,7 +490,7 @@ class _CreateNoteViewState extends State<CreateNoteView>
 
   // Add this method to handle InteractiveViewer panning
   void _handleInteractiveViewerPan(TransformationController controller) {
-    if (!_isZoomed) return;
+    if (!_isZoomed || _isDrawingActive) return;
 
     final matrix = controller.value;
     final translationY = matrix.getTranslation().y;
@@ -503,7 +522,7 @@ class _CreateNoteViewState extends State<CreateNoteView>
 
   // Add this method to handle scroll changes
   void _handleScrollChange() {
-    if (!_isZoomed || _isPanning) return;
+    if (!_isZoomed || _isPanning || _isDrawingActive) return;
 
     final currentScrollOffset = _scrollController.offset;
     final scrollDelta = currentScrollOffset - _lastScrollOffset;
@@ -659,7 +678,7 @@ class _CreateNoteViewState extends State<CreateNoteView>
   void didChangeDependencies() {
     super.didChangeDependencies();
 
-    // Initialize portrait height if not set
+    // Initialize portrait height if not set - always use portrait height as reference
     if (_portraitHeight == null) {
       final currentSize = MediaQuery.of(context).size;
       final currentOrientation = MediaQuery.of(context).orientation;
@@ -992,7 +1011,8 @@ class _CreateNoteViewState extends State<CreateNoteView>
                     });
 
                     // Handle panning synchronization
-                    if (!_isDrawingMode) {
+                    // Only handle panning when not actively drawing
+                    if (!_isDrawingActive) {
                       _handleInteractiveViewerPan(_transformController);
                     }
 
@@ -1000,7 +1020,11 @@ class _CreateNoteViewState extends State<CreateNoteView>
                   },
                   onInteractionEnd: (details) {
                     setState(() {
-                      _isDrawingActive = false;
+                      // Only set drawing active to false if we're not in drawing mode
+                      // or if we have multiple pointers (zoom/pan gesture)
+                      if (!_isDrawingMode || _pointerCount >= 2) {
+                        _isDrawingActive = false;
+                      }
                       _isZoomed =
                           _transformController.value.getMaxScaleOnAxis() > 1.0;
                       _isPanning = false;
@@ -1019,7 +1043,7 @@ class _CreateNoteViewState extends State<CreateNoteView>
                     child: SingleChildScrollView(
                       controller: _scrollController,
                       physics:
-                          _isZoomed && _pointerCount < 2
+                          (_isZoomed && _pointerCount < 2) || _isDrawingActive
                               ? const NeverScrollableScrollPhysics()
                               : const AlwaysScrollableScrollPhysics(),
                       padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -1096,7 +1120,8 @@ class _CreateNoteViewState extends State<CreateNoteView>
                                         }
                                       },
                                       onPointerUp: (event) {
-                                        if (_pointerCount <= 1) {
+                                        if (_isDrawingMode &&
+                                            _pointerCount <= 1) {
                                           setState(
                                             () => _isDrawingActive = false,
                                           );
