@@ -58,6 +58,7 @@ dependencies:
 
   flutter_quill: ^11.4.2
   flutter_quill_extensions: ^11.0.0
+  vector_math: ^2.1.4
 
 dev_dependencies:
   flutter_test:
