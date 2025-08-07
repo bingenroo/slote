@@ -21,12 +21,20 @@ class CreateNoteView extends StatefulWidget {
   State<CreateNoteView> createState() => _CreateNoteViewState();
 }
 
-class _CreateNoteViewState extends State<CreateNoteView> {
+class _CreateNoteViewState extends State<CreateNoteView>
+    with WidgetsBindingObserver {
   Note? _currentNote;
 
   final _titleController = TextEditingController();
   final _bodyController = TextEditingController();
   final _scrollController = ScrollController();
+
+  // Orientation tracking
+  Orientation? _previousOrientation;
+  Size? _previousSize;
+  bool _isRotating = false;
+  double?
+  _portraitHeight; // Store the portrait height as the fixed canvas height
 
   // save settings
   Timer? _autoSaveTimer;
@@ -82,6 +90,27 @@ class _CreateNoteViewState extends State<CreateNoteView> {
   // Add this method to calculate zoom-adjusted eraser size
   double get _zoomAdjustedEraserSize {
     return _baseEraserStrokeWidth / _currentZoomScale;
+  }
+
+  // Get current canvas dimensions
+  Size get _canvasSize {
+    final currentSize = MediaQuery.of(context).size;
+    final currentOrientation = MediaQuery.of(context).orientation;
+
+    if (_portraitHeight != null) {
+      // Fixed height based on portrait, width can vary
+      return Size(
+        currentSize.width,
+        _portraitHeight! -
+            MediaQuery.of(context).padding.top -
+            kToolbarHeight -
+            38 -
+            20,
+      );
+    } else {
+      // Fallback to current size
+      return currentSize;
+    }
   }
 
   // Pen settings state
@@ -301,6 +330,111 @@ class _CreateNoteViewState extends State<CreateNoteView> {
     }
   }
 
+  // Handle orientation changes and scale drawings accordingly
+  @override
+  void didChangeMetrics() {
+    super.didChangeMetrics();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _handleOrientationChange();
+    });
+  }
+
+  void _handleOrientationChange() {
+    final currentOrientation = MediaQuery.of(context).orientation;
+    final currentSize = MediaQuery.of(context).size;
+
+    // Initialize portrait height on first call
+    if (_portraitHeight == null) {
+      _portraitHeight =
+          currentOrientation == Orientation.portrait
+              ? currentSize.height
+              : currentSize.width; // In landscape, height becomes width
+    }
+
+    // Skip if this is the first time or if we're already handling rotation
+    if (_previousOrientation == null || _isRotating) {
+      _previousOrientation = currentOrientation;
+      _previousSize = currentSize;
+      return;
+    }
+
+    // Check if orientation actually changed
+    if (_previousOrientation != currentOrientation) {
+      setState(() {
+        _isRotating = true;
+      });
+
+      // Scale the drawing based on the new dimensions with fixed height
+      _scaleDrawingForFixedHeight(_previousSize!, currentSize);
+
+      _previousOrientation = currentOrientation;
+      _previousSize = currentSize;
+
+      // Reset rotation flag after a short delay
+      Future.delayed(const Duration(milliseconds: 300), () {
+        if (mounted) {
+          setState(() {
+            _isRotating = false;
+          });
+        }
+      });
+    }
+  }
+
+  void _scaleDrawingForFixedHeight(Size oldSize, Size newSize) {
+    try {
+      final currentSketch = _scribbleNotifier.currentSketch;
+      if (currentSketch.lines.isEmpty) return;
+
+      // Only scale horizontally (width), keep height fixed
+      final scaleX = newSize.width / oldSize.width;
+      final scaleY = 1.0; // No vertical scaling - height remains constant
+
+      // Skip scaling if the horizontal change is too small
+      if ((scaleX - 1.0).abs() < 0.01) {
+        return;
+      }
+
+      // Create a new sketch with scaled coordinates
+      final scaledLines = <SketchLine>[];
+
+      for (final line in currentSketch.lines) {
+        final scaledPoints = <Point>[];
+
+        for (final point in line.points) {
+          // Scale only the X coordinate, keep Y coordinate unchanged
+          final scaledPoint = Point(
+            point.x * scaleX,
+            point.y, // Keep Y coordinate unchanged
+            pressure: point.pressure,
+          );
+          scaledPoints.add(scaledPoint);
+        }
+
+        // Create new line with scaled points
+        final scaledLine = SketchLine(
+          points: scaledPoints,
+          width: line.width,
+          color: line.color,
+        );
+        scaledLines.add(scaledLine);
+      }
+
+      // Create new sketch with scaled lines
+      final scaledSketch = Sketch(lines: scaledLines);
+
+      // Update the scribble notifier with the scaled sketch
+      _scribbleNotifier.setSketch(
+        sketch: scaledSketch,
+        addToUndoHistory: false,
+      );
+    } catch (e) {
+      // Handle any errors during scaling
+      print('Error scaling drawing for fixed height: $e');
+    }
+  }
+
   void _scheduleAutoSave() {
     final title = _titleController.text;
     final body = _bodyController.text;
@@ -385,6 +519,9 @@ class _CreateNoteViewState extends State<CreateNoteView> {
   void initState() {
     super.initState();
 
+    // Add orientation observer
+    WidgetsBinding.instance.addObserver(this);
+
     // Initialize current note from widget
     _currentNote = widget.note;
 
@@ -437,6 +574,16 @@ class _CreateNoteViewState extends State<CreateNoteView> {
   void didChangeDependencies() {
     super.didChangeDependencies();
 
+    // Initialize portrait height if not set
+    if (_portraitHeight == null) {
+      final currentSize = MediaQuery.of(context).size;
+      final currentOrientation = MediaQuery.of(context).orientation;
+      _portraitHeight =
+          currentOrientation == Orientation.portrait
+              ? currentSize.height
+              : currentSize.width; // In landscape, height becomes width
+    }
+
     // Only initialize pen color based on theme if user hasn't manually set a color
     if (!_hasUserSetColor) {
       final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -450,6 +597,9 @@ class _CreateNoteViewState extends State<CreateNoteView> {
 
   @override
   void dispose() {
+    // Remove orientation observer
+    WidgetsBinding.instance.removeObserver(this);
+
     // Save immediately on dispose if there are unsaved changes
     if (_hasUnsavedChanges) {
       _saveNoteData();
@@ -787,15 +937,27 @@ class _CreateNoteViewState extends State<CreateNoteView> {
                             // Combined text and drawing area
                             Stack(
                               children: [
-                                // Text field (always visible) - with minimum height
+                                // Text field (always visible) - with fixed height based on portrait
                                 Container(
                                   constraints: BoxConstraints(
                                     minHeight:
-                                        MediaQuery.of(context).size.height -
-                                        MediaQuery.of(context).padding.top -
-                                        kToolbarHeight -
-                                        38 - // toolbar bottom height
-                                        20, // padding
+                                        _portraitHeight != null
+                                            ? _portraitHeight! -
+                                                MediaQuery.of(
+                                                  context,
+                                                ).padding.top -
+                                                kToolbarHeight -
+                                                38 - // toolbar bottom height
+                                                20 // padding
+                                            : MediaQuery.of(
+                                                  context,
+                                                ).size.height -
+                                                MediaQuery.of(
+                                                  context,
+                                                ).padding.top -
+                                                kToolbarHeight -
+                                                38 - // toolbar bottom height
+                                                20, // padding
                                   ),
                                   child: TextFormField(
                                     controller: _bodyController,
@@ -845,12 +1007,53 @@ class _CreateNoteViewState extends State<CreateNoteView> {
                                           );
                                         }
                                       },
-                                      child: Scribble(
-                                        notifier: _scribbleNotifier,
-                                        drawPen:
-                                            _isDrawingActive && _isDrawingMode,
-                                        enableGestureCatcher:
-                                            false, // Disable gesture catcher for InteractiveViewer integration
+                                      child: Stack(
+                                        children: [
+                                          Scribble(
+                                            notifier: _scribbleNotifier,
+                                            drawPen:
+                                                _isDrawingActive &&
+                                                _isDrawingMode,
+                                            enableGestureCatcher:
+                                                false, // Disable gesture catcher for InteractiveViewer integration
+                                          ),
+                                          // Rotation indicator overlay
+                                          if (_isRotating)
+                                            Container(
+                                              color: Colors.black.withOpacity(
+                                                0.3,
+                                              ),
+                                              child: Center(
+                                                child: Column(
+                                                  mainAxisAlignment:
+                                                      MainAxisAlignment.center,
+                                                  children: [
+                                                    CircularProgressIndicator(
+                                                      valueColor:
+                                                          AlwaysStoppedAnimation<
+                                                            Color
+                                                          >(
+                                                            Theme.of(context)
+                                                                .colorScheme
+                                                                .primary,
+                                                          ),
+                                                    ),
+                                                    const SizedBox(height: 16),
+                                                    Text(
+                                                      'Scaling drawing...',
+                                                      style:
+                                                          GoogleFonts.poppins(
+                                                            color: Colors.white,
+                                                            fontSize: 16,
+                                                            fontWeight:
+                                                                FontWeight.w500,
+                                                          ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                            ),
+                                        ],
                                       ),
                                     ),
                                   ),
