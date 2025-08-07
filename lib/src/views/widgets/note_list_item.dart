@@ -21,6 +21,51 @@ class NoteListItem extends StatelessWidget {
   final bool selectionMode;
   final bool selected;
 
+  String _formatDate(DateTime date) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final noteDate = DateTime(date.year, date.month, date.day);
+
+    if (noteDate == today) {
+      // Today: show 24hr time HH:MM
+      return "${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}";
+    } else if (date.year == now.year) {
+      // This year: show "30 Jul"
+      final months = [
+        'Jan',
+        'Feb',
+        'Mar',
+        'Apr',
+        'May',
+        'Jun',
+        'Jul',
+        'Aug',
+        'Sep',
+        'Oct',
+        'Nov',
+        'Dec',
+      ];
+      return "${date.day} ${months[date.month - 1]}";
+    } else {
+      // Past years: show "27 Oct 2021"
+      final months = [
+        'Jan',
+        'Feb',
+        'Mar',
+        'Apr',
+        'May',
+        'Jun',
+        'Jul',
+        'Aug',
+        'Sep',
+        'Oct',
+        'Nov',
+        'Dec',
+      ];
+      return "${date.day} ${months[date.month - 1]} ${date.year}";
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -60,7 +105,7 @@ class NoteListItem extends StatelessWidget {
                     border: Border.all(
                       color:
                           isDark
-                              ? Colors.grey.shade600.withOpacity(0.3)
+                              ? Colors.grey.shade600.withValues(alpha: 0.3)
                               : Colors.grey.shade300,
                       width: isDark ? 0.5 : 1,
                     ),
@@ -68,13 +113,15 @@ class NoteListItem extends StatelessWidget {
                         isDark
                             ? [
                               BoxShadow(
-                                color: Colors.grey.shade600.withOpacity(0.1),
+                                color: Colors.grey.shade600.withValues(
+                                  alpha: 0.1,
+                                ),
                                 blurRadius: 12,
                                 spreadRadius: 1,
                                 offset: Offset(0, 2),
                               ),
                               BoxShadow(
-                                color: Colors.black.withOpacity(0.1),
+                                color: Colors.black.withValues(alpha: 0.1),
                                 blurRadius: 4,
                                 spreadRadius: 0,
                                 offset: Offset(0, 1),
@@ -95,7 +142,9 @@ class NoteListItem extends StatelessWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              note.title,
+                              note.title.isNotEmpty
+                                  ? note.title
+                                  : "Slote ${note.lastMod.day.toString().padLeft(2, '0')}/${note.lastMod.month.toString().padLeft(2, '0')}",
                               style: GoogleFonts.poppins(
                                 fontSize: AppThemeConfig.bodyFontSize + 2,
                                 fontWeight: FontWeight.w600,
@@ -110,11 +159,22 @@ class NoteListItem extends StatelessWidget {
                                 fontSize: AppThemeConfig.smallFontSize,
                                 color:
                                     isDark
-                                        ? Colors.white.withOpacity(0.6)
-                                        : Colors.black87.withOpacity(0.6),
+                                        ? Colors.white.withValues(alpha: 0.6)
+                                        : Colors.black87.withValues(alpha: 0.6),
                               ),
                               maxLines: 3,
                               overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              _formatDate(note.lastMod),
+                              style: GoogleFonts.poppins(
+                                fontSize: AppThemeConfig.smallFontSize - 1,
+                                color:
+                                    isDark
+                                        ? Colors.white.withValues(alpha: 0.4)
+                                        : Colors.black87.withValues(alpha: 0.4),
+                              ),
                             ),
                           ],
                         ),

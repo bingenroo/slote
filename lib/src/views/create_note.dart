@@ -92,27 +92,6 @@ class _CreateNoteViewState extends State<CreateNoteView>
     return _baseEraserStrokeWidth / _currentZoomScale;
   }
 
-  // Get current canvas dimensions
-  Size get _canvasSize {
-    final currentSize = MediaQuery.of(context).size;
-    final currentOrientation = MediaQuery.of(context).orientation;
-
-    if (_portraitHeight != null) {
-      // Fixed height based on portrait, width can vary
-      return Size(
-        currentSize.width,
-        _portraitHeight! -
-            MediaQuery.of(context).padding.top -
-            kToolbarHeight -
-            38 -
-            20,
-      );
-    } else {
-      // Fallback to current size
-      return currentSize;
-    }
-  }
-
   // Pen settings state
   late Color _penColor;
   double _penStrokeWidth = 2.0;
@@ -341,16 +320,17 @@ class _CreateNoteViewState extends State<CreateNoteView>
   }
 
   void _handleOrientationChange() {
+    // Check if widget is still mounted before proceeding
+    if (!mounted) return;
+
     final currentOrientation = MediaQuery.of(context).orientation;
     final currentSize = MediaQuery.of(context).size;
 
     // Initialize portrait height on first call
-    if (_portraitHeight == null) {
-      _portraitHeight =
-          currentOrientation == Orientation.portrait
-              ? currentSize.height
-              : currentSize.width; // In landscape, height becomes width
-    }
+    _portraitHeight ??=
+        currentOrientation == Orientation.portrait
+            ? currentSize.height
+            : currentSize.width; // In landscape, height becomes width
 
     // Skip if this is the first time or if we're already handling rotation
     if (_previousOrientation == null || _isRotating) {
@@ -389,7 +369,6 @@ class _CreateNoteViewState extends State<CreateNoteView>
 
       // Only scale horizontally (width), keep height fixed
       final scaleX = newSize.width / oldSize.width;
-      final scaleY = 1.0; // No vertical scaling - height remains constant
 
       // Skip scaling if the horizontal change is too small
       if ((scaleX - 1.0).abs() < 0.01) {
@@ -431,11 +410,14 @@ class _CreateNoteViewState extends State<CreateNoteView>
       );
     } catch (e) {
       // Handle any errors during scaling
-      print('Error scaling drawing for fixed height: $e');
+      debugPrint('Error scaling drawing for fixed height: $e');
     }
   }
 
   void _scheduleAutoSave() {
+    // Check if widget is still mounted before proceeding
+    if (!mounted) return;
+
     final title = _titleController.text;
     final body = _bodyController.text;
     final hasDrawing = hasDrawingContent;
@@ -449,7 +431,7 @@ class _CreateNoteViewState extends State<CreateNoteView>
 
       // Schedule new auto-save
       _autoSaveTimer = Timer(_autoSaveDelay, () {
-        if (_hasUnsavedChanges) {
+        if (_hasUnsavedChanges && mounted) {
           _saveNoteData();
           _hasUnsavedChanges = false;
         }
@@ -458,6 +440,9 @@ class _CreateNoteViewState extends State<CreateNoteView>
   }
 
   void _saveNoteData() async {
+    // Check if widget is still mounted before proceeding
+    if (!mounted) return;
+
     final title = _titleController.text;
     final body = _bodyController.text;
     final hasDrawing = hasDrawingContent;
@@ -506,7 +491,7 @@ class _CreateNoteViewState extends State<CreateNoteView>
     _autoSaveTimer?.cancel();
 
     // Save immediately if there are unsaved changes and there's actual content
-    if (_hasUnsavedChanges) {
+    if (_hasUnsavedChanges && mounted) {
       _saveNoteData();
       _hasUnsavedChanges = false;
     }
@@ -575,14 +560,14 @@ class _CreateNoteViewState extends State<CreateNoteView>
     super.didChangeDependencies();
 
     // Initialize portrait height if not set
-    if (_portraitHeight == null) {
-      final currentSize = MediaQuery.of(context).size;
-      final currentOrientation = MediaQuery.of(context).orientation;
-      _portraitHeight =
-          currentOrientation == Orientation.portrait
+    _portraitHeight ??=
+        (() {
+          final currentSize = MediaQuery.of(context).size;
+          final currentOrientation = MediaQuery.of(context).orientation;
+          return currentOrientation == Orientation.portrait
               ? currentSize.height
               : currentSize.width; // In landscape, height becomes width
-    }
+        })();
 
     // Only initialize pen color based on theme if user hasn't manually set a color
     if (!_hasUserSetColor) {
@@ -1020,8 +1005,8 @@ class _CreateNoteViewState extends State<CreateNoteView>
                                           // Rotation indicator overlay
                                           if (_isRotating)
                                             Container(
-                                              color: Colors.black.withOpacity(
-                                                0.3,
+                                              color: Colors.black.withValues(
+                                                alpha: 0.3,
                                               ),
                                               child: Center(
                                                 child: Column(
