@@ -339,10 +339,12 @@ class _CreateNoteViewState extends State<CreateNoteView>
     final currentSize = MediaQuery.of(context).size;
 
     // Initialize portrait height on first call
-    _portraitHeight ??=
-        currentOrientation == Orientation.portrait
-            ? currentSize.height
-            : currentSize.width; // In landscape, height becomes width
+    if (_portraitHeight == null) {
+      _portraitHeight =
+          currentOrientation == Orientation.portrait
+              ? currentSize.height
+              : currentSize.width; // In landscape, height becomes width
+    }
 
     // Skip if this is the first time or if we're already handling rotation
     if (_previousOrientation == null || _isRotating) {
@@ -357,7 +359,7 @@ class _CreateNoteViewState extends State<CreateNoteView>
         _isRotating = true;
       });
 
-      // Scale the drawing based on the new dimensions with fixed height
+      // Scale the drawing based on the new dimensions
       _scaleDrawingForFixedHeight(_previousSize!, currentSize);
 
       _previousOrientation = currentOrientation;
@@ -379,11 +381,12 @@ class _CreateNoteViewState extends State<CreateNoteView>
       final currentSketch = _scribbleNotifier.currentSketch;
       if (currentSketch.lines.isEmpty) return;
 
-      // Only scale horizontally (width), keep height fixed
+      // Calculate scaling factors for both dimensions
       final scaleX = newSize.width / oldSize.width;
+      final scaleY = newSize.height / oldSize.height;
 
-      // Skip scaling if the horizontal change is too small
-      if ((scaleX - 1.0).abs() < 0.01) {
+      // Skip scaling if the changes are too small
+      if ((scaleX - 1.0).abs() < 0.01 && (scaleY - 1.0).abs() < 0.01) {
         return;
       }
 
@@ -394,10 +397,10 @@ class _CreateNoteViewState extends State<CreateNoteView>
         final scaledPoints = <Point>[];
 
         for (final point in line.points) {
-          // Scale only the X coordinate, keep Y coordinate unchanged
+          // Scale both X and Y coordinates proportionally
           final scaledPoint = Point(
             point.x * scaleX,
-            point.y, // Keep Y coordinate unchanged
+            point.y * scaleY,
             pressure: point.pressure,
           );
           scaledPoints.add(scaledPoint);
@@ -657,14 +660,14 @@ class _CreateNoteViewState extends State<CreateNoteView>
     super.didChangeDependencies();
 
     // Initialize portrait height if not set
-    _portraitHeight ??=
-        (() {
-          final currentSize = MediaQuery.of(context).size;
-          final currentOrientation = MediaQuery.of(context).orientation;
-          return currentOrientation == Orientation.portrait
+    if (_portraitHeight == null) {
+      final currentSize = MediaQuery.of(context).size;
+      final currentOrientation = MediaQuery.of(context).orientation;
+      _portraitHeight =
+          currentOrientation == Orientation.portrait
               ? currentSize.height
               : currentSize.width; // In landscape, height becomes width
-        })();
+    }
 
     // Only initialize pen color based on theme if user hasn't manually set a color
     if (!_hasUserSetColor) {
