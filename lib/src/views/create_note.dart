@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'package:vector_math/vector_math_64.dart' as vm;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lottie/lottie.dart';
@@ -52,6 +53,12 @@ class _CreateNoteViewState extends State<CreateNoteView>
   bool _isZoomed = false;
   bool _isDrawingActive = false;
   int _pointerCount = 0;
+
+  // new variables for synchronization
+  bool _isPanning = false;
+  bool _isScrolling = false;
+  double _lastPanOffset = 0.0;
+  double _lastScrollOffset = 0.0;
 
   // int? _activeToolPointerId;
   // final GlobalKey _painterKey = GlobalKey();
@@ -459,6 +466,73 @@ class _CreateNoteViewState extends State<CreateNoteView>
     });
   }
 
+  // Add this method to handle InteractiveViewer panning
+  void _handleInteractiveViewerPan(TransformationController controller) {
+    if (!_isZoomed) return;
+
+    final matrix = controller.value;
+    final translationY = matrix.getTranslation().y;
+
+    // Calculate how much we've panned vertically
+    final panDelta = translationY - _lastPanOffset;
+
+    if (panDelta.abs() > 1.0) {
+      // Threshold to avoid micro-movements
+      _isPanning = true;
+
+      // Convert pan movement to scroll movement
+      final scrollDelta = panDelta / _currentZoomScale;
+      final newScrollOffset = _scrollController.offset - scrollDelta;
+
+      // Clamp scroll offset to valid range
+      final maxScroll = _scrollController.position.maxScrollExtent;
+      final clampedOffset = newScrollOffset.clamp(0.0, maxScroll);
+
+      // Only update if we're not already scrolling
+      if (!_isScrolling) {
+        _scrollController.jumpTo(clampedOffset);
+        _showScrollBarTemporarily();
+      }
+
+      _lastPanOffset = translationY;
+    }
+  }
+
+  // Add this method to handle scroll changes
+  void _handleScrollChange() {
+    if (!_isZoomed || _isPanning) return;
+
+    final currentScrollOffset = _scrollController.offset;
+    final scrollDelta = currentScrollOffset - _lastScrollOffset;
+
+    if (scrollDelta.abs() > 1.0) {
+      // Threshold to avoid micro-movements
+      _isScrolling = true;
+
+      // Convert scroll movement to pan movement
+      final panDelta = scrollDelta * _currentZoomScale;
+
+      // Update InteractiveViewer transformation
+      final matrix = _transformController.value.clone();
+      final currentTranslation = matrix.getTranslation();
+      final newTranslation = vm.Vector3(
+        currentTranslation.x,
+        currentTranslation.y - panDelta,
+        currentTranslation.z,
+      );
+
+      matrix.setTranslation(newTranslation);
+      _transformController.value = matrix;
+
+      _lastScrollOffset = currentScrollOffset;
+
+      // Reset scrolling flag after a short delay
+      Future.delayed(const Duration(milliseconds: 50), () {
+        _isScrolling = false;
+      });
+    }
+  }
+
   void _saveNoteData() async {
     // Check if widget is still mounted before proceeding
     if (!mounted) return;
@@ -541,8 +615,8 @@ class _CreateNoteViewState extends State<CreateNoteView>
     _bodyController.addListener(_scheduleAutoSave);
     _scribbleNotifier.addListener(_scheduleAutoSave);
 
-    // Add scroll listener for scroll bar visibility
-    _scrollController.addListener(_showScrollBarTemporarily);
+    // Add scroll and interactive viewer listeners
+    _scrollController.addListener(_handleScrollChange);
 
     // _scribbleNotifier = ScribbleNotifier(
     //   // Only allow single finger touches for drawing
@@ -618,7 +692,7 @@ class _CreateNoteViewState extends State<CreateNoteView>
     _titleController.removeListener(_scheduleAutoSave);
     _bodyController.removeListener(_scheduleAutoSave);
     _scribbleNotifier.removeListener(_scheduleAutoSave);
-    _scrollController.removeListener(_showScrollBarTemporarily);
+    _scrollController.removeListener(_handleScrollChange);
 
     _titleController.dispose();
     _bodyController.dispose();
@@ -903,7 +977,6 @@ class _CreateNoteViewState extends State<CreateNoteView>
                   scaleFactor: 1000.0,
                   onInteractionStart: (details) {
                     setState(() {
-                      // Reset drawing when multi-touch starts
                       if (_pointerCount >= 2) _isDrawingActive = false;
                     });
                   },
@@ -914,7 +987,12 @@ class _CreateNoteViewState extends State<CreateNoteView>
                       _currentZoomScale =
                           _transformController.value.getMaxScaleOnAxis();
                     });
-                    // Update eraser size when zoom changes
+
+                    // Handle panning synchronization
+                    if (!_isDrawingMode) {
+                      _handleInteractiveViewerPan(_transformController);
+                    }
+
                     _updateEraserSizeForZoom();
                   },
                   onInteractionEnd: (details) {
@@ -922,19 +1000,23 @@ class _CreateNoteViewState extends State<CreateNoteView>
                       _isDrawingActive = false;
                       _isZoomed =
                           _transformController.value.getMaxScaleOnAxis() > 1.0;
+                      _isPanning = false;
                     });
+
+                    // Reset pan offset when interaction ends
+                    _lastPanOffset =
+                        _transformController.value.getTranslation().y;
                   },
                   child: Scrollbar(
                     controller: _scrollController,
-                    thumbVisibility:
-                        _showScrollBar && !_isZoomed && !_isDrawingMode,
+                    thumbVisibility: _showScrollBar && !_isDrawingMode,
                     trackVisibility: false,
                     thickness: 6,
                     radius: const Radius.circular(10),
                     child: SingleChildScrollView(
                       controller: _scrollController,
                       physics:
-                          (_isZoomed || _isDrawingMode) && _pointerCount < 2
+                          _isZoomed && _pointerCount < 2
                               ? const NeverScrollableScrollPhysics()
                               : const AlwaysScrollableScrollPhysics(),
                       padding: const EdgeInsets.symmetric(horizontal: 20),
