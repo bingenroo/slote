@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:convert';
-import 'package:vector_math/vector_math_64.dart' as vm;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lottie/lottie.dart';
@@ -20,6 +19,330 @@ class CreateNoteView extends StatefulWidget {
 
   @override
   State<CreateNoteView> createState() => _CreateNoteViewState();
+}
+
+class ZoomPanSurface extends StatefulWidget {
+  final Widget child;
+  final bool isDrawingMode;
+  final bool isDrawingActive; // true only while 1-finger drawing
+  final ScrollController scrollController;
+  final ValueChanged<double>? onScaleChanged;
+  final double minScale;
+  final double maxScale;
+  final double Function()?
+  contentHeightProvider; // optional: provide dynamic content height
+
+  const ZoomPanSurface({
+    super.key,
+    required this.child,
+    required this.isDrawingMode,
+    required this.isDrawingActive,
+    required this.scrollController,
+    this.onScaleChanged,
+    this.minScale = 1.0, // don't allow zoom-out past original
+    this.maxScale = 3.0,
+    this.contentHeightProvider, // if null, we’ll infer from scroll metrics
+  });
+
+  @override
+  State<ZoomPanSurface> createState() => _ZoomPanSurfaceState();
+}
+
+class _ZoomPanSurfaceState extends State<ZoomPanSurface>
+    with SingleTickerProviderStateMixin {
+  // final TransformationController _tc = TransformationController();
+
+  // Gesture state
+  int _pointers = 0;
+  double _scale = 1.0;
+  double _lastScale = 1.0;
+  Offset _pan = Offset.zero;
+  Offset _lastFocal = Offset.zero;
+
+  // Viewport/content
+  Size _viewport = Size.zero;
+  double _contentHeight = 0.0;
+
+  // Scrollbar
+  bool _showScrollBar = false;
+  Timer? _scrollBarTimer;
+  static const _scrollBarHideDelay = Duration(seconds: 1);
+
+  // Soft boundary margin to avoid cut-offs at top/bottom
+  static const _softMarginY = 50.0;
+
+  // Visual overscroll (rubber band) and recoil animation
+  double _overscrollY = 0.0;
+  double _overscrollX = 0.0;
+  AnimationController? _recoilCtrl;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.scrollController.addListener(_updateContentHeightFromScroll);
+    _recoilCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 200),
+    );
+  }
+
+  @override
+  void dispose() {
+    widget.scrollController.removeListener(_updateContentHeightFromScroll);
+    _scrollBarTimer?.cancel();
+    if (_recoilTick != null) {
+      _recoilCtrl?.removeListener(_recoilTick!);
+    }
+    _recoilCtrl?.dispose();
+    super.dispose();
+  }
+
+  void _updateContentHeightFromScroll() {
+    if (!widget.scrollController.hasClients) return;
+    final max = widget.scrollController.position.maxScrollExtent;
+    if (_viewport.height == 0) return;
+    final newHeight = max + _viewport.height;
+    if ((newHeight - _contentHeight).abs() > 8) {
+      setState(() => _contentHeight = newHeight);
+    }
+  }
+
+  void _showScrollThumb() {
+    setState(() => _showScrollBar = true);
+    _scrollBarTimer?.cancel();
+    _scrollBarTimer = Timer(_scrollBarHideDelay, () {
+      if (mounted) setState(() => _showScrollBar = false);
+    });
+  }
+
+  void _startRecoilIfNeeded() {
+    if (_overscrollX.abs() <= 0.1 && _overscrollY.abs() <= 0.1) return;
+    _recoilCtrl?.stop();
+    final startX = _overscrollX;
+    final startY = _overscrollY;
+
+    // remove existing listener if any
+    if (_recoilTick != null) {
+      _recoilCtrl!.removeListener(_recoilTick!);
+    }
+
+    // create a new listener and add it
+    _recoilTick = () {
+      if (!mounted) return;
+      final t = Curves.easeOutCubic.transform(_recoilCtrl!.value);
+      setState(() {
+        _overscrollX = startX * (1.0 - t);
+        _overscrollY = startY * (1.0 - t);
+      });
+    };
+    _recoilCtrl!.addListener(_recoilTick!);
+
+    _recoilCtrl!.forward(from: 0.0);
+  }
+
+  // keep a reference to avoid stacking listeners
+  VoidCallback? _recoilTick;
+
+  // Add this method to _ZoomPanSurfaceState:
+  Alignment _getZoomAlignment() {
+    if (!widget.scrollController.hasClients) {
+      return Alignment.topLeft;
+    }
+
+    final scrollOffset = widget.scrollController.offset;
+    final maxScroll = widget.scrollController.position.maxScrollExtent;
+
+    if (maxScroll <= 0) {
+      return Alignment.topLeft;
+    }
+
+    // Calculate which quadrant we're in
+    final scrollRatio = (scrollOffset / maxScroll).clamp(0.0, 1.0);
+
+    // Fix the panRatio calculation
+    double panRatio = 0.0;
+    if (_scale > 1.0) {
+      final maxPanX =
+          (_viewport.width * _scale) - _viewport.width; // Available pan range
+      if (maxPanX > 0) {
+        panRatio = (-_pan.dx / maxPanX).clamp(
+          0.0,
+          1.0,
+        ); // 0.0 = left, 1.0 = right
+      }
+    }
+
+    // Choose corner based on position:
+    final isTopHalf = scrollRatio < 0.5;
+    final isLeftHalf = panRatio < 0.5;
+
+    if (isTopHalf && isLeftHalf) {
+      return Alignment.topLeft; // (-1, -1)
+    } else if (isTopHalf && !isLeftHalf) {
+      return Alignment.topRight; // (1, -1)
+    } else if (!isTopHalf && isLeftHalf) {
+      return Alignment.bottomLeft; // (-1, 1)
+    } else {
+      return Alignment.bottomRight; // (1, 1)
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, c) {
+        _viewport = Size(c.maxWidth, c.maxHeight);
+        // Try provider first; fallback to inferred
+        final provided = widget.contentHeightProvider?.call();
+        if (provided != null && provided > 0) {
+          _contentHeight = provided;
+        }
+
+        return Listener(
+          onPointerDown: (_) => setState(() => _pointers++),
+          onPointerUp: (_) {
+            setState(() => _pointers = (_pointers - 1).clamp(0, 10));
+            if (_pointers == 0) _startRecoilIfNeeded();
+          },
+          child: GestureDetector(
+            onScaleStart: (d) {
+              _lastFocal = d.focalPoint;
+              _lastScale = _scale;
+              _showScrollThumb();
+            },
+            onScaleUpdate: (d) {
+              // Drawing mode: single-finger fully locked
+              if (widget.isDrawingMode && _pointers == 1) return;
+
+              // Multi-touch: zoom + pan
+              if (_pointers >= 2) {
+                // Zoom
+                final ns = (_lastScale * d.scale).clamp(
+                  widget.minScale,
+                  widget.maxScale,
+                );
+                if (ns != _scale) {
+                  setState(() => _scale = ns);
+                  widget.onScaleChanged?.call(_scale);
+                }
+
+                // Pan
+                final delta = d.focalPoint - _lastFocal;
+                _applyPan(delta);
+                _lastFocal = d.focalPoint;
+                _showScrollThumb();
+                return;
+              }
+
+              // Single-touch: only when NOT drawing mode (text mode)
+              if (!widget.isDrawingMode && _pointers == 1) {
+                final delta = d.focalPoint - _lastFocal;
+                _applyPan(delta);
+                _lastFocal = d.focalPoint;
+                _showScrollThumb();
+              }
+            },
+            onScaleEnd: (d) {
+              _startRecoilIfNeeded();
+            },
+            child: Scrollbar(
+              controller: widget.scrollController,
+              thumbVisibility: _showScrollBar && !widget.isDrawingMode,
+              radius: const Radius.circular(10),
+              thickness: 6,
+              child: NotificationListener<ScrollNotification>(
+                onNotification: (n) {
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    if (!mounted) return;
+                    _showScrollThumb();
+                    _updateContentHeightFromScroll();
+                  });
+                  return false;
+                },
+                child: SingleChildScrollView(
+                  controller: widget.scrollController,
+                  physics:
+                      widget.isDrawingMode
+                          ? const NeverScrollableScrollPhysics()
+                          : const BouncingScrollPhysics(),
+                  child: Transform(
+                    transform:
+                        Matrix4.identity()
+                          ..translate(
+                            _pan.dx + _overscrollX,
+                            _pan.dy + _overscrollY,
+                          )
+                          ..scale(_scale),
+                    alignment: _getZoomAlignment(), // ← Dynamic alignment
+                    child: widget.child,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  // Around line 278-304, modify the _applyPan method:
+
+  void _applyPan(Offset delta) {
+    final scaledW = _viewport.width * _scale;
+
+    // Get current alignment to adjust boundaries
+    final alignment = _getZoomAlignment();
+
+    // Adjust horizontal boundaries based on zoom alignment
+    double minX, maxX;
+    final availX = (scaledW - _viewport.width).clamp(0.0, double.infinity);
+
+    if (alignment.x < 0) {
+      // Left-aligned zoom (topLeft, bottomLeft)
+      minX = -availX;
+      maxX = 0.0;
+    } else {
+      // Right-aligned zoom (topRight, bottomRight)
+      // Shift boundaries to account for right-anchored scaling
+      final rightShift = availX;
+      minX = -availX;
+      maxX = rightShift;
+    }
+
+    // Horizontal handling with adjusted boundaries
+    final candX = _pan.dx + delta.dx;
+    const resistance = 0.5;
+    const maxPull = 120.0;
+
+    final clampedX = candX.clamp(minX, maxX);
+    final overX = candX - clampedX;
+    if (overX.abs() > 0) {
+      final visualX = overX * resistance;
+      _overscrollX = visualX.clamp(-maxPull, maxPull);
+    }
+
+    // Vertical: ONLY use scroll controller (unchanged)
+    if (delta.dy.abs() > 0.5 && widget.scrollController.hasClients) {
+      final current = widget.scrollController.offset;
+      final maxScroll = widget.scrollController.position.maxScrollExtent;
+      final proposed = current - (delta.dy / _scale);
+      final clampedScroll = proposed.clamp(0.0, maxScroll);
+      final overScroll = proposed - clampedScroll;
+
+      if (overScroll.abs() > 0) {
+        final visualY = -overScroll * resistance * _scale;
+        _overscrollY = visualY.clamp(-maxPull, maxPull);
+      }
+
+      if (current != clampedScroll) {
+        widget.scrollController.jumpTo(clampedScroll);
+      }
+    }
+
+    setState(() {
+      _pan = Offset(clampedX, 0.0);
+    });
+  }
 }
 
 class _CreateNoteViewState extends State<CreateNoteView>
@@ -42,34 +365,17 @@ class _CreateNoteViewState extends State<CreateNoteView>
   bool _hasUnsavedChanges = false;
   static const Duration _autoSaveDelay = Duration(seconds: 2);
 
-  // Scroll bar visibility timer
-  Timer? _scrollBarTimer;
-  bool _showScrollBar = false;
-  static const Duration _scrollBarHideDelay = Duration(seconds: 1);
-
   // Drawing mode state and flags
   bool _isDrawingMode = false;
   // bool _isEraserStrokeMode = false;
-  bool _isZoomed = false;
   bool _isDrawingActive = false;
   int _pointerCount = 0;
+  double _currentZoomScale = 1.0;
+  // bool _isPanning = false;
 
-  // new variables for synchronization
-  bool _isPanning = false;
-  bool _isScrolling = false;
-  double _lastPanOffset = 0.0;
-  double _lastScrollOffset = 0.0;
-
-  // int? _activeToolPointerId;
-  // final GlobalKey _painterKey = GlobalKey();
-
-  final TransformationController _transformController =
-      TransformationController();
-
-  // Zoom and pan state
-  final double _scale = 1.0;
-  final double _minScale = 0.5;
-  final double _maxScale = 3.0;
+  double get _zoomAdjustedEraserSize {
+    return _baseEraserStrokeWidth / _currentZoomScale;
+  }
 
   // Undo/Redo state
   late UnifiedUndoRedoController _unifiedUndoRedoController;
@@ -95,14 +401,7 @@ class _CreateNoteViewState extends State<CreateNoteView>
     }
   }
 
-  // bool get _isEraserMode => _scribbleNotifier.value is Erasing;
-
-  double _currentZoomScale = 1.0;
   final double _baseEraserStrokeWidth = 15.0; // Base eraser size at 1.0 zoom
-  // Add this method to calculate zoom-adjusted eraser size
-  double get _zoomAdjustedEraserSize {
-    return _baseEraserStrokeWidth / _currentZoomScale;
-  }
 
   // Pen settings state
   late Color _penColor;
@@ -471,88 +770,6 @@ class _CreateNoteViewState extends State<CreateNoteView>
     }
   }
 
-  void _showScrollBarTemporarily() {
-    setState(() {
-      _showScrollBar = true;
-    });
-
-    _scrollBarTimer?.cancel();
-    _scrollBarTimer = Timer(_scrollBarHideDelay, () {
-      if (mounted) {
-        setState(() {
-          _showScrollBar = false;
-        });
-      }
-    });
-  }
-
-  // Add this method to handle InteractiveViewer panning
-  void _handleInteractiveViewerPan(TransformationController controller) {
-    if (!_isZoomed || _isDrawingActive) return;
-
-    final matrix = controller.value;
-    final translationY = matrix.getTranslation().y;
-
-    // Calculate how much we've panned vertically
-    final panDelta = translationY - _lastPanOffset;
-
-    if (panDelta.abs() > 1.0) {
-      // Threshold to avoid micro-movements
-      _isPanning = true;
-
-      // Convert pan movement to scroll movement
-      final scrollDelta = panDelta / _currentZoomScale;
-      final newScrollOffset = _scrollController.offset - scrollDelta;
-
-      // Clamp scroll offset to valid range
-      final maxScroll = _scrollController.position.maxScrollExtent;
-      final clampedOffset = newScrollOffset.clamp(0.0, maxScroll);
-
-      // Only update if we're not already scrolling
-      if (!_isScrolling) {
-        _scrollController.jumpTo(clampedOffset);
-        _showScrollBarTemporarily();
-      }
-
-      _lastPanOffset = translationY;
-    }
-  }
-
-  // Add this method to handle scroll changes
-  void _handleScrollChange() {
-    if (!_isZoomed || _isPanning || _isDrawingActive) return;
-
-    final currentScrollOffset = _scrollController.offset;
-    final scrollDelta = currentScrollOffset - _lastScrollOffset;
-
-    if (scrollDelta.abs() > 1.0) {
-      // Threshold to avoid micro-movements
-      _isScrolling = true;
-
-      // Convert scroll movement to pan movement
-      final panDelta = scrollDelta * _currentZoomScale;
-
-      // Update InteractiveViewer transformation
-      final matrix = _transformController.value.clone();
-      final currentTranslation = matrix.getTranslation();
-      final newTranslation = vm.Vector3(
-        currentTranslation.x,
-        currentTranslation.y - panDelta,
-        currentTranslation.z,
-      );
-
-      matrix.setTranslation(newTranslation);
-      _transformController.value = matrix;
-
-      _lastScrollOffset = currentScrollOffset;
-
-      // Reset scrolling flag after a short delay
-      Future.delayed(const Duration(milliseconds: 50), () {
-        _isScrolling = false;
-      });
-    }
-  }
-
   void _saveNoteData() async {
     // Check if widget is still mounted before proceeding
     if (!mounted) return;
@@ -635,14 +852,6 @@ class _CreateNoteViewState extends State<CreateNoteView>
     _bodyController.addListener(_scheduleAutoSave);
     _scribbleNotifier.addListener(_scheduleAutoSave);
 
-    // Add scroll and interactive viewer listeners
-    _scrollController.addListener(_handleScrollChange);
-
-    // _scribbleNotifier = ScribbleNotifier(
-    //   // Only allow single finger touches for drawing
-    //   allowedPointersMode: ScribblePointerMode.penOnly,
-    // );
-
     // undo redo
     _unifiedUndoRedoController = UnifiedUndoRedoController(
       textController: _bodyController,
@@ -708,12 +917,9 @@ class _CreateNoteViewState extends State<CreateNoteView>
     }
 
     _autoSaveTimer?.cancel();
-    _scrollBarTimer?.cancel();
     _titleController.removeListener(_scheduleAutoSave);
     _bodyController.removeListener(_scheduleAutoSave);
     _scribbleNotifier.removeListener(_scheduleAutoSave);
-    _scrollController.removeListener(_handleScrollChange);
-
     _titleController.dispose();
     _bodyController.dispose();
     _scrollController.dispose();
@@ -981,6 +1187,7 @@ class _CreateNoteViewState extends State<CreateNoteView>
         child: Column(
           children: [
             // Zoomable and pannable content area
+            // In your build method, replace the current Expanded widget:
             Expanded(
               child: Listener(
                 onPointerDown: (_) => setState(() => _pointerCount++),
@@ -988,202 +1195,114 @@ class _CreateNoteViewState extends State<CreateNoteView>
                     (_) => setState(
                       () => _pointerCount = (_pointerCount - 1).clamp(0, 10),
                     ),
-                child: InteractiveViewer(
-                  panEnabled: !_isDrawingActive || _pointerCount >= 2,
-                  scaleEnabled: !_isDrawingActive || _pointerCount >= 2,
-                  transformationController: _transformController,
-                  minScale: _minScale,
-                  maxScale: _maxScale,
-                  scaleFactor: 1000.0,
-                  onInteractionStart: (details) {
+                child: ZoomPanSurface(
+                  isDrawingMode: _isDrawingMode,
+                  isDrawingActive: _isDrawingActive,
+                  scrollController: _scrollController,
+                  onScaleChanged: (s) {
                     setState(() {
-                      if (_pointerCount >= 2) _isDrawingActive = false;
+                      _currentZoomScale = s;
                     });
-                  },
-                  onInteractionUpdate: (details) {
-                    setState(() {
-                      _isZoomed =
-                          _transformController.value.getMaxScaleOnAxis() > 1.0;
-                      _currentZoomScale =
-                          _transformController.value.getMaxScaleOnAxis();
-                    });
-
-                    // Handle panning synchronization
-                    // Only handle panning when not actively drawing
-                    if (!_isDrawingActive) {
-                      _handleInteractiveViewerPan(_transformController);
-                    }
-
                     _updateEraserSizeForZoom();
                   },
-                  onInteractionEnd: (details) {
-                    setState(() {
-                      // Only set drawing active to false if we're not in drawing mode
-                      // or if we have multiple pointers (zoom/pan gesture)
-                      if (!_isDrawingMode || _pointerCount >= 2) {
-                        _isDrawingActive = false;
-                      }
-                      _isZoomed =
-                          _transformController.value.getMaxScaleOnAxis() > 1.0;
-                      _isPanning = false;
-                    });
-
-                    // Reset pan offset when interaction ends
-                    _lastPanOffset =
-                        _transformController.value.getTranslation().y;
+                  // Optional: provide content height if you can compute it
+                  contentHeightProvider: () {
+                    // Return 0/null to let it infer from scroll metrics
+                    return 0;
                   },
-                  child: Scrollbar(
-                    controller: _scrollController,
-                    thumbVisibility: _showScrollBar && !_isDrawingMode,
-                    trackVisibility: false,
-                    thickness: 6,
-                    radius: const Radius.circular(10),
-                    child: SingleChildScrollView(
-                      controller: _scrollController,
-                      physics:
-                          (_isZoomed && _pointerCount < 2) || _isDrawingActive
-                              ? const NeverScrollableScrollPhysics()
-                              : const AlwaysScrollableScrollPhysics(),
-                      padding: const EdgeInsets.symmetric(horizontal: 20),
-                      child: Transform.scale(
-                        scale: _scale,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const SizedBox(height: 10),
-                            // Combined text and drawing area
-                            Stack(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const SizedBox(height: 10),
+                      Stack(
+                        children: [
+                          // Text editor
+                          Container(
+                            constraints: BoxConstraints(
+                              minHeight:
+                                  _portraitHeight != null
+                                      ? _portraitHeight! -
+                                          MediaQuery.of(context).padding.top -
+                                          kToolbarHeight -
+                                          38 -
+                                          20
+                                      : MediaQuery.of(context).size.height -
+                                          MediaQuery.of(context).padding.top -
+                                          kToolbarHeight -
+                                          38 -
+                                          20,
+                            ),
+                            // child: TextFormField(
+                            //   controller: _bodyController,
+                            //   decoration: InputDecoration(
+                            //     border: InputBorder.none,
+                            //     hintText: "Start Sloting...",
+                            //     hintStyle: TextStyle(
+                            //       color: Colors.grey.shade300,
+                            //       fontSize: AppThemeConfig.bodyFontSize,
+                            //       fontStyle: FontStyle.italic,
+                            //     ),
+                            //   ),
+                            //   style: GoogleFonts.poppins(
+                            //     fontSize: AppThemeConfig.bodyFontSize,
+                            //   ),
+                            //   maxLines: null,
+                            //   textInputAction: TextInputAction.newline,
+                            //   keyboardType: TextInputType.multiline,
+                            // ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                // Text field (always visible) - with fixed height based on portrait
-                                Container(
-                                  constraints: BoxConstraints(
-                                    minHeight:
-                                        _portraitHeight != null
-                                            ? _portraitHeight! -
-                                                MediaQuery.of(
-                                                  context,
-                                                ).padding.top -
-                                                kToolbarHeight -
-                                                38 - // toolbar bottom height
-                                                20 // padding
-                                            : MediaQuery.of(
-                                                  context,
-                                                ).size.height -
-                                                MediaQuery.of(
-                                                  context,
-                                                ).padding.top -
-                                                kToolbarHeight -
-                                                38 - // toolbar bottom height
-                                                20, // padding
-                                  ),
-                                  child: TextFormField(
-                                    controller: _bodyController,
-                                    decoration: InputDecoration(
-                                      border: InputBorder.none,
-                                      hintText: "Start Sloting...",
-                                      hintStyle: TextStyle(
-                                        color: Colors.grey.shade300,
-                                        fontSize: AppThemeConfig.bodyFontSize,
-                                        fontStyle: FontStyle.italic,
-                                      ),
-                                    ),
-                                    style: GoogleFonts.poppins(
-                                      fontSize: AppThemeConfig.bodyFontSize,
-                                    ),
-                                    maxLines: null,
-                                    textInputAction: TextInputAction.newline,
-                                    keyboardType: TextInputType.multiline,
+                                Text(
+                                  'Top sentence: This is the very first sentence at the top of the note.',
+                                  style: GoogleFonts.poppins(
+                                    fontSize: AppThemeConfig.bodyFontSize,
                                   ),
                                 ),
-
-                                // Drawing layer (always visible) - on top
-                                Positioned.fill(
-                                  child: IgnorePointer(
-                                    // Only ignore when:
-                                    // 1. Not in drawing mode AND single pointer (normal text editing)
-                                    // OR
-                                    // 2. Multi-touch (zoom/pan)
-                                    ignoring:
-                                        (!_isDrawingMode &&
-                                            _pointerCount < 2) ||
-                                        _pointerCount >= 2,
-                                    child: Listener(
-                                      behavior: HitTestBehavior.translucent,
-                                      onPointerDown: (event) {
-                                        if (_isDrawingMode &&
-                                            _pointerCount < 2) {
-                                          setState(
-                                            () => _isDrawingActive = true,
-                                          );
-                                        }
-                                      },
-                                      onPointerUp: (event) {
-                                        if (_isDrawingMode &&
-                                            _pointerCount <= 1) {
-                                          setState(
-                                            () => _isDrawingActive = false,
-                                          );
-                                        }
-                                      },
-                                      child: Stack(
-                                        children: [
-                                          Scribble(
-                                            notifier: _scribbleNotifier,
-                                            drawPen:
-                                                _isDrawingActive &&
-                                                _isDrawingMode,
-                                            enableGestureCatcher:
-                                                false, // Disable gesture catcher for InteractiveViewer integration
-                                          ),
-                                          // Rotation indicator overlay
-                                          if (_isRotating)
-                                            Container(
-                                              color: Colors.black.withValues(
-                                                alpha: 0.3,
-                                              ),
-                                              child: Center(
-                                                child: Column(
-                                                  mainAxisAlignment:
-                                                      MainAxisAlignment.center,
-                                                  children: [
-                                                    CircularProgressIndicator(
-                                                      valueColor:
-                                                          AlwaysStoppedAnimation<
-                                                            Color
-                                                          >(
-                                                            Theme.of(context)
-                                                                .colorScheme
-                                                                .primary,
-                                                          ),
-                                                    ),
-                                                    const SizedBox(height: 16),
-                                                    Text(
-                                                      'Scaling drawing...',
-                                                      style:
-                                                          GoogleFonts.poppins(
-                                                            color: Colors.white,
-                                                            fontSize: 16,
-                                                            fontWeight:
-                                                                FontWeight.w500,
-                                                          ),
-                                                    ),
-                                                  ],
-                                                ),
-                                              ),
-                                            ),
-                                        ],
-                                      ),
-                                    ),
+                                const SizedBox(height: 12),
+                                // Force lots of vertical space to create overflow
+                                ...List.generate(
+                                  150,
+                                  (_) => const SizedBox(height: 24),
+                                ),
+                                const SizedBox(height: 12),
+                                Text(
+                                  'Bottom sentence: This is the very last sentence at the bottom of the note.',
+                                  style: GoogleFonts.poppins(
+                                    fontSize: AppThemeConfig.bodyFontSize,
                                   ),
                                 ),
                               ],
                             ),
-                            // Add some bottom padding for better scrolling
-                            const SizedBox(height: 10),
-                          ],
-                        ),
+                          ),
+                          // Drawing overlay
+                          Positioned.fill(
+                            child: IgnorePointer(
+                              ignoring: !_isDrawingMode,
+                              child: Listener(
+                                behavior: HitTestBehavior.translucent,
+                                onPointerDown: (_) {
+                                  if (_isDrawingMode && _pointerCount < 2) {
+                                    setState(() => _isDrawingActive = true);
+                                  }
+                                },
+                                onPointerUp: (_) {
+                                  if (_isDrawingMode && _pointerCount <= 1) {
+                                    setState(() => _isDrawingActive = false);
+                                  }
+                                },
+                                child: Scribble(
+                                  notifier: _scribbleNotifier,
+                                  drawPen: _isDrawingActive && _isDrawingMode,
+                                  enableGestureCatcher: false,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
-                    ),
+                      const SizedBox(height: 10),
+                    ],
                   ),
                 ),
               ),
