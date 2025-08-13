@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lottie/lottie.dart';
@@ -10,7 +9,7 @@ import 'package:slote/src/res/theme_config.dart';
 import 'package:slote/src/services/local_db.dart';
 import 'package:slote/src/functions/undo_redo.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
-import 'dart:developer';
+// import 'dart:developer';
 import 'package:scribble/scribble.dart';
 
 class CreateNoteView extends StatefulWidget {
@@ -30,6 +29,8 @@ class ZoomPanSurface extends StatefulWidget {
   final ValueChanged<double>? onScaleChanged;
   final double minScale;
   final double maxScale;
+  final double Function()?
+  contentHeightProvider; // optional: provide dynamic content height
 
   const ZoomPanSurface({
     super.key,
@@ -40,58 +41,84 @@ class ZoomPanSurface extends StatefulWidget {
     this.onScaleChanged,
     this.minScale = 1.0, // don't allow zoom-out past original
     this.maxScale = 3.0,
+    this.contentHeightProvider, // if null, we’ll infer from scroll metrics
   });
 
   @override
   State<ZoomPanSurface> createState() => _ZoomPanSurfaceState();
 }
 
-class _ZoomPanSurfaceState extends State<ZoomPanSurface> {
+class _ZoomPanSurfaceState extends State<ZoomPanSurface>
+    with SingleTickerProviderStateMixin {
+  // final TransformationController _tc = TransformationController();
+
   // Gesture state
-  int _pointerCount = 0;
+  int _pointers = 0;
   double _scale = 1.0;
-  Offset _offset = Offset.zero;
-  // Offset _localFocalPoint = Offset.zero;
+  double _lastScale = 1.0;
+  Offset _pan = Offset.zero;
+  Offset _lastFocal = Offset.zero;
 
-  // Stores x and y coordinate of all fingers
+  // additional gesteure fields
   final Map<int, Offset> _pointerPositions = {};
-
-  // Two finger Pinch
   double? _pinchStartScale;
-  double? _pinchStartDistance;
+  double? _pinchStartDist;
   Offset? _pinchLastFocal;
+  bool _manualPinch = false;
+  bool _isScaling = false;
+
+  bool get _textMode => !widget.isDrawingMode;
+  bool get _twoFingerTextMode => _textMode && _pointers >= 2;
+
+  // 1-finger horizontal pan tolerance (text mode only)
+  Offset? _oneFingerStart;
+  Offset? _oneFingerLast;
+  bool _manualOneFingerPan = false;
+  bool _oneFingerDecisionMade = false;
+  static const double _oneFingerSlop = 10.0; // px
+  static const double _horizontalBias = 1.5; // require dx > dy * bias
+
+  double _dist(Offset a, Offset b) => (a - b).distance;
+  Offset _mid(Offset a, Offset b) =>
+      Offset((a.dx + b.dx) / 2, (a.dy + b.dy) / 2);
 
   // Viewport/content
   Size _viewport = Size.zero;
   double _contentHeight = 0.0;
-  // Dynamic bounds
-  Rect get _currentContentBounds {
-    return Rect.fromLTWH(0, 0, _viewport.width, _contentHeight);
-  }
 
-  Offset _constrainOffset(Offset proposedOffset, double scale) {
-    final bounds = _currentContentBounds;
+  // Scrollbar
+  bool _showScrollBar = false;
+  Timer? _scrollBarTimer;
+  static const _scrollBarHideDelay = Duration(seconds: 1);
 
-    final scaledWidth = bounds.width * scale;
-    final scaledHeight = bounds.height * scale;
+  // Visual overscroll (rubber band) and recoil animation
+  double _overscrollY = 0.0;
+  double _overscrollX = 0.0;
+  AnimationController? _recoilCtrl;
 
-    final maxX = math.max(0.0, scaledWidth - _viewport.width).toDouble();
-    final maxY = math.max(0.0, scaledHeight - _viewport.height).toDouble();
+  ScrollHoldController? _scrollHold;
 
-    // Allow positive Y offset if content is smaller than viewport
-    final minY = scaledHeight < _viewport.height ? 0.0 : -maxY;
-    final maxYOffset =
-        scaledHeight < _viewport.height ? _viewport.height - scaledHeight : 0.0;
-
-    return Offset(
-      proposedOffset.dx.clamp(-maxX, 0.0),
-      proposedOffset.dy.clamp(minY, maxYOffset),
+  @override
+  void initState() {
+    super.initState();
+    widget.scrollController.addListener(_updateContentHeightFromScroll);
+    _recoilCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 200),
     );
   }
 
-  double _distance(Offset a, Offset b) => (a - b).distance;
-  Offset _midPoint(Offset a, Offset b) =>
-      Offset((a.dx + b.dx) / 2, (a.dy + b.dy) / 2);
+  @override
+  void dispose() {
+    widget.scrollController.removeListener(_updateContentHeightFromScroll);
+    _scrollBarTimer?.cancel();
+    _scrollHold?.cancel();
+    if (_recoilTick != null) {
+      _recoilCtrl?.removeListener(_recoilTick!);
+    }
+    _recoilCtrl?.dispose();
+    super.dispose();
+  }
 
   void _updateContentHeightFromScroll() {
     if (!widget.scrollController.hasClients) return;
@@ -103,153 +130,597 @@ class _ZoomPanSurfaceState extends State<ZoomPanSurface> {
     }
   }
 
-  Alignment? _localFocalPoint;
+  void _showScrollThumb() {
+    setState(() => _showScrollBar = true);
+    _scrollBarTimer?.cancel();
+    _scrollBarTimer = Timer(_scrollBarHideDelay, () {
+      if (mounted) setState(() => _showScrollBar = false);
+    });
+  }
+
+  void _startRecoilIfNeeded() {
+    if (_overscrollX.abs() <= 0.1 && _overscrollY.abs() <= 0.1) return;
+    _recoilCtrl?.stop();
+    final startX = _overscrollX;
+    final startY = _overscrollY;
+
+    // remove existing listener if any
+    if (_recoilTick != null) {
+      _recoilCtrl!.removeListener(_recoilTick!);
+    }
+
+    // create a new listener and add it
+    _recoilTick = () {
+      if (!mounted) return;
+      final t = Curves.easeOutCubic.transform(_recoilCtrl!.value);
+      setState(() {
+        _overscrollX = startX * (1.0 - t);
+        _overscrollY = startY * (1.0 - t);
+      });
+    };
+    _recoilCtrl!.addListener(_recoilTick!);
+
+    _recoilCtrl!.forward(from: 0.0);
+  }
+
+  // keep a reference to avoid stacking listeners
+  VoidCallback? _recoilTick;
+
+  Alignment? _pivot;
+
+  // Add this method to _ZoomPanSurfaceState:
+  // Alignment _getZoomAlignment() {
+  //   if (!widget.scrollController.hasClients) {
+  //     return Alignment.topLeft;
+  //   }
+
+  //   final scrollOffset = widget.scrollController.offset;
+  //   final maxScroll = widget.scrollController.position.maxScrollExtent;
+
+  //   if (maxScroll <= 0) {
+  //     return Alignment.topLeft;
+  //   }
+
+  //   // Calculate which quadrant we're in
+  //   final scrollRatio = (scrollOffset / maxScroll).clamp(0.0, 1.0);
+
+  //   // Fix the panRatio calculation
+  //   double panRatio = 0.0;
+  //   if (_scale > 1.0) {
+  //     final maxPanX = (_viewport.width * _scale) - _viewport.width;
+  //     if (maxPanX > 0) {
+  //       // map _pan.dx ∈ [-maxPanX, +maxPanX] → panRatio ∈ [0, 1]
+  //       panRatio = ((_pan.dx + maxPanX) / (2 * maxPanX)).clamp(0.0, 1.0);
+  //     }
+  //   }
+
+  //   // Choose corner based on position:
+  //   final isTopHalf = scrollRatio < 0.5;
+  //   // prefer left when exactly in the middle
+  //   final isLeftHalf = panRatio <= 0.5;
+
+  //   if (isTopHalf && isLeftHalf) {
+  //     return Alignment.topLeft; // (-1, -1)
+  //   } else if (isTopHalf && !isLeftHalf) {
+  //     return Alignment.topRight; // (1, -1)
+  //   } else if (!isTopHalf && isLeftHalf) {
+  //     return Alignment.bottomLeft; // (-1, 1)
+  //   } else {
+  //     return Alignment.bottomRight; // (1, 1)
+  //   }
+  // }
+
+  // Alignment _getZoomAlignment() {
+  //   if (!widget.scrollController.hasClients) return Alignment.topLeft;
+
+  //   final scrollOffset = widget.scrollController.offset;
+  //   final maxScroll = widget.scrollController.position.maxScrollExtent;
+  //   if (maxScroll <= 0) return Alignment.topLeft;
+
+  //   final scrollRatio = (scrollOffset / maxScroll).clamp(0.0, 1.0);
+
+  //   double panRatio = 0.0;
+  //   if (_scale > 1.0) {
+  //     final maxPanX = (_viewport.width * _scale) - _viewport.width;
+  //     if (maxPanX > 0) {
+  //       panRatio = ((_pan.dx + maxPanX) / (2 * maxPanX)).clamp(0.0, 1.0);
+  //     }
+  //   }
+
+  //   final isTopHalf = scrollRatio < 0.5;
+  //   final isLeftHalf = panRatio <= 0.5;
+  //   if (isTopHalf && isLeftHalf) return Alignment.topLeft;
+  //   if (isTopHalf && !isLeftHalf) return Alignment.topRight;
+  //   if (!isTopHalf && isLeftHalf) return Alignment.bottomLeft;
+  //   return Alignment.bottomRight;
+  // }
+
   Alignment _alignmentFromGlobalOffset(Offset global) {
     final rb = context.findRenderObject() as RenderBox?;
     if (rb == null || _viewport.isEmpty) return Alignment.center;
     final local = rb.globalToLocal(global); // pixel position in this widget
     return Alignment(
-      (local.dx / _viewport.width) * 2 - 1,
-      (local.dy / _viewport.height) * 2 - 1,
+      (local.dx / _viewport.width) * 2 - 1, // map 0‥w ⟶ –1‥1
+      (local.dy / _viewport.height) * 2 - 1, // map 0‥h ⟶ –1‥1
     );
-  }
-
-  @override
-  void initState() {
-    super.initState();
-    widget.scrollController.addListener(_updateContentHeightFromScroll);
-  }
-
-  @override
-  void dispose() {
-    widget.scrollController.removeListener(_updateContentHeightFromScroll);
-    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(
-      builder: (context, constraints) {
-        // Initialize viewport size
-        _viewport = Size(constraints.maxWidth, constraints.maxHeight);
+      builder: (context, c) {
+        _viewport = Size(c.maxWidth, c.maxHeight);
+        // Try provider first; fallback to inferred
+        final provided = widget.contentHeightProvider?.call();
+        if (provided != null && provided > 0) {
+          _contentHeight = provided;
+        }
+
         return Listener(
-          onPointerDown: (e) {
-            // Get global coordinate and store it in the offset array _pointerPositions
+          behavior: HitTestBehavior.translucent,
+          onPointerDown: (PointerDownEvent e) {
+            // _pointerPositions[e.pointer] = e.position;
+            // final newCount = _pointers + 1;
+            // setState(() => _pointers = newCount);
+
             _pointerPositions[e.pointer] = e.position;
-            setState(() => _pointerCount = _pointerPositions.length);
+            setState(() => _pointers = _pointerPositions.length);
 
-            // 2 fingers scale (Text and Drawing)
-            if (_pointerCount == 2 && !widget.isDrawingActive) {
-              final positions = _pointerPositions.values.toList();
-              final distance = _distance(positions[0], positions[1]);
-              final globalFocal = _midPoint(positions[0], positions[1]);
+            // prepare 1-finger tolerance (text mode)
+            if (_textMode && _pointerPositions.length == 1) {
+              _oneFingerStart = e.position;
+              _oneFingerLast = e.position;
+              _oneFingerDecisionMade = false;
+              _manualOneFingerPan = false;
+            }
 
+            // begin 2-finger manual pinch immediately (text mode)
+            if (_textMode && _pointerPositions.length == 2) {
+              // end any 1-finger manual pan state so pinch can take over indefinitely
+              _manualOneFingerPan = false;
+              _oneFingerDecisionMade = false;
+              _oneFingerStart = null;
+              _oneFingerLast = null;
+
+              final pts = _pointerPositions.values.toList(growable: false);
+              final startDist = _dist(pts[0], pts[1]);
               _pinchStartScale = _scale;
-              _pinchStartDistance = distance;
-              _pinchLastFocal = globalFocal;
-              _localFocalPoint = _alignmentFromGlobalOffset(globalFocal);
+              _pinchStartDist = startDist > 0 ? startDist : 1.0;
+              final focal = _mid(pts[0], pts[1]);
+              _pinchLastFocal = focal;
+              _manualPinch = true;
+              _pivot = _alignmentFromGlobalOffset(focal);
+
+              if (widget.scrollController.hasClients) {
+                try {
+                  _scrollHold ??= widget.scrollController.position.hold(() {
+                    _scrollHold = null;
+                  });
+                } catch (_) {}
+              }
             }
           },
-          onPointerMove: (e) {
+          onPointerMove: (PointerMoveEvent e) {
             _pointerPositions[e.pointer] = e.position;
 
-            // Handle 2 finger zoom/pan (only when not drawing)
-            if (_pointerCount == 2 && !widget.isDrawingActive) {
-              final positions = _pointerPositions.values.toList();
-              final currentDistance = _distance(positions[0], positions[1]);
-              final currentFocal = _midPoint(positions[0], positions[1]);
+            // Auto-escalate to pinch if a second finger appears during 1-finger pan/scroll
+            if (_textMode && _pointerPositions.length >= 2 && !_manualPinch) {
+              final pts = _pointerPositions.values.toList(growable: false);
 
-              if (_pinchStartDistance != null && _pinchStartScale != null) {
-                // Calculate and apply zoom
-                final baseScale = _pinchStartScale ?? _scale;
-                final scaleRatio = currentDistance / _pinchStartDistance!;
-                final newScale = (baseScale * scaleRatio).clamp(
+              // end 1-finger pan state so pinch can take over seamlessly
+              _manualOneFingerPan = false;
+              _oneFingerDecisionMade = false;
+              _oneFingerStart = null;
+              _oneFingerLast = null;
+
+              // final startDist = _dist(pts[0], pts[1]);
+              _pinchStartScale = _scale;
+              final focal = _mid(pts[0], pts[1]);
+              _pinchLastFocal = focal;
+              _manualPinch = true;
+              _pivot = _alignmentFromGlobalOffset(focal);
+
+              if (widget.scrollController.hasClients) {
+                try {
+                  _scrollHold ??= widget.scrollController.position.hold(() {
+                    _scrollHold = null;
+                  });
+                } catch (_) {}
+              }
+            }
+
+            // Auto-demote back to 1-finger pan if one finger remains during pinch
+            if (_textMode && _manualPinch && _pointerPositions.length == 1) {
+              _manualPinch = false;
+              _pinchStartScale = null;
+              _pinchStartDist = null;
+              _pinchLastFocal = null;
+
+              _manualOneFingerPan = true;
+              _oneFingerDecisionMade =
+                  true; // skip slop; we already know intent
+              final remaining = _pointerPositions.values.first;
+              _oneFingerStart = remaining;
+              _oneFingerLast = remaining;
+              // keep scroll held
+            }
+
+            // 1-finger tolerance routing (text mode)
+            if (_textMode &&
+                _pointerPositions.length == 1 &&
+                _oneFingerStart != null) {
+              final cur = e.position;
+              final total = cur - _oneFingerStart!;
+              if (!_oneFingerDecisionMade) {
+                if (total.distance >= _oneFingerSlop) {
+                  final absDx = total.dx.abs();
+                  final absDy = total.dy.abs();
+                  if (absDx > absDy * _horizontalBias) {
+                    // choose horizontal pan: disable scroll and pan ourselves
+                    _oneFingerDecisionMade = true;
+                    _manualOneFingerPan = true;
+                    _oneFingerLast = cur;
+
+                    if (widget.scrollController.hasClients) {
+                      try {
+                        _scrollHold ??= widget.scrollController.position.hold(
+                          () {
+                            _scrollHold = null;
+                          },
+                        );
+                      } catch (_) {}
+                    }
+                  } else {
+                    // choose vertical scroll: let scrollable win
+                    _oneFingerDecisionMade = true;
+                    _manualOneFingerPan = false;
+                    _scrollHold?.cancel();
+                    _scrollHold = null;
+                  }
+                }
+              } else if (_manualOneFingerPan && _oneFingerLast != null) {
+                // perform diagonal pan; suppress scroll
+                final delta = cur - _oneFingerLast!;
+                _applyPan(delta);
+                _oneFingerLast = cur;
+                _showScrollThumb();
+              }
+            }
+
+            // 2-finger manual pinch path (text mode)
+            if (_textMode && _manualPinch && _pointerPositions.length >= 2) {
+              final pts = _pointerPositions.values.toList(growable: false);
+              final currentDist = _dist(
+                pts[0],
+                pts[1],
+              ).clamp(1.0, double.infinity);
+              final focal = _mid(pts[0], pts[1]);
+
+              final baseScale = _pinchStartScale ?? _scale;
+              final baseDist = (_pinchStartDist ?? currentDist);
+              final nextScale = (baseScale * (currentDist / baseDist)).clamp(
+                widget.minScale,
+                widget.maxScale,
+              );
+
+              if (nextScale != _scale) {
+                // 1. keep the content under the fingers
+                final scaleFactor = nextScale / _scale;
+                final dxToFocal = focal.dx - _pan.dx;
+                final newPanX = _pan.dx - dxToFocal * (scaleFactor - 1);
+                _applyPan(
+                  Offset(newPanX - _pan.dx, 0),
+                ); // reuse your clamp logic
+
+                // 2. update the pivot & scale
+                _pivot = _alignmentFromGlobalOffset(focal);
+                setState(() => _scale = nextScale);
+                widget.onScaleChanged?.call(_scale);
+              }
+
+              if (_pinchLastFocal != null) {
+                final delta = focal - _pinchLastFocal!;
+                _applyPan(delta);
+              }
+              _pinchLastFocal = focal;
+              _showScrollThumb();
+            }
+          },
+          onPointerUp: (PointerUpEvent e) {
+            // _pointerPositions.remove(e.pointer);
+            // final newCount = (_pointers - 1).clamp(0, 10);
+            // setState(() => _pointers = newCount);
+
+            _pointerPositions.remove(e.pointer);
+            setState(() => _pointers = _pointerPositions.length);
+
+            // end 1-finger tolerance/pan
+            if (_textMode && _pointerPositions.isEmpty) {
+              _manualOneFingerPan = false;
+              _oneFingerDecisionMade = false;
+              _oneFingerStart = null;
+              _oneFingerLast = null;
+              _scrollHold?.cancel();
+              _scrollHold = null;
+            }
+
+            if (_textMode && _manualPinch) {
+              // end manual pinch cleanly
+              _manualPinch = false;
+              _pinchStartScale = null;
+              _pinchStartDist = null;
+              _pinchLastFocal = null;
+              _pivot = null;
+
+              // release scroll; do NOT force 1-finger pan – let tolerance decide
+              _scrollHold?.cancel();
+              _scrollHold = null;
+
+              if (_pointerPositions.length == 1) {
+                final remaining = _pointerPositions.values.first;
+                _oneFingerStart = remaining;
+                _oneFingerLast = remaining;
+                _oneFingerDecisionMade = false;
+                _manualOneFingerPan = false;
+              } else {
+                _oneFingerStart = null;
+                _oneFingerLast = null;
+              }
+
+              _startRecoilIfNeeded();
+            }
+
+            if (_pointers == 0) _startRecoilIfNeeded();
+          },
+          onPointerCancel: (PointerCancelEvent e) {
+            // _pointerPositions.remove(e.pointer);
+            // final newCount = (_pointers - 1).clamp(0, 10);
+            // setState(() => _pointers = newCount);
+
+            _pointerPositions.remove(e.pointer);
+            setState(() => _pointers = _pointerPositions.length);
+
+            _manualOneFingerPan = false;
+            _oneFingerDecisionMade = false;
+            _oneFingerStart = null;
+            _oneFingerLast = null;
+
+            if (_textMode && _manualPinch) {
+              // end manual pinch cleanly
+              _manualPinch = false;
+              _pinchStartScale = null;
+              _pinchStartDist = null;
+              _pinchLastFocal = null;
+              _pivot = null;
+
+              // release scroll; do NOT force 1-finger pan – let tolerance decide
+              _scrollHold?.cancel();
+              _scrollHold = null;
+
+              if (_pointerPositions.length == 1) {
+                final remaining = _pointerPositions.values.first;
+                _oneFingerStart = remaining;
+                _oneFingerLast = remaining;
+                _oneFingerDecisionMade = false;
+                _manualOneFingerPan = false;
+              } else {
+                _oneFingerStart = null;
+                _oneFingerLast = null;
+              }
+
+              _startRecoilIfNeeded();
+            }
+
+            _scrollHold?.cancel();
+            _scrollHold = null;
+          },
+          child: GestureDetector(
+            behavior: HitTestBehavior.translucent,
+            onScaleStart: (d) {
+              _pivot = Alignment.center;
+              _isScaling = true;
+              _lastFocal = d.focalPoint;
+              _lastScale = _scale;
+              // only update pivot for two-finger gestures or when NOT in drawing mode
+              if (!widget.isDrawingMode || _pointers >= 2) {
+                _pivot = _alignmentFromGlobalOffset(d.focalPoint);
+              }
+              _showScrollThumb();
+            },
+            onScaleUpdate: (d) {
+              // Drawing mode: single-finger fully locked
+              if (widget.isDrawingMode && _pointers == 1) return;
+
+              // If manual pinch took over (text mode, 2+ fingers), skip default scale path
+              // bypass default scale path while manual pinch or manual 1-finger pan is active in text mode
+              // if (_textMode && (_manualPinch || _manualOneFingerPan)) return;
+
+              // In text mode, delegate ALL gestures to the manual Listener logic
+              // (manual one-finger pan and manual two-finger pinch)
+              if (_textMode || _manualPinch) return;
+
+              // Multi-touch: zoom + pan
+              if (_pointers >= 2) {
+                // Zoom
+                final ns = (_lastScale * d.scale).clamp(
                   widget.minScale,
                   widget.maxScale,
                 );
+                if (ns != _scale) {
+                  final factor = ns / _scale;
+                  final dxToFocal = d.focalPoint.dx - _pan.dx;
+                  final newPanX = _pan.dx - dxToFocal * (factor - 1);
+                  _applyPan(Offset(newPanX - _pan.dx, 0));
 
-                if (newScale != _scale) {
-                  // Keep content under fingers pinned during zoom
-                  final scaleFactor = newScale / _scale;
-                  final dxToFocal = currentFocal.dx - _offset.dx;
-                  final dyToFocal = currentFocal.dy - _offset.dy;
-
-                  // prevent scaling and translating a child inside a scroll view.
-                  // Transform only changes painting, not layout.
-                  // Mixing vertical translate with the
-                  // scroll position creates gaps near the bottom after zooming.
-                  // Fix by letting vertical movement be handled by the ScrollController only,
-                  // and only translate horizontally;
-                  // adjust the scroll offset during pinch to keep the focal point pinned.
-                  final newOffsetX = _offset.dx - dxToFocal * (scaleFactor - 1);
-
-                  // Use scroll for vertical movement; adjust to keep focal pinned
-                  if (widget.scrollController.hasClients) {
-                    final deltaScroll = dyToFocal * (scaleFactor - 1);
-                    final maxScroll =
-                        widget.scrollController.position.maxScrollExtent;
-                    final target = (widget.scrollController.offset +
-                            deltaScroll)
-                        .clamp(0.0, maxScroll);
-                    widget.scrollController.jumpTo(target);
-                  }
-
-                  // Constrain X only; keep Y at 0
-                  final constrainedOffset = _constrainOffset(
-                    Offset(newOffsetX, 0.0),
-                    newScale,
-                  );
-
-                  setState(() {
-                    _scale = newScale;
-                    _offset = constrainedOffset;
-                    _localFocalPoint = _alignmentFromGlobalOffset(currentFocal);
-                  });
-
+                  _pivot = _alignmentFromGlobalOffset(d.focalPoint);
+                  setState(() => _scale = ns);
                   widget.onScaleChanged?.call(_scale);
                 }
+                // Pan
+                final delta = d.focalPoint - _lastFocal;
+                _applyPan(delta);
+                _lastFocal = d.focalPoint;
+                _showScrollThumb();
+                return;
               }
-              _pinchLastFocal = currentFocal;
-            }
-          },
-          onPointerUp: (e) {
-            _pointerPositions.remove(e.pointer);
-            setState(() => _pointerCount = _pointerPositions.length);
 
-            // Reset pinch state when no longer multi-touch
-            if (_pointerCount < 2) {
-              _pinchStartScale = null;
-              _pinchStartDistance = null;
-              _pinchLastFocal = null;
-            }
-          },
+              // Single-touch: only when NOT drawing mode (text mode)
+              // if (!widget.isDrawingMode && _pointers == 1) {
+              //   final delta = d.focalPoint - _lastFocal;
+              //   _applyPan(delta);
+              //   _lastFocal = d.focalPoint;
+              //   _showScrollThumb();
+              // }
 
-          onPointerCancel: (e) {
-            _pointerPositions.remove(e.pointer);
-            setState(() => _pointerCount = _pointerPositions.length);
+              // Drawing mode: allow two-finger pinch/pan here
+              if (widget.isDrawingMode && _pointers >= 2) {
+                final ns = (_lastScale * d.scale).clamp(
+                  widget.minScale,
+                  widget.maxScale,
+                );
+                if (ns != _scale) {
+                  setState(() => _scale = ns);
+                  widget.onScaleChanged?.call(_scale);
+                }
+                final delta = d.focalPoint - _lastFocal;
+                _applyPan(delta);
+                _lastFocal = d.focalPoint;
+                _showScrollThumb();
+              }
+            },
+            onScaleEnd: (d) {
+              _isScaling = false;
+              if (!(_textMode && (_manualPinch || _manualOneFingerPan))) {
+                _startRecoilIfNeeded();
+                _pivot = null;
+              }
+            },
+            child: IgnorePointer(
+              ignoring:
+                  _twoFingerTextMode || (_textMode && _manualOneFingerPan),
+              child: Scrollbar(
+                controller: widget.scrollController,
+                thumbVisibility: _showScrollBar && !widget.isDrawingMode,
+                radius: const Radius.circular(10),
+                thickness: 6,
+                child: NotificationListener<ScrollNotification>(
+                  onNotification: (n) {
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      if (!mounted) return;
+                      _showScrollThumb();
+                      _updateContentHeightFromScroll();
+                    });
+                    return false;
+                  },
+                  child: SingleChildScrollView(
+                    controller: widget.scrollController,
+                    physics:
+                        _twoFingerTextMode || (_textMode && _manualOneFingerPan)
+                            ? const NeverScrollableScrollPhysics()
+                            : (widget.isDrawingMode
+                                ? const NeverScrollableScrollPhysics()
+                                : const BouncingScrollPhysics()),
+                    // Replace the whole Builder(...) body under SingleChildScrollView with:
+                    child: Builder(
+                      builder: (_) {
+                        // extra height introduced by zoom (doesn't change layout)
+                        final extra = (_contentHeight * (_scale - 1.0)).clamp(
+                          0.0,
+                          double.infinity,
+                        );
 
-            // Reset all pinch state on cancel
-            if (_pointerCount < 2) {
-              _pinchStartScale = null;
-              _pinchStartDistance = null;
-              _pinchLastFocal = null;
-            }
-          },
-          child: SingleChildScrollView(
-            controller: widget.scrollController,
-            physics: const BouncingScrollPhysics(),
-            child: Transform(
-              transform:
-                  Matrix4.identity()
-                    ..translate(_offset.dx, 0.0)
-                    ..scale(_scale),
-              alignment: _localFocalPoint,
-              child: widget.child,
+                        // scroll ratio 0..1
+                        double t = 0.0;
+                        if (widget.scrollController.hasClients) {
+                          final pos = widget.scrollController.position;
+                          try {
+                            final max = pos.maxScrollExtent;
+                            t =
+                                max > 0
+                                    ? (pos.pixels / max).clamp(0.0, 1.0)
+                                    : 0.0;
+                          } catch (e) {
+                            // Position not fully initialized yet
+                            t = 0.0;
+                          }
+                        }
+
+                        // compensate vertically across the whole scroll range:
+                        // top -> -extra/2, middle -> 0, bottom -> +extra/2
+                        final vComp = (t - 0.5) * extra;
+
+                        return Transform(
+                          transform:
+                              Matrix4.identity()
+                                ..translate(
+                                  _pan.dx + _overscrollX,
+                                  vComp + _overscrollY,
+                                )
+                                ..scale(_scale),
+                          alignment: _pivot ?? Alignment.center,
+                          child: widget.child,
+                        );
+                      },
+                    ),
+                  ),
+                ),
+              ),
             ),
           ),
         );
       },
     );
+  }
+
+  // Around line 278-304, modify the _applyPan method:
+
+  void _applyPan(Offset delta) {
+    final scaledW = _viewport.width * _scale;
+    final availX = (scaledW - _viewport.width).clamp(0.0, double.infinity);
+
+    // allow the page to slide over the whole extra width
+    // ----- compute horizontal limits so blank space is never exposed -----
+    final double pivotX = (_pivot?.x ?? 0.0).clamp(
+      -1.0,
+      1.0,
+    ); // -1 (left) .. 1 (right)
+    final double minX = -availX * (1 + pivotX) / 2;
+    final double maxX = availX * (1 - pivotX) / 2;
+
+    final candX = _pan.dx + delta.dx;
+    const resistance = 0.5;
+    const maxPull = 120.0;
+
+    final clampedX = candX.clamp(minX, maxX);
+    // final overX = candX - clampedX;
+    // if (overX.abs() > 0) {
+    //   final visualX = overX * resistance;
+    //   _overscrollX = visualX.clamp(-maxPull, maxPull);
+    // }
+    final overX = candX - clampedX; // ignore – no horizontal rubber-band
+    _overscrollX = 0.0;
+
+    // Vertical via scroll controller (keep as-is)
+    if (delta.dy.abs() > 0.5 && widget.scrollController.hasClients) {
+      final current = widget.scrollController.offset;
+      final maxScroll = widget.scrollController.position.maxScrollExtent;
+      final proposed = current - (delta.dy / _scale);
+      final clampedScroll = proposed.clamp(0.0, maxScroll);
+      final overScroll = proposed - clampedScroll;
+
+      if (overScroll.abs() > 0) {
+        final visualY = -overScroll * resistance * _scale;
+        _overscrollY = visualY.clamp(-maxPull, maxPull);
+      }
+
+      if (current != clampedScroll) {
+        widget.scrollController.jumpTo(clampedScroll);
+      }
+    }
+
+    setState(() {
+      _pan = Offset(clampedX, 0.0);
+    });
   }
 }
 
@@ -261,6 +732,10 @@ class _CreateNoteViewState extends State<CreateNoteView>
   final _bodyController = TextEditingController();
   final _scrollController = ScrollController();
 
+  // Orientation tracking
+  Orientation? _previousOrientation;
+  Size? _previousSize;
+  bool _isRotating = false;
   double?
   _portraitHeight; // Store the portrait height as the fixed canvas height
 
@@ -273,7 +748,7 @@ class _CreateNoteViewState extends State<CreateNoteView>
   bool _isDrawingMode = false;
   // bool _isEraserStrokeMode = false;
   bool _isDrawingActive = false;
-  final int _pointerCount = 0;
+  int _pointerCount = 0;
   double _currentZoomScale = 1.0;
   // bool _isPanning = false;
 
@@ -521,6 +996,131 @@ class _CreateNoteViewState extends State<CreateNoteView>
   void _updateEraserSizeForZoom() {
     if (_scribbleNotifier.value is Erasing) {
       _scribbleNotifier.setStrokeWidth(_zoomAdjustedEraserSize);
+    }
+  }
+
+  // Handle orientation changes and scale drawings accordingly
+  @override
+  void didChangeMetrics() {
+    super.didChangeMetrics();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _handleOrientationChange();
+    });
+  }
+
+  void _handleOrientationChange() {
+    // Check if widget is still mounted before proceeding
+    if (!mounted) return;
+
+    final currentOrientation = MediaQuery.of(context).orientation;
+    final currentSize = MediaQuery.of(context).size;
+
+    // Initialize portrait height on first call - always use portrait height as reference
+    _portraitHeight ??=
+        currentOrientation == Orientation.portrait
+            ? currentSize.height
+            : currentSize.width;
+
+    // Skip if this is the first time or if we're already handling rotation
+    if (_previousOrientation == null || _isRotating) {
+      _previousOrientation = currentOrientation;
+      _previousSize = currentSize;
+      return;
+    }
+
+    // Check if orientation actually changed
+    if (_previousOrientation != currentOrientation) {
+      setState(() {
+        _isRotating = true;
+      });
+
+      // Transform the drawing based on the new dimensions
+      // Only scale width, keep height constant using portrait height as reference
+      _scaleDrawingForFixedHeight(_previousSize!, currentSize);
+
+      _previousOrientation = currentOrientation;
+      _previousSize = currentSize;
+
+      // Reset rotation flag after a short delay
+      Future.delayed(const Duration(milliseconds: 300), () {
+        if (mounted) {
+          setState(() {
+            _isRotating = false;
+          });
+        }
+      });
+    }
+  }
+
+  void _scaleDrawingForFixedHeight(Size oldSize, Size newSize) {
+    try {
+      final currentSketch = _scribbleNotifier.currentSketch;
+      if (currentSketch.lines.isEmpty) return;
+
+      // Get the current orientation to determine the transformation
+      final currentOrientation = MediaQuery.of(context).orientation;
+      final previousOrientation = _previousOrientation;
+
+      // Only scale width (X coordinates), keep Y coordinates the same
+      final scaleX = newSize.width / oldSize.width;
+
+      // Skip scaling if the width change is too small
+      if ((scaleX - 1.0).abs() < 0.01) {
+        return;
+      }
+
+      // Create a new sketch with transformed coordinates
+      final transformedLines = <SketchLine>[];
+
+      for (final line in currentSketch.lines) {
+        final transformedPoints = <Point>[];
+
+        for (final point in line.points) {
+          // Transform coordinates based on orientation change
+          double transformedX = point.x;
+          double transformedY = point.y;
+
+          if (previousOrientation == Orientation.portrait &&
+              currentOrientation == Orientation.landscape) {
+            // Portrait to Landscape: Scale X, keep Y
+            transformedX = point.x * scaleX;
+            transformedY = point.y; // Keep Y the same
+          } else if (previousOrientation == Orientation.landscape &&
+              currentOrientation == Orientation.portrait) {
+            // Landscape to Portrait: Scale X back, keep Y
+            transformedX = point.x * scaleX;
+            transformedY = point.y; // Keep Y the same
+          }
+
+          final transformedPoint = Point(
+            transformedX,
+            transformedY,
+            pressure: point.pressure,
+          );
+          transformedPoints.add(transformedPoint);
+        }
+
+        // Create new line with transformed points
+        final transformedLine = SketchLine(
+          points: transformedPoints,
+          width: line.width,
+          color: line.color,
+        );
+        transformedLines.add(transformedLine);
+      }
+
+      // Create new sketch with transformed lines
+      final transformedSketch = Sketch(lines: transformedLines);
+
+      // Update the scribble notifier with the transformed sketch
+      _scribbleNotifier.setSketch(
+        sketch: transformedSketch,
+        addToUndoHistory: false,
+      );
+    } catch (e) {
+      // Handle any errors during scaling
+      debugPrint('Error scaling drawing for fixed height: $e');
     }
   }
 
@@ -968,21 +1568,36 @@ class _CreateNoteViewState extends State<CreateNoteView>
             // Zoomable and pannable content area
             // In your build method, replace the current Expanded widget:
             Expanded(
-              child: ZoomPanSurface(
-                isDrawingMode: _isDrawingMode,
-                isDrawingActive: _isDrawingActive,
-                scrollController: _scrollController,
-                onScaleChanged: (s) {
-                  setState(() {
-                    _currentZoomScale = s;
-                  });
-                  _updateEraserSizeForZoom();
-                },
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 10),
+              child: Listener(
+                behavior: HitTestBehavior.translucent,
+                onPointerDown: (_) => setState(() => _pointerCount++),
+                onPointerUp:
+                    (_) => setState(
+                      () => _pointerCount = (_pointerCount - 1).clamp(0, 10),
+                    ),
+                onPointerCancel:
+                    (_) => setState(
+                      () => _pointerCount = (_pointerCount - 1).clamp(0, 10),
+                    ),
+                child: ZoomPanSurface(
+                  isDrawingMode: _isDrawingMode,
+                  isDrawingActive: _isDrawingActive,
+                  scrollController: _scrollController,
+                  onScaleChanged: (s) {
+                    setState(() {
+                      _currentZoomScale = s;
+                    });
+                    _updateEraserSizeForZoom();
+                  },
+                  // Optional: provide content height if you can compute it
+                  contentHeightProvider: () {
+                    // Return 0/null to let it infer from scroll metrics
+                    return 0;
+                  },
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      const SizedBox(height: 10),
                       Stack(
                         children: [
                           // Text editor
@@ -1015,7 +1630,6 @@ class _CreateNoteViewState extends State<CreateNoteView>
                               style: GoogleFonts.poppins(
                                 fontSize: AppThemeConfig.bodyFontSize,
                               ),
-                              readOnly: true,
                               maxLines: null,
                               textInputAction: TextInputAction.newline,
                               keyboardType: TextInputType.multiline,
@@ -1073,6 +1687,7 @@ class _CreateNoteViewState extends State<CreateNoteView>
                           ),
                         ],
                       ),
+                      const SizedBox(height: 10),
                     ],
                   ),
                 ),
