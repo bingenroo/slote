@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lottie/lottie.dart';
@@ -11,7 +10,9 @@ import 'package:slote/src/services/local_db.dart';
 import 'package:slote/src/functions/undo_redo.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'dart:developer';
+import 'package:slote/src/views/widgets/viewport/viewport_surface.dart';
 import 'package:scribble/scribble.dart';
+import 'dart:math' as math;
 
 class CreateNoteView extends StatefulWidget {
   const CreateNoteView({super.key, this.note});
@@ -22,244 +23,12 @@ class CreateNoteView extends StatefulWidget {
   State<CreateNoteView> createState() => _CreateNoteViewState();
 }
 
-class ZoomPanSurface extends StatefulWidget {
-  final Widget child;
-  final bool isDrawingMode;
-  final bool isDrawingActive; // true only while 1-finger drawing
-  final ScrollController scrollController;
-  final ValueChanged<double>? onScaleChanged;
-  final double minScale;
-  final double maxScale;
-
-  const ZoomPanSurface({
-    super.key,
-    required this.child,
-    required this.isDrawingMode,
-    required this.isDrawingActive,
-    required this.scrollController,
-    this.onScaleChanged,
-    this.minScale = 1.0, // don't allow zoom-out past original
-    this.maxScale = 3.0,
-  });
-
-  @override
-  State<ZoomPanSurface> createState() => _ZoomPanSurfaceState();
-}
-
-class _ZoomPanSurfaceState extends State<ZoomPanSurface> {
-  // Gesture state
-  int _pointerCount = 0;
-  double _scale = 1.0;
-  Offset _offset = Offset.zero;
-  // Offset _localFocalPoint = Offset.zero;
-
-  // Stores x and y coordinate of all fingers
-  final Map<int, Offset> _pointerPositions = {};
-
-  // Two finger Pinch
-  double? _pinchStartScale;
-  double? _pinchStartDistance;
-  Offset? _pinchLastFocal;
-
-  // Viewport/content
-  Size _viewport = Size.zero;
-  double _contentHeight = 0.0;
-  // Dynamic bounds
-  Rect get _currentContentBounds {
-    return Rect.fromLTWH(0, 0, _viewport.width, _contentHeight);
-  }
-
-  Offset _constrainOffset(Offset proposedOffset, double scale) {
-    final bounds = _currentContentBounds;
-
-    final scaledWidth = bounds.width * scale;
-    final scaledHeight = bounds.height * scale;
-
-    final maxX = math.max(0.0, scaledWidth - _viewport.width).toDouble();
-    final maxY = math.max(0.0, scaledHeight - _viewport.height).toDouble();
-
-    // Allow positive Y offset if content is smaller than viewport
-    final minY = scaledHeight < _viewport.height ? 0.0 : -maxY;
-    final maxYOffset =
-        scaledHeight < _viewport.height ? _viewport.height - scaledHeight : 0.0;
-
-    return Offset(
-      proposedOffset.dx.clamp(-maxX, 0.0),
-      proposedOffset.dy.clamp(minY, maxYOffset),
-    );
-  }
-
-  double _distance(Offset a, Offset b) => (a - b).distance;
-  Offset _midPoint(Offset a, Offset b) =>
-      Offset((a.dx + b.dx) / 2, (a.dy + b.dy) / 2);
-
-  void _updateContentHeightFromScroll() {
-    if (!widget.scrollController.hasClients) return;
-    final max = widget.scrollController.position.maxScrollExtent;
-    if (_viewport.height == 0) return;
-    final newHeight = max + _viewport.height;
-    if ((newHeight - _contentHeight).abs() > 8) {
-      setState(() => _contentHeight = newHeight);
-    }
-  }
-
-  Alignment? _localFocalPoint;
-  Alignment _alignmentFromGlobalOffset(Offset global) {
-    final rb = context.findRenderObject() as RenderBox?;
-    if (rb == null || _viewport.isEmpty) return Alignment.center;
-    final local = rb.globalToLocal(global); // pixel position in this widget
-    return Alignment(
-      (local.dx / _viewport.width) * 2 - 1,
-      (local.dy / _viewport.height) * 2 - 1,
-    );
-  }
-
-  @override
-  void initState() {
-    super.initState();
-    widget.scrollController.addListener(_updateContentHeightFromScroll);
-  }
-
-  @override
-  void dispose() {
-    widget.scrollController.removeListener(_updateContentHeightFromScroll);
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        // Initialize viewport size
-        _viewport = Size(constraints.maxWidth, constraints.maxHeight);
-        return Listener(
-          onPointerDown: (e) {
-            // Get global coordinate and store it in the offset array _pointerPositions
-            _pointerPositions[e.pointer] = e.position;
-            setState(() => _pointerCount = _pointerPositions.length);
-
-            // 2 fingers scale (Text and Drawing)
-            if (_pointerCount == 2 && !widget.isDrawingActive) {
-              final positions = _pointerPositions.values.toList();
-              final distance = _distance(positions[0], positions[1]);
-              final globalFocal = _midPoint(positions[0], positions[1]);
-
-              _pinchStartScale = _scale;
-              _pinchStartDistance = distance;
-              _pinchLastFocal = globalFocal;
-              _localFocalPoint = _alignmentFromGlobalOffset(globalFocal);
-            }
-          },
-          onPointerMove: (e) {
-            _pointerPositions[e.pointer] = e.position;
-
-            // Handle 2 finger zoom/pan (only when not drawing)
-            if (_pointerCount == 2 && !widget.isDrawingActive) {
-              final positions = _pointerPositions.values.toList();
-              final currentDistance = _distance(positions[0], positions[1]);
-              final currentFocal = _midPoint(positions[0], positions[1]);
-
-              if (_pinchStartDistance != null && _pinchStartScale != null) {
-                // Calculate and apply zoom
-                final baseScale = _pinchStartScale ?? _scale;
-                final scaleRatio = currentDistance / _pinchStartDistance!;
-                final newScale = (baseScale * scaleRatio).clamp(
-                  widget.minScale,
-                  widget.maxScale,
-                );
-
-                if (newScale != _scale) {
-                  // Keep content under fingers pinned during zoom
-                  final scaleFactor = newScale / _scale;
-                  final dxToFocal = currentFocal.dx - _offset.dx;
-                  final dyToFocal = currentFocal.dy - _offset.dy;
-
-                  // prevent scaling and translating a child inside a scroll view.
-                  // Transform only changes painting, not layout.
-                  // Mixing vertical translate with the
-                  // scroll position creates gaps near the bottom after zooming.
-                  // Fix by letting vertical movement be handled by the ScrollController only,
-                  // and only translate horizontally;
-                  // adjust the scroll offset during pinch to keep the focal point pinned.
-                  final newOffsetX = _offset.dx - dxToFocal * (scaleFactor - 1);
-
-                  // Use scroll for vertical movement; adjust to keep focal pinned
-                  if (widget.scrollController.hasClients) {
-                    final deltaScroll = dyToFocal * (scaleFactor - 1);
-                    final maxScroll =
-                        widget.scrollController.position.maxScrollExtent;
-                    final target = (widget.scrollController.offset +
-                            deltaScroll)
-                        .clamp(0.0, maxScroll);
-                    widget.scrollController.jumpTo(target);
-                  }
-
-                  // Constrain X only; keep Y at 0
-                  final constrainedOffset = _constrainOffset(
-                    Offset(newOffsetX, 0.0),
-                    newScale,
-                  );
-
-                  setState(() {
-                    _scale = newScale;
-                    _offset = constrainedOffset;
-                    _localFocalPoint = _alignmentFromGlobalOffset(currentFocal);
-                  });
-
-                  widget.onScaleChanged?.call(_scale);
-                }
-              }
-              _pinchLastFocal = currentFocal;
-            }
-          },
-          onPointerUp: (e) {
-            _pointerPositions.remove(e.pointer);
-            setState(() => _pointerCount = _pointerPositions.length);
-
-            // Reset pinch state when no longer multi-touch
-            if (_pointerCount < 2) {
-              _pinchStartScale = null;
-              _pinchStartDistance = null;
-              _pinchLastFocal = null;
-            }
-          },
-
-          onPointerCancel: (e) {
-            _pointerPositions.remove(e.pointer);
-            setState(() => _pointerCount = _pointerPositions.length);
-
-            // Reset all pinch state on cancel
-            if (_pointerCount < 2) {
-              _pinchStartScale = null;
-              _pinchStartDistance = null;
-              _pinchLastFocal = null;
-            }
-          },
-          child: SingleChildScrollView(
-            controller: widget.scrollController,
-            physics: const BouncingScrollPhysics(),
-            child: Transform(
-              transform:
-                  Matrix4.identity()
-                    ..translate(_offset.dx, 0.0)
-                    ..scale(_scale),
-              alignment: _localFocalPoint,
-              child: widget.child,
-            ),
-          ),
-        );
-      },
-    );
-  }
-}
-
 class _CreateNoteViewState extends State<CreateNoteView>
     with WidgetsBindingObserver {
   Note? _currentNote;
 
   final _titleController = TextEditingController();
   final _bodyController = TextEditingController();
-  final _scrollController = ScrollController();
 
   double?
   _portraitHeight; // Store the portrait height as the fixed canvas height
@@ -274,12 +43,17 @@ class _CreateNoteViewState extends State<CreateNoteView>
   // bool _isEraserStrokeMode = false;
   bool _isDrawingActive = false;
   final int _pointerCount = 0;
-  double _currentZoomScale = 1.0;
   // bool _isPanning = false;
 
-  double get _zoomAdjustedEraserSize {
-    return _baseEraserStrokeWidth / _currentZoomScale;
-  }
+  Matrix4 _currentTransform = Matrix4.identity();
+  double _currentScale = 1.0;
+
+  // Global Key for calc height
+  final GlobalKey _viewportKey = GlobalKey();
+  double _viewportHeight = 0.0; // State variable for viewport height
+
+  final GlobalKey _contentKey = GlobalKey();
+  double _contentHeight = 0.0; // State variable for content height
 
   // Undo/Redo state
   late UnifiedUndoRedoController _unifiedUndoRedoController;
@@ -520,7 +294,75 @@ class _CreateNoteViewState extends State<CreateNoteView>
   // Add this method to update eraser size when zoom changes
   void _updateEraserSizeForZoom() {
     if (_scribbleNotifier.value is Erasing) {
-      _scribbleNotifier.setStrokeWidth(_zoomAdjustedEraserSize);
+      _scribbleNotifier.setStrokeWidth(_baseEraserStrokeWidth / _currentScale);
+    }
+  }
+
+  void _measureViewportHeight() {
+    final RenderBox? renderBox =
+        _viewportKey.currentContext?.findRenderObject() as RenderBox?;
+    if (renderBox == null) return;
+    final newHeight = renderBox.size.height;
+
+    // Only update state if the height has actually changed
+    if (newHeight > 0 && (newHeight - _viewportHeight).abs() > 1.0) {
+      if (mounted) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            setState(() {
+              _viewportHeight = newHeight;
+            });
+          }
+        });
+      }
+    }
+  }
+
+  double _calculateTextHeight() {
+    final text = _bodyController.text;
+    if (text.isEmpty) {
+      return _viewportHeight;
+    }
+
+    final textPainter = TextPainter(
+      text: TextSpan(
+        text: text,
+        style: GoogleFonts.poppins(fontSize: AppThemeConfig.bodyFontSize),
+      ),
+      textDirection: TextDirection.ltr,
+      textAlign: TextAlign.start,
+    );
+
+    // Layout without width constraint to get natural height
+    textPainter.layout();
+
+    final calculatedHeight = textPainter.size.height + 20; // Add some padding
+
+    // Return either viewport height or calculated height, whichever is larger
+    return calculatedHeight > _viewportHeight
+        ? calculatedHeight
+        : _viewportHeight;
+  }
+
+  void _measureContentHeight() {
+    // Calculate text height using TextPainter
+    final textHeight = _calculateTextHeight();
+
+    // Add some buffer for drawings, but ensure minimum is viewport height
+    final totalContentHeight = textHeight + 100; // Add buffer for drawings
+
+    // Only update state if the height has actually changed
+    if (totalContentHeight > 0 &&
+        (totalContentHeight - _contentHeight).abs() > 1.0) {
+      if (mounted) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            setState(() {
+              _contentHeight = totalContentHeight;
+            });
+          }
+        });
+      }
     }
   }
 
@@ -631,6 +473,9 @@ class _CreateNoteViewState extends State<CreateNoteView>
     _bodyController.addListener(_scheduleAutoSave);
     _scribbleNotifier.addListener(_scheduleAutoSave);
 
+    // Replace the existing generic setState listener with the measurement listener
+    _bodyController.addListener(_measureContentHeight);
+
     // undo redo
     _unifiedUndoRedoController = UnifiedUndoRedoController(
       textController: _bodyController,
@@ -656,6 +501,8 @@ class _CreateNoteViewState extends State<CreateNoteView>
 
     // Initialize the undo/redo controller with the current state (for both new and existing notes)
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      _measureViewportHeight();
+      _measureContentHeight();
       _unifiedUndoRedoController.initializeWithCurrentState();
     });
   }
@@ -683,6 +530,11 @@ class _CreateNoteViewState extends State<CreateNoteView>
       _scribbleNotifier.setColor(_penColor);
       _scribbleNotifier.setStrokeWidth(_penStrokeWidth);
     }
+
+    // Measure viewport height after dependencies change (orientation, etc.)
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _measureViewportHeight();
+    });
   }
 
   @override
@@ -701,7 +553,6 @@ class _CreateNoteViewState extends State<CreateNoteView>
     _scribbleNotifier.removeListener(_scheduleAutoSave);
     _titleController.dispose();
     _bodyController.dispose();
-    _scrollController.dispose();
     _unifiedUndoRedoController.dispose();
     _scribbleNotifier.dispose();
 
@@ -947,9 +798,9 @@ class _CreateNoteViewState extends State<CreateNoteView>
                               } else {
                                 // Switch to eraser mode
                                 _scribbleNotifier.setEraser();
-                                _scribbleNotifier.setStrokeWidth(
-                                  _zoomAdjustedEraserSize,
-                                );
+                                // _scribbleNotifier.setStrokeWidth(
+                                //   _zoomAdjustedEraserSize,
+                                // );
                               }
                             },
                             tooltip: 'Eraser',
@@ -968,113 +819,98 @@ class _CreateNoteViewState extends State<CreateNoteView>
             // Zoomable and pannable content area
             // In your build method, replace the current Expanded widget:
             Expanded(
-              child: ZoomPanSurface(
-                isDrawingMode: _isDrawingMode,
-                isDrawingActive: _isDrawingActive,
-                scrollController: _scrollController,
-                onScaleChanged: (s) {
-                  setState(() {
-                    _currentZoomScale = s;
-                  });
-                  _updateEraserSizeForZoom();
-                },
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 10),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Stack(
-                        children: [
-                          // Text editor
-                          Container(
-                            constraints: BoxConstraints(
-                              minHeight:
-                                  _portraitHeight != null
-                                      ? _portraitHeight! -
-                                          MediaQuery.of(context).padding.top -
-                                          kToolbarHeight -
-                                          38 -
-                                          20
-                                      : MediaQuery.of(context).size.height -
-                                          MediaQuery.of(context).padding.top -
-                                          kToolbarHeight -
-                                          38 -
-                                          20,
-                            ),
-                            child: TextFormField(
-                              controller: _bodyController,
-                              decoration: InputDecoration(
-                                border: InputBorder.none,
-                                hintText: "Start Sloting...",
-                                hintStyle: TextStyle(
-                                  color: Colors.grey.shade300,
-                                  fontSize: AppThemeConfig.bodyFontSize,
-                                  fontStyle: FontStyle.italic,
+              child: Container(
+                key: _viewportKey,
+                child: Builder(
+                  builder: (context) {
+                    // log(
+                    //   "Creating ViewportSurface - _contentHeight: $_contentHeight, _viewportHeight: $_viewportHeight",
+                    // );
+                    return ViewportSurface(
+                      isDrawingMode: _isDrawingMode,
+                      isDrawingActive: _isDrawingActive,
+                      viewportHeight: _viewportHeight,
+                      contentHeight: _contentHeight,
+                      onScaleChanged: (scale) {
+                        setState(() {
+                          _currentScale = scale;
+                        });
+                        _updateEraserSizeForZoom();
+                      },
+                      // onTransformChanged: (transform) {
+                      //   _currentTransform =
+                      //       transform; // for future features like saving the current view state or coordinating with drawing coordinates
+                      // },
+                      minScale: 1.0,
+                      maxScale: 3.0,
+                      showScrollbar: true,
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 10),
+                        child: Stack(
+                          children: [
+                            Stack(
+                              key: _contentKey,
+                              children: [
+                                TextFormField(
+                                  controller: _bodyController,
+                                  decoration: InputDecoration(
+                                    border: InputBorder.none,
+                                    hintText: "Start Sloting...",
+                                    hintStyle: TextStyle(
+                                      color: Colors.grey.shade300,
+                                      fontSize: AppThemeConfig.bodyFontSize,
+                                      fontStyle: FontStyle.italic,
+                                    ),
+                                  ),
+                                  style: GoogleFonts.poppins(
+                                    fontSize: AppThemeConfig.bodyFontSize,
+                                  ),
+                                  readOnly: _isDrawingMode,
+                                  maxLines: null,
+                                  textInputAction: TextInputAction.newline,
+                                  keyboardType: TextInputType.multiline,
                                 ),
-                              ),
-                              style: GoogleFonts.poppins(
-                                fontSize: AppThemeConfig.bodyFontSize,
-                              ),
-                              readOnly: true,
-                              maxLines: null,
-                              textInputAction: TextInputAction.newline,
-                              keyboardType: TextInputType.multiline,
-                            ),
-                            // child: Column(
-                            //   crossAxisAlignment: CrossAxisAlignment.start,
-                            //   children: [
-                            //     Text(
-                            //       'Top sentence: This is the very first sentence at the top of the note.',
-                            //       style: GoogleFonts.poppins(
-                            //         fontSize: AppThemeConfig.bodyFontSize,
-                            //       ),
-                            //     ),
-                            //     const SizedBox(height: 12),
-                            //     // Force lots of vertical space to create overflow
-                            //     ...List.generate(
-                            //       150,
-                            //       (_) => const SizedBox(height: 24),
-                            //     ),
-                            //     const SizedBox(height: 12),
-                            //     Text(
-                            //       'Bottom sentence: This is the very last sentence at the bottom of the note.',
-                            //       style: GoogleFonts.poppins(
-                            //         fontSize: AppThemeConfig.bodyFontSize,
-                            //       ),
-                            //     ),
-                            //   ],
-                            // ),
-                          ),
-                          // in the Stack, replace the current drawing overlay block
-                          Positioned.fill(
-                            child: IgnorePointer(
-                              // Previously: ignoring: !_isDrawingMode,
-                              // New: also ignore when 2+ fingers are down to block Scribble's InteractiveViewer
-                              ignoring: !_isDrawingMode || _pointerCount >= 2,
-                              child: Listener(
-                                behavior: HitTestBehavior.translucent,
-                                onPointerDown: (_) {
-                                  if (_isDrawingMode && _pointerCount < 2) {
-                                    setState(() => _isDrawingActive = true);
-                                  }
-                                },
-                                onPointerUp: (_) {
-                                  if (_isDrawingMode && _pointerCount <= 1) {
-                                    setState(() => _isDrawingActive = false);
-                                  }
-                                },
-                                child: Scribble(
-                                  notifier: _scribbleNotifier,
-                                  drawPen: _isDrawingActive && _isDrawingMode,
-                                  enableGestureCatcher: false,
+                                // in the Stack, replace the current drawing overlay block
+                                Positioned.fill(
+                                  child: IgnorePointer(
+                                    // Previously: ignoring: !_isDrawingMode,
+                                    // New: also ignore when 2+ fingers are down to block Scribble's InteractiveViewer
+                                    ignoring:
+                                        !_isDrawingMode || _pointerCount >= 2,
+                                    child: Listener(
+                                      behavior: HitTestBehavior.translucent,
+                                      onPointerDown: (_) {
+                                        if (_isDrawingMode &&
+                                            _pointerCount < 2) {
+                                          setState(
+                                            () => _isDrawingActive = true,
+                                          );
+                                        }
+                                      },
+                                      onPointerUp: (_) {
+                                        if (_isDrawingMode &&
+                                            _pointerCount <= 1) {
+                                          setState(
+                                            () => _isDrawingActive = false,
+                                          );
+                                        }
+                                      },
+                                      // child: Scribble(
+                                      //   notifier: _scribbleNotifier,
+                                      //   drawPen:
+                                      //       _isDrawingActive && _isDrawingMode,
+                                      //   enableGestureCatcher: false,
+                                      // ),
+                                    ),
+                                  ),
                                 ),
-                              ),
+                              ],
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
-                    ],
-                  ),
+                    );
+                  },
                 ),
               ),
             ),
