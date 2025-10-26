@@ -1,0 +1,27 @@
+please take a look at my code and give me a detailed advice (no need to be concise) on how should i proceed further.
+
+Decided to code zoom and pan and scroll without the help of InteractiveViewer. This is because i require the following features:
+
+Text mode:
+- 1 pointer scrolling and panning. swiping up and down will toggle scrolling, gesture diagonal or horizontal will transform instead. 
+- 2 pointers will either pan or zoom depending on the movement of the pointer
+- in zoomed mode, user is able to scroll to the top and bottom of the actual note without exceeding the initial boundaries. like wise for panning (able to pan the whole note)
+- scroll bar will always tally with any changes to the y axis. say if we are zoomed and panning diagonally, then the scroll bar will reflect the y shift
+- while zooming, the scroll bar will shrink in size also because now there is more to scroll
+
+Draw mode:
+- no scrolling allowed
+- 1 pointer is reserved for drawing. If users zoomed and draw, the view got to be locked. Previous InteractiveViewer method does not lock the view very well and the screen is shaked when drawn
+- 2 pointer is reserved for both panning (any directions) and zooming
+- scroll bar will reflect for panning but it is not because we scroll, its just our y is shifted due to panning 
+- while zooming, the scroll bar will shrink in size also because now there is more to scroll
+
+My current stage and errors:
+- for now im only handling text mode with the preliminary stages of implimenting proper scroll feature
+- i cant seem to get the calculations right to update the scroll height so that i can scroll to the top most and bottom most of the note. is there a simplier way instead of calculating? the use of states and check for the boundaries (both initial boundary and zoomed/transform boundaries)
+- previousles you given me a solution to put a sizedbox within the single child scroll view in order to unrestrct scroll (previously after zoom, we are not able to scroll past what we see). however this BouncingScrollPhysics and we have to manually calculate the height of the sized box
+- we also discussed that using gesture detector would conflict with pointer listeners so lets stick to pointer listeners
+- _alignmentFromGlobalOffset was implimented to give similar feel like InteractiveViewer where users can actually zoom to where they want to (not just center, top right/left, bottom right/left). however it feels like this method is not good enough as it seems to not zoom to where i want it exactly to be
+
+Vision:
+ultimately i want to create a zooming, panning and scrolling experience like samsung notes (and make it robust). i know the complexity is high so lets work on 1 part at a time starting with text mode, scrolling and zooming (lets not do panning yet). Please also give your advice on how should i proceed with this complexity. maybe current implimentations should be totally changed so make life simplier and with clean code?
