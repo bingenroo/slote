@@ -38,6 +38,29 @@ This guide shows you how to run and test the Slote app on Android emulators usin
 - Android Studio installed (for creating emulators)
 - At least one Android Virtual Device (AVD) created
 
+### Creating Your First Emulator
+
+If `emu-list` shows "Unable to find any emulator sources", you need to create an AVD:
+
+1. **Open Android Studio**
+2. **Go to**: Tools → Device Manager (or More Actions → Virtual Device Manager)
+3. **Click**: "Create Device" button
+4. **Select a device**: Choose any device (e.g., Pixel 5, Pixel 6)
+5. **Select system image**:
+   - Choose an API level (recommended: API 33 or 34)
+   - Click "Download" if the system image isn't installed
+   - Wait for download to complete
+6. **Finish setup**: Click "Next" → "Finish"
+7. **Close Android Studio** (you don't need it running to use the emulator)
+
+After creating the emulator, verify it's available:
+
+```bash
+emu-list
+```
+
+You should now see your emulator listed!
+
 ## Quick Start
 
 ### 1. Check Available Emulators
@@ -189,13 +212,31 @@ flutter test --coverage
 
 ### No Emulators Found
 
-If `emu-list` shows no emulators:
+If `emu-list` shows "Unable to find any emulator sources":
+
+**You need to create your first Android Virtual Device (AVD):**
 
 1. Open Android Studio
-2. Go to **Tools → Device Manager**
-3. Create a new Virtual Device
-4. Download a system image if needed
-5. Finish setup and close Android Studio
+2. Go to **Tools → Device Manager** (or **More Actions → Virtual Device Manager**)
+3. Click **"Create Device"** button
+4. Select a device (e.g., Pixel 5)
+5. Select a system image (API 33 or 34 recommended)
+   - Click **"Download"** if the system image isn't installed
+   - Wait for download to complete
+6. Click **Next** → **Finish**
+7. Close Android Studio
+
+After creating the emulator, verify it's available:
+
+```bash
+emu-list
+```
+
+You should now see your emulator listed. Then launch it with:
+
+```bash
+emu <emulator_id>
+```
 
 ### Emulator Won't Start
 

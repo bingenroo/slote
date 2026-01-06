@@ -1,0 +1,28 @@
+{
+  "appId": "com.slote.hivebrowser",
+  "productName": "Hive Browser",
+  "directories": {
+    "output": "release",
+    "buildResources": "build"
+  },
+  "files": [
+    "dist/**/*",
+    "package.json",
+    "node_modules/**/*"
+  ],
+  "extraResources": [],
+  "mac": {
+    "category": "public.app-category.developer-tools",
+    "target": ["dmg", "zip"]
+  },
+  "win": {
+    "target": ["nsis", "zip"]
+  },
+  "linux": {
+    "target": ["AppImage", "deb", "rpm"]
+  },
+  "nsis": {
+    "oneClick": false,
+    "allowToChangeInstallationDirectory": true
+  }
+}
