@@ -13,6 +13,7 @@ import 'dart:developer';
 import 'package:slote_viewport/slote_viewport.dart';
 // TODO: Replace scribble with slote_draw
 // import 'package:scribble/scribble.dart';
+import '../scribble_stub.dart';
 import 'dart:math' as math;
 
 class CreateNoteView extends StatefulWidget {

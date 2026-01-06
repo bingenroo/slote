@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'dart:developer';
-import '../zoom_pan/scroll_controller.dart' as scroll;
+import 'scroll_controller.dart' as scroll;
 
 class ViewportSurface extends StatefulWidget {
   final Widget child;
@@ -35,7 +35,7 @@ class ViewportSurface extends StatefulWidget {
 class _ViewportSurfaceState extends State<ViewportSurface> {
   // Matrix4 _transform = Matrix4.identity();
   // late scroll.VerticalScrollController _scrollController;
-  late scroll.ScrollController _scrollWidget;
+  // late scroll.ScrollController _scrollWidget;
 
   @override
   void initState() {

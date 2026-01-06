@@ -1,0 +1,281 @@
+# Running Slote on Emulator - Quick Guide
+
+## 🚀 Quick Reference (Copy These Commands)
+
+```bash
+# 1. List available emulators
+emu-list
+
+# 2. Launch an emulator (replace <emulator_id> with actual ID)
+emu <emulator_id>
+
+# 3. Check if emulator is running
+flutter devices
+
+# 4. Navigate to app and run
+cd /Users/bingenro/Documents/Slote/slote_app
+flutter pub get
+flutter run
+```
+
+**Most Common Workflow:**
+
+```bash
+emu-list                    # See available emulators
+emu Pixel_5_API_33          # Launch one (use ID from above)
+cd /Users/bingenro/Documents/Slote/slote_app && flutter run  # Run app
+```
+
+---
+
+## Overview
+
+This guide shows you how to run and test the Slote app on Android emulators using command-line tools, without needing to open Android Studio.
+
+## Prerequisites
+
+- Flutter SDK installed and configured
+- Android Studio installed (for creating emulators)
+- At least one Android Virtual Device (AVD) created
+
+## Quick Start
+
+### 1. Check Available Emulators
+
+List all available emulators:
+
+```bash
+emu-list
+```
+
+Or use the full command:
+
+```bash
+flutter emulators
+```
+
+### 2. Launch an Emulator
+
+Use the shortest alias:
+
+```bash
+emu <emulator_id>
+```
+
+Example:
+
+```bash
+emu Pixel_5_API_33
+```
+
+Alternative commands:
+
+```bash
+# Using alias
+emu-launch <emulator_id>
+
+# Using script
+launch-emu <emulator_id>
+
+# Direct script
+cd /Users/bingenro/Documents/Slote
+./launch_emulator.sh <emulator_id>
+```
+
+### 3. Verify Emulator is Running
+
+Check connected devices:
+
+```bash
+flutter devices
+```
+
+You should see your emulator listed (e.g., `emulator-5554`).
+
+### 4. Run Your App
+
+Navigate to the app directory and run:
+
+```bash
+cd /Users/bingenro/Documents/Slote/slote_app
+flutter pub get
+flutter run
+```
+
+Or target a specific device:
+
+```bash
+flutter run -d <device-id>
+```
+
+## Available Aliases
+
+The following aliases are configured in your `~/.zshrc`:
+
+| Alias        | Command                      | Description                      |
+| ------------ | ---------------------------- | -------------------------------- |
+| `emu-list`   | `flutter emulators`          | List all available emulators     |
+| `emu`        | `flutter emulators --launch` | Launch an emulator (shortest)    |
+| `emu-launch` | `flutter emulators --launch` | Launch an emulator (alternative) |
+| `launch-emu` | `./launch_emulator.sh`       | Run the helper script            |
+
+## Helper Script
+
+Location: `/Users/bingenro/Documents/Slote/launch_emulator.sh`
+
+**Usage:**
+
+```bash
+# Show available emulators and usage
+./launch_emulator.sh
+
+# Launch specific emulator
+./launch_emulator.sh <emulator_id>
+```
+
+## Complete Workflow Example
+
+```bash
+# Step 1: List available emulators
+emu-list
+
+# Step 2: Launch an emulator (replace with actual ID from step 1)
+emu Pixel_5_API_33
+
+# Step 3: Wait for emulator to boot (check with flutter devices)
+flutter devices
+
+# Step 4: Navigate to app and install dependencies
+cd /Users/bingenro/Documents/Slote/slote_app
+flutter pub get
+
+# Step 5: Run the app
+flutter run
+```
+
+## Useful Flutter Commands
+
+### Hot Reload & Development
+
+- **Hot Reload**: Press `r` in terminal while app is running
+- **Hot Restart**: Press `R` (capital R)
+- **Open DevTools**: Press `d`
+- **Quit**: Press `q`
+
+### Running Modes
+
+```bash
+# Debug mode (default)
+flutter run
+
+# Release mode
+flutter run --release
+
+# Verbose output
+flutter run -v
+```
+
+### Testing
+
+```bash
+# Run tests
+flutter test
+
+# Run tests with coverage
+flutter test --coverage
+```
+
+## Troubleshooting
+
+### No Emulators Found
+
+If `emu-list` shows no emulators:
+
+1. Open Android Studio
+2. Go to **Tools → Device Manager**
+3. Create a new Virtual Device
+4. Download a system image if needed
+5. Finish setup and close Android Studio
+
+### Emulator Won't Start
+
+```bash
+# Check if emulator is already running
+flutter devices
+
+# Kill existing emulator processes
+adb kill-server
+adb start-server
+
+# Try launching again
+emu <emulator_id>
+```
+
+### App Won't Build
+
+```bash
+# Clean build cache
+cd /Users/bingenro/Documents/Slote/slote_app
+flutter clean
+
+# Reinstall dependencies
+flutter pub get
+
+# Try running again
+flutter run
+```
+
+### Check Flutter Setup
+
+```bash
+# Full diagnostic
+flutter doctor -v
+
+# Check specific platform
+flutter doctor --android-licenses
+```
+
+## Alternative: Running on Web (No Emulator Needed)
+
+If you want to test quickly without an emulator:
+
+```bash
+cd /Users/bingenro/Documents/Slote/slote_app
+flutter pub get
+flutter run -d chrome
+```
+
+## Alternative: Running on macOS Desktop
+
+Test directly on your Mac:
+
+```bash
+cd /Users/bingenro/Documents/Slote/slote_app
+flutter pub get
+flutter run -d macos
+```
+
+## Notes
+
+- Emulators take time to boot (30-60 seconds typically)
+- First launch of an emulator may take longer
+- Keep the emulator window open while developing
+- Use hot reload (`r`) for faster iteration during development
+
+---
+
+**Quick Reference Card** (Copy these commands):
+
+```bash
+# List emulators
+emu-list
+
+# Launch emulator
+emu <emulator_id>
+
+# Check devices
+flutter devices
+
+# Run app
+cd /Users/bingenro/Documents/Slote/slote_app && flutter run
+```

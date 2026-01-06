@@ -198,3 +198,41 @@ class TextUndoRedoController extends ChangeNotifier {
   }
 }
 
+/// Unified undo/redo controller that handles both text and drawing (scribble)
+/// This is a temporary implementation that wraps TextUndoRedoController
+/// TODO: Replace with proper implementation when scribble is migrated to slote_draw
+class UnifiedUndoRedoController extends ChangeNotifier {
+  final TextUndoRedoController _textController;
+  // TODO: Add drawing controller when slote_draw is integrated
+
+  UnifiedUndoRedoController({
+    required TextEditingController textController,
+    // ignore: unused_element
+    dynamic scribbleNotifier, // Accept but ignore for now
+  }) : _textController = TextUndoRedoController(textController: textController) {
+    _textController.addListener(notifyListeners);
+  }
+
+  bool get canUndo => _textController.canUndo;
+  bool get canRedo => _textController.canRedo;
+
+  void initializeWithCurrentState() {
+    _textController.initializeWithCurrentState();
+  }
+
+  void undo() {
+    _textController.undo();
+  }
+
+  void redo() {
+    _textController.redo();
+  }
+
+  @override
+  void dispose() {
+    _textController.removeListener(notifyListeners);
+    _textController.dispose();
+    super.dispose();
+  }
+}
+
