@@ -2,6 +2,8 @@
 
 ## 🚀 Quick Reference (Copy These Commands)
 
+### macOS/Linux
+
 ```bash
 # 1. List available emulators
 emu-list
@@ -26,11 +28,42 @@ emu Pixel_5_API_33          # Launch one (use ID from above)
 cd /Users/bingenro/Documents/Slote/slote_app && flutter run  # Run app
 ```
 
+### Windows
+
+```batch
+REM 1. List available emulators
+flutter emulators
+
+REM 2. Launch an emulator using the script
+launch_emulator.bat
+
+REM 3. Check if emulator is running
+flutter devices
+
+REM 4. Navigate to app and run
+cd C:\path\to\Slote\slote_app
+flutter pub get
+flutter run
+```
+
+**Most Common Workflow:**
+
+```batch
+flutter emulators                                    REM See available emulators
+launch_emulator.bat                                   REM Launch default emulator
+cd C:\path\to\Slote\slote_app && flutter pub get && flutter run  REM Run app
+```
+
 ---
 
 ## Overview
 
 This guide shows you how to run and test the Slote app on Android emulators using command-line tools, without needing to open Android Studio.
+
+**Platform Support:**
+
+- **macOS/Linux**: Use `launch_emulator.sh` (bash script)
+- **Windows**: Use `launch_emulator.bat` (batch script)
 
 ## Prerequisites
 
@@ -41,7 +74,9 @@ This guide shows you how to run and test the Slote app on Android emulators usin
 
 ### Installing Android Command Line Tools
 
-**Option 1: Using Homebrew (Recommended)**
+#### macOS/Linux
+
+**Option 1: Using Homebrew (macOS only)**
 
 ```bash
 brew install --cask android-commandlinetools
@@ -50,17 +85,17 @@ brew install --cask android-commandlinetools
 **Option 2: Direct Download**
 
 1. Visit: https://developer.android.com/studio#command-tools
-2. Download "Command line tools only" for macOS
+2. Download "Command line tools only" for your platform (macOS or Linux)
 3. Extract and set up:
    ```bash
    mkdir -p ~/Android/Sdk/cmdline-tools
-   unzip ~/Downloads/commandlinetools-mac-*.zip -d ~/Android/Sdk/cmdline-tools
+   unzip ~/Downloads/commandlinetools-*.zip -d ~/Android/Sdk/cmdline-tools
    cd ~/Android/Sdk/cmdline-tools
    mv tools latest
    ```
 
 **Configure Environment Variables:**
-Add to `~/.zshrc`:
+Add to `~/.zshrc` (macOS) or `~/.bashrc` (Linux):
 
 ```bash
 export ANDROID_HOME=$HOME/Android/Sdk
@@ -70,20 +105,62 @@ export PATH=$PATH:$ANDROID_HOME/platform-tools
 export PATH=$PATH:$ANDROID_HOME/emulator
 ```
 
-Then reload: `source ~/.zshrc`
+Then reload: `source ~/.zshrc` or `source ~/.bashrc`
+
+#### Windows
+
+**Direct Download (Recommended)**
+
+1. Visit: https://developer.android.com/studio#command-tools
+2. Download "Command line tools only" for Windows
+3. Extract and set up:
+
+   ```batch
+   REM Create directory
+   mkdir "%LOCALAPPDATA%\Android\Sdk\cmdline-tools"
+
+   REM Extract (adjust path to your download location)
+   REM Use built-in Windows extract or 7-Zip/WinRAR
+   REM Then manually rename "tools" folder to "latest" in the extracted location
+   ```
+
+   **Or using PowerShell (if available):**
+
+   ```powershell
+   New-Item -ItemType Directory -Force -Path "$env:LOCALAPPDATA\Android\Sdk\cmdline-tools"
+   Expand-Archive -Path "$env:USERPROFILE\Downloads\commandlinetools-win-*.zip" -DestinationPath "$env:LOCALAPPDATA\Android\Sdk\cmdline-tools"
+   Rename-Item -Path "$env:LOCALAPPDATA\Android\Sdk\cmdline-tools\tools" -NewName "latest"
+   ```
+
+**Configure Environment Variables:**
+
+1. Open **System Properties** → **Environment Variables**
+2. Add new **User variables**:
+   - `ANDROID_HOME` = `%LOCALAPPDATA%\Android\Sdk`
+   - `ANDROID_SDK_ROOT` = `%LOCALAPPDATA%\Android\Sdk`
+3. Edit **Path** variable and add:
+   - `%ANDROID_HOME%\cmdline-tools\latest\bin`
+   - `%ANDROID_HOME%\platform-tools`
+   - `%ANDROID_HOME%\emulator`
+
+**Or via Command Prompt (temporary for current session):**
+
+```batch
+set ANDROID_HOME=%LOCALAPPDATA%\Android\Sdk
+set ANDROID_SDK_ROOT=%ANDROID_HOME%
+set PATH=%PATH%;%ANDROID_HOME%\cmdline-tools\latest\bin
+set PATH=%PATH%;%ANDROID_HOME%\platform-tools
+set PATH=%PATH%;%ANDROID_HOME%\emulator
+```
 
 **Install Required SDK Components:**
 
-```bash
-# Accept licenses
-yes | sdkmanager --licenses
+```batch
+REM Accept licenses (press 'y' for each)
+sdkmanager --licenses
 
-# Install essential packages
-sdkmanager "platform-tools" \
-           "platforms;android-33" \
-           "platforms;android-36" \
-           "build-tools;33.0.0" \
-           "emulator"
+REM Install essential packages
+sdkmanager "platform-tools" "platforms;android-33" "platforms;android-36" "build-tools;33.0.0" "emulator"
 ```
 
 ### Creating Your First Emulator
@@ -203,9 +280,11 @@ The following aliases are configured in your `~/.zshrc`:
 | `emu-launch` | `flutter emulators --launch` | Launch an emulator (alternative) |
 | `launch-emu` | `./launch_emulator.sh`       | Run the helper script            |
 
-## Helper Script
+## Helper Scripts
 
-Location: `/Users/bingenro/Documents/Slote/launch_emulator.sh`
+### macOS/Linux: `launch_emulator.sh`
+
+Location: `/Users/bingenro/Documents/Slote/launch_emulator.sh` (or `./launch_emulator.sh` from project root)
 
 **Features:**
 
@@ -228,16 +307,40 @@ Location: `/Users/bingenro/Documents/Slote/launch_emulator.sh`
 ./launch_emulator.sh apple_ios_simulator
 ```
 
+### Windows: `launch_emulator.bat`
+
+Location: `.\launch_emulator.bat` (from project root)
+
+**Features:**
+
+- Simple batch script that works on all Windows versions
+- No execution policy issues
+- Automatically detects Android SDK in common Windows locations
+- Provides basic error diagnostics
+- Can be run by double-clicking or from command prompt
+
+**Usage:**
+
+```batch
+REM Launch default emulator (Medium_Phone_API_36.1)
+launch_emulator.bat
+
+REM Launch specific emulator
+launch_emulator.bat Medium_Phone_API_36.1
+```
+
+**Or simply double-click the file** to launch the default emulator.
+
 **What the Script Does:**
 
-1. Sets required Android SDK environment variables
-2. Attempts to launch the emulator
-3. If launch fails, provides detailed diagnostics:
-   - Checks for missing system images
-   - Shows exact `sdkmanager` command to install missing images
-   - Verifies Android SDK setup
-   - Checks PATH configuration
-   - Displays AVD configuration details
+1. Set required Android SDK environment variables
+2. Attempt to launch the emulator
+3. If launch fails, provide detailed diagnostics:
+   - Check for missing system images
+   - Show exact `sdkmanager` command to install missing images
+   - Verify Android SDK setup
+   - Check PATH configuration
+   - Display AVD configuration details
 
 ## Complete Workflow Example
 
@@ -299,7 +402,10 @@ flutter test --coverage
 
 - **Root Cause**: AVD created but system image package not installed
 - **Why**: Creating an AVD doesn't automatically install the system image; it must be installed separately
-- **Solution**: Use `launch_emulator.sh` to detect and get the exact install command, or install via `sdkmanager`
+- **Solution**:
+  - **macOS/Linux**: Use `launch_emulator.sh` to detect and get the exact install command
+  - **Windows**: Use `launch_emulator.bat` to detect and get the exact install command
+  - Or install via `sdkmanager` directly
 - **Prevention**: Always install system image before creating AVD
 
 **Secondary Issues:**
@@ -370,30 +476,62 @@ emu <emulator_id>
 
 1. **Use the launch script to identify the missing system image:**
 
+   **macOS/Linux:**
+
    ```bash
    cd /Users/bingenro/Documents/Slote
    ./launch_emulator.sh
+   ```
+
+   **Windows:**
+
+   ```batch
+   cd C:\path\to\Slote
+   launch_emulator.bat
    ```
 
    The script will automatically detect the missing system image and show you the exact command to install it.
 
 2. **Install the missing system image:**
 
+   **macOS/Linux:**
+
    ```bash
    # The script will show you the exact command, typically something like:
    sdkmanager "system-images;android-36.1;google_apis_playstore;arm64-v8a"
    ```
 
+   **Windows:**
+
+   ```batch
+   REM The script will show you the exact command, typically something like:
+   sdkmanager "system-images;android-36.1;google_apis_playstore;arm64-v8a"
+   ```
+
 3. **Verify installation:**
+
+   **macOS/Linux:**
 
    ```bash
    # Check that the system image directory exists
    ls -la $HOME/Android/Sdk/system-images/android-36.1/google_apis_playstore/arm64-v8a/
    ```
 
+   **Windows:**
+
+   ```batch
+   REM Check that the system image directory exists
+   dir "%LOCALAPPDATA%\Android\Sdk\system-images\android-36.1\google_apis_playstore\arm64-v8a"
+   ```
+
 4. **Launch the emulator again:**
+   **macOS/Linux:**
    ```bash
    ./launch_emulator.sh
+   ```
+   **Windows:**
+   ```batch
+   launch_emulator.bat
    ```
 
 **Prevention:**
@@ -403,7 +541,9 @@ emu <emulator_id>
 - Verify system images are installed: `sdkmanager --list | grep system-images`
 
 **Environment Variables:**
-The `launch_emulator.sh` script automatically sets `ANDROID_SDK_ROOT` and `ANDROID_HOME`, but for permanent setup, add to `~/.zshrc`:
+The launch scripts automatically set `ANDROID_SDK_ROOT` and `ANDROID_HOME`, but for permanent setup:
+
+**macOS/Linux:** Add to `~/.zshrc` (macOS) or `~/.bashrc` (Linux):
 
 ```bash
 export ANDROID_HOME=$HOME/Android/Sdk
@@ -412,6 +552,58 @@ export PATH=$PATH:$ANDROID_HOME/cmdline-tools/latest/bin
 export PATH=$PATH:$ANDROID_HOME/platform-tools
 export PATH=$PATH:$ANDROID_HOME/emulator
 ```
+
+**Windows:** Set via System Properties → Environment Variables:
+
+1. Open **System Properties** → **Environment Variables**
+2. Add new **User variables**:
+   - `ANDROID_HOME` = `%LOCALAPPDATA%\Android\Sdk`
+   - `ANDROID_SDK_ROOT` = `%LOCALAPPDATA%\Android\Sdk`
+3. Edit **Path** variable and add:
+   - `%ANDROID_HOME%\cmdline-tools\latest\bin`
+   - `%ANDROID_HOME%\platform-tools`
+   - `%ANDROID_HOME%\emulator`
+
+**Or via Command Prompt (temporary for current session):**
+
+```batch
+set ANDROID_HOME=%LOCALAPPDATA%\Android\Sdk
+set ANDROID_SDK_ROOT=%ANDROID_HOME%
+set PATH=%PATH%;%ANDROID_HOME%\cmdline-tools\latest\bin
+set PATH=%PATH%;%ANDROID_HOME%\platform-tools
+set PATH=%PATH%;%ANDROID_HOME%\emulator
+```
+
+### Windows-Specific Issues
+
+**Android SDK Not Found:**
+
+The `.bat` script automatically searches common Windows locations:
+
+- `%LOCALAPPDATA%\Android\Sdk` (most common)
+- `%USERPROFILE%\AppData\Local\Android\Sdk`
+- `%USERPROFILE%\Android\Sdk`
+
+If your SDK is in a different location, set the environment variable:
+
+```batch
+set ANDROID_HOME=C:\Your\Custom\Path\Android\Sdk
+set ANDROID_SDK_ROOT=%ANDROID_HOME%
+```
+
+**Path Separator Issues:**
+
+Windows uses semicolons (`;`) in PATH, not colons (`:`). The script handles this automatically, but if setting manually:
+
+```batch
+set PATH=%PATH%;%ANDROID_HOME%\cmdline-tools\latest\bin
+set PATH=%PATH%;%ANDROID_HOME%\platform-tools
+set PATH=%PATH%;%ANDROID_HOME%\emulator
+```
+
+**Emulator Binary Location:**
+
+On Windows, the emulator executable is `emulator.exe` (not just `emulator`). The `.bat` script handles this automatically.
 
 ### App Won't Build
 
