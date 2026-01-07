@@ -2,7 +2,7 @@
   "name": "hive-browser",
   "version": "1.0.0",
   "description": "Standalone desktop application for browsing and editing Hive database files",
-  "main": "dist/main/main.js",
+  "main": "dist/main/main/main.js",
   "scripts": {
     "dev": "concurrently \"npm run dev:main\" \"npm run dev:renderer\"",
     "dev:main": "tsc -p tsconfig.main.json && tsc -p tsconfig.preload.json && electron .",
@@ -52,4 +52,3 @@
     "react-dom": "^18.2.0"
   }
 }
-

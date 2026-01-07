@@ -48,6 +48,11 @@ const DataViewer: React.FC<DataViewerProps> = ({ boxName }) => {
   }, [searchText, records]);
 
   const loadRecords = async () => {
+    if (!window.electronAPI) {
+      console.error('Electron API is not available');
+      setLoading(false);
+      return;
+    }
     try {
       setLoading(true);
       const data = await window.electronAPI.getRecords(boxName);
@@ -71,6 +76,10 @@ const DataViewer: React.FC<DataViewerProps> = ({ boxName }) => {
   };
 
   const handleSave = async () => {
+    if (!window.electronAPI) {
+      alert('Electron API is not available');
+      return;
+    }
     if (selectedRecord) {
       try {
         setLoading(true);
@@ -87,6 +96,10 @@ const DataViewer: React.FC<DataViewerProps> = ({ boxName }) => {
   };
 
   const handleAddRecord = async (key: string | number, value: any) => {
+    if (!window.electronAPI) {
+      alert('Electron API is not available');
+      return;
+    }
     try {
       setLoading(true);
       await window.electronAPI.addRecord(boxName, key, value);
@@ -106,6 +119,10 @@ const DataViewer: React.FC<DataViewerProps> = ({ boxName }) => {
   };
 
   const handleDeleteConfirm = async () => {
+    if (!window.electronAPI) {
+      alert('Electron API is not available');
+      return;
+    }
     if (recordToDelete) {
       try {
         setLoading(true);

@@ -50,6 +50,10 @@ hive_browser/
 6. **Save Changes**: Click "Save" to persist changes to the database file
 7. **Export/Import**: Use Export to save database as JSON, or Import to load records from JSON
 
+## Troubleshooting
+
+If you encounter issues with the Electron window not showing or `window.electronAPI` being undefined, see [TROUBLESHOOTING.md](./TROUBLESHOOTING.md) for common issues and solutions.
+
 ## Note
 
 This MVP version works with JSON-exported Hive databases. For full binary Hive file support, a custom parser needs to be implemented based on the Hive file format specification.
