@@ -36,22 +36,83 @@ This guide shows you how to run and test the Slote app on Android emulators usin
 
 - Flutter SDK installed and configured
 - Android Studio installed (for creating emulators)
+- Android Command Line Tools installed
 - At least one Android Virtual Device (AVD) created
+
+### Installing Android Command Line Tools
+
+**Option 1: Using Homebrew (Recommended)**
+
+```bash
+brew install --cask android-commandlinetools
+```
+
+**Option 2: Direct Download**
+
+1. Visit: https://developer.android.com/studio#command-tools
+2. Download "Command line tools only" for macOS
+3. Extract and set up:
+   ```bash
+   mkdir -p ~/Android/Sdk/cmdline-tools
+   unzip ~/Downloads/commandlinetools-mac-*.zip -d ~/Android/Sdk/cmdline-tools
+   cd ~/Android/Sdk/cmdline-tools
+   mv tools latest
+   ```
+
+**Configure Environment Variables:**
+Add to `~/.zshrc`:
+
+```bash
+export ANDROID_HOME=$HOME/Android/Sdk
+export ANDROID_SDK_ROOT=$HOME/Android/Sdk
+export PATH=$PATH:$ANDROID_HOME/cmdline-tools/latest/bin
+export PATH=$PATH:$ANDROID_HOME/platform-tools
+export PATH=$PATH:$ANDROID_HOME/emulator
+```
+
+Then reload: `source ~/.zshrc`
+
+**Install Required SDK Components:**
+
+```bash
+# Accept licenses
+yes | sdkmanager --licenses
+
+# Install essential packages
+sdkmanager "platform-tools" \
+           "platforms;android-33" \
+           "platforms;android-36" \
+           "build-tools;33.0.0" \
+           "emulator"
+```
 
 ### Creating Your First Emulator
 
 If `emu-list` shows "Unable to find any emulator sources", you need to create an AVD:
+
+**Important:** Install the system image **before** creating the AVD to avoid launch failures.
 
 1. **Open Android Studio**
 2. **Go to**: Tools → Device Manager (or More Actions → Virtual Device Manager)
 3. **Click**: "Create Device" button
 4. **Select a device**: Choose any device (e.g., Pixel 5, Pixel 6)
 5. **Select system image**:
-   - Choose an API level (recommended: API 33 or 34)
-   - Click "Download" if the system image isn't installed
-   - Wait for download to complete
+   - Choose an API level (recommended: API 33, 34, or 36)
+   - **CRITICAL**: Click "Download" if the system image isn't installed
+   - Wait for download to complete before proceeding
+   - If you skip this step, the emulator will fail to launch later
 6. **Finish setup**: Click "Next" → "Finish"
 7. **Close Android Studio** (you don't need it running to use the emulator)
+
+**Alternative: Install system image via command line first:**
+
+```bash
+# Install system image before creating AVD
+sdkmanager "system-images;android-36;google_apis_playstore;arm64-v8a"
+
+# Then create AVD via Android Studio or command line
+avdmanager create avd -n MyEmulator -k "system-images;android-36;google_apis_playstore;arm64-v8a"
+```
 
 After creating the emulator, verify it's available:
 
@@ -146,15 +207,37 @@ The following aliases are configured in your `~/.zshrc`:
 
 Location: `/Users/bingenro/Documents/Slote/launch_emulator.sh`
 
+**Features:**
+
+- Automatically launches `Medium_Phone_API_36.1` by default if no emulator is specified
+- Automatically sets `ANDROID_SDK_ROOT` and `ANDROID_HOME` environment variables
+- Detects missing system images and provides exact installation commands
+- Provides detailed error diagnostics when emulator launch fails
+- Shows comprehensive troubleshooting information
+
 **Usage:**
 
 ```bash
-# Show available emulators and usage
+# Launch default emulator (Medium_Phone_API_36.1)
 ./launch_emulator.sh
 
 # Launch specific emulator
 ./launch_emulator.sh <emulator_id>
+
+# Example: Launch iOS simulator instead
+./launch_emulator.sh apple_ios_simulator
 ```
+
+**What the Script Does:**
+
+1. Sets required Android SDK environment variables
+2. Attempts to launch the emulator
+3. If launch fails, provides detailed diagnostics:
+   - Checks for missing system images
+   - Shows exact `sdkmanager` command to install missing images
+   - Verifies Android SDK setup
+   - Checks PATH configuration
+   - Displays AVD configuration details
 
 ## Complete Workflow Example
 
@@ -210,6 +293,21 @@ flutter test --coverage
 
 ## Troubleshooting
 
+### Common Root Causes
+
+**Most Common Issue: Missing System Image**
+
+- **Root Cause**: AVD created but system image package not installed
+- **Why**: Creating an AVD doesn't automatically install the system image; it must be installed separately
+- **Solution**: Use `launch_emulator.sh` to detect and get the exact install command, or install via `sdkmanager`
+- **Prevention**: Always install system image before creating AVD
+
+**Secondary Issues:**
+
+- Missing `ANDROID_SDK_ROOT` environment variable (script handles this automatically)
+- Android Command Line Tools not properly configured
+- System image path mismatch between AVD config and installed packages
+
 ### No Emulators Found
 
 If `emu-list` shows "Unable to find any emulator sources":
@@ -250,6 +348,69 @@ adb start-server
 
 # Try launching again
 emu <emulator_id>
+```
+
+### Emulator Exits with Code 1 - Missing System Image
+
+**Root Cause:** The AVD (Android Virtual Device) was created but the required system image package is not installed. This is the most common cause of emulator launch failures.
+
+**Symptoms:**
+
+- Error message: `The Android emulator exited with code 1 during startup`
+- Error message: `FATAL | Cannot find AVD system path` or `Broken AVD system path`
+- Warning: `system-images/android-X.X/google_apis_playstore/arm64-v8a/ is not a valid directory`
+
+**Why This Happens:**
+
+- Creating an AVD in Android Studio or via Flutter doesn't automatically install the system image
+- The system image must be installed separately using `sdkmanager`
+- If you create an AVD before installing the system image, the emulator will fail to launch
+
+**Solution:**
+
+1. **Use the launch script to identify the missing system image:**
+
+   ```bash
+   cd /Users/bingenro/Documents/Slote
+   ./launch_emulator.sh
+   ```
+
+   The script will automatically detect the missing system image and show you the exact command to install it.
+
+2. **Install the missing system image:**
+
+   ```bash
+   # The script will show you the exact command, typically something like:
+   sdkmanager "system-images;android-36.1;google_apis_playstore;arm64-v8a"
+   ```
+
+3. **Verify installation:**
+
+   ```bash
+   # Check that the system image directory exists
+   ls -la $HOME/Android/Sdk/system-images/android-36.1/google_apis_playstore/arm64-v8a/
+   ```
+
+4. **Launch the emulator again:**
+   ```bash
+   ./launch_emulator.sh
+   ```
+
+**Prevention:**
+
+- Always install the system image **before** creating an AVD
+- When creating an AVD in Android Studio, make sure to click "Download" for the system image if it's not already installed
+- Verify system images are installed: `sdkmanager --list | grep system-images`
+
+**Environment Variables:**
+The `launch_emulator.sh` script automatically sets `ANDROID_SDK_ROOT` and `ANDROID_HOME`, but for permanent setup, add to `~/.zshrc`:
+
+```bash
+export ANDROID_HOME=$HOME/Android/Sdk
+export ANDROID_SDK_ROOT=$HOME/Android/Sdk
+export PATH=$PATH:$ANDROID_HOME/cmdline-tools/latest/bin
+export PATH=$PATH:$ANDROID_HOME/platform-tools
+export PATH=$PATH:$ANDROID_HOME/emulator
 ```
 
 ### App Won't Build
