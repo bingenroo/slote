@@ -11,6 +11,7 @@ import {
   Chip,
 } from '@mui/material';
 import { HiveRecord } from '../../shared/types';
+import { DatabaseService } from '../services/database-service';
 
 interface TableViewProps {
   records: HiveRecord[];
@@ -31,11 +32,8 @@ const TableView: React.FC<TableViewProps> = ({
     );
   }
 
-  // Extract columns from first record (assuming all records have similar structure)
-  const firstRecord = records[0];
-  const columns = firstRecord.value && typeof firstRecord.value === 'object'
-    ? Object.keys(firstRecord.value)
-    : ['value'];
+  // Transform records to note format
+  const transformedRecords = DatabaseService.transformToNoteFormat(records);
 
   return (
     <Box sx={{ p: 2, height: '100%', overflow: 'auto' }}>
@@ -43,38 +41,45 @@ const TableView: React.FC<TableViewProps> = ({
         <Table stickyHeader>
           <TableHead>
             <TableRow>
-              <TableCell>Key</TableCell>
-              {columns.map((col) => (
-                <TableCell key={col}>{col}</TableCell>
-              ))}
+              <TableCell>Note Title</TableCell>
+              <TableCell>Note Description</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
-            {records.map((record) => (
-              <TableRow
-                key={String(record.key)}
-                hover
-                selected={selectedRecord?.key === record.key}
-                onClick={() => onSelectRecord(record)}
-                sx={{ cursor: 'pointer' }}
-              >
-                <TableCell>
-                  <Chip label={String(record.key)} size="small" />
-                </TableCell>
-                {columns.map((col) => {
-                  const value = record.value && typeof record.value === 'object'
-                    ? record.value[col]
-                    : record.value;
-                  return (
-                    <TableCell key={col}>
-                      {typeof value === 'object'
-                        ? JSON.stringify(value)
-                        : String(value ?? '')}
-                    </TableCell>
-                  );
-                })}
-              </TableRow>
-            ))}
+            {transformedRecords.map((transformedRecord, index) => {
+              const noteTitle = Object.keys(transformedRecord)[0];
+              const noteDescription = transformedRecord[noteTitle];
+              const originalRecord = records[index];
+              
+              return (
+                <TableRow
+                  key={String(originalRecord.key)}
+                  hover
+                  selected={selectedRecord?.key === originalRecord.key}
+                  onClick={() => onSelectRecord(originalRecord)}
+                  sx={{ cursor: 'pointer' }}
+                >
+                  <TableCell>
+                    <Chip label={noteTitle} size="small" color="primary" />
+                  </TableCell>
+                  <TableCell>
+                    {noteDescription.length > 0 ? (
+                      <Box sx={{ maxWidth: 500 }}>
+                        {noteDescription.map((line, i) => (
+                          <Box key={i} sx={{ mb: 0.5 }}>
+                            {line}
+                          </Box>
+                        ))}
+                      </Box>
+                    ) : (
+                      <Box sx={{ color: 'text.secondary', fontStyle: 'italic' }}>
+                        (no description)
+                      </Box>
+                    )}
+                  </TableCell>
+                </TableRow>
+              );
+            })}
           </TableBody>
         </Table>
       </TableContainer>

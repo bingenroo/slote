@@ -74,3 +74,133 @@ To prevent this issue in the future:
 - `src/main/preload.ts` - Preload script that exposes `window.electronAPI`
 - `src/renderer/components/App.tsx` - React component that uses `window.electronAPI`
 
+---
+
+## Issue: Note Data Not Displaying Correctly - Titles and Descriptions Missing
+
+### Symptoms
+- Table view shows "Key" and "lines" columns instead of "Note Title" and "Note Description"
+- Raw JSON view shows `{"lines":[]}` instead of proper note format
+- Note titles appear as keys but descriptions are empty
+- Desired format `[{ "note title": [note description] }]` is not displayed
+
+### Root Cause
+
+The Hive binary file was storing Note data in an incorrect format:
+
+1. **Keys stored as strings (titles) instead of integers (note.id)**:
+   - Expected: Keys should be integers (note.id) as per `box.put(note.id, note)` in Flutter
+   - Actual: Keys were stored as strings containing note titles (e.g., "test", "test1", "test 3 desc")
+
+2. **Values stored as JSON strings instead of binary Note objects**:
+   - Expected: Values should be binary-encoded Note objects with typeId 0, containing fields: id, title, body, drawingData, lastMod
+   - Actual: Values were stored as JSON strings like `{"lines":[]}` instead of proper binary Note objects
+
+3. **Parser was extracting wrong data structure**:
+   - The binary parser was correctly extracting the string keys and JSON values
+   - However, it wasn't recognizing that the keys were actually titles and the values were malformed
+   - The parser attempted to parse Note objects from binary format, but the data wasn't in that format
+
+This mismatch occurred because:
+- The Hive database file structure didn't match the expected format where Note objects are stored with integer keys and binary-encoded values
+- The parser needed to handle this legacy/incorrect format and reconstruct proper Note objects
+
+### Solution
+
+Implemented a multi-layered solution to handle the incorrect format and transform it to the desired display format:
+
+1. **Enhanced Binary Parser** (`hive-parser.ts`):
+   - Added detection for the malformed format (string keys with JSON `{"lines":[]}` values)
+   - Implemented Note object reconstruction from available data:
+     - Uses the key (string) as the note title
+     - Extracts body from the `lines` array if present (currently empty in the data)
+     - Generates a stable ID from the key string using a hash function
+     - Creates a proper Note object structure with id, title, body, drawingData, lastMod
+
+2. **Transformation Function** (`database-service.ts`):
+   - Created `transformToNoteFormat()` method that converts HiveRecord[] to the desired format
+   - Handles both proper Note objects (with id, title, body) and the malformed format
+   - Transforms records to: `[{ "note title": [note description] }]`
+   - Handles empty titles by replacing them with date format: `"Slote DD/MM"` (matching Flutter app behavior)
+   - Splits description by newlines into an array
+
+3. **Updated Views**:
+   - **TableView**: Now displays "Note Title" and "Note Description" columns with proper data
+   - **Raw JSON View**: Shows the transformed format `[{ "note title": [note description] }]` instead of raw records
+
+### Code Changes
+
+**Key Files Modified:**
+- `src/main/hive-parser.ts`: Added Note object reconstruction logic
+- `src/renderer/services/database-service.ts`: Added `transformToNoteFormat()` method
+- `src/renderer/components/TableView.tsx`: Updated to use transformed format
+- `src/renderer/components/DataViewer.tsx`: Updated Raw JSON view to show transformed format
+
+**Key Implementation Details:**
+
+```typescript
+// In hive-parser.ts - Reconstruct Note from malformed format
+if (value && typeof value === 'object' && 'lines' in value && Array.isArray(value.lines)) {
+  // Generate stable ID from key string
+  let noteId: number;
+  if (typeof key === 'string' && /^\d+$/.test(key)) {
+    noteId = parseInt(key, 10);
+  } else {
+    // Hash the string to generate a stable ID
+    let hash = 0;
+    for (let i = 0; i < key.length; i++) {
+      const char = key.charCodeAt(i);
+      hash = ((hash << 5) - hash) + char;
+      hash = hash & hash;
+    }
+    noteId = Math.abs(hash) & 0xFFFFFFFF;
+  }
+  
+  value = {
+    id: noteId,
+    title: String(key),
+    body: value.lines && value.lines.length > 0 ? value.lines.join('\n') : '',
+    drawingData: null,
+    lastMod: Date.now(),
+  } as Note;
+}
+```
+
+```typescript
+// In database-service.ts - Transform to desired format
+static transformToNoteFormat(records: HiveRecord[]): Array<Record<string, string[]>> {
+  return records.map((record) => {
+    // Extract title and body from Note object or reconstruct from available data
+    // Handle empty titles with date replacement
+    // Return format: { "note title": [note description] }
+  });
+}
+```
+
+### Verification
+
+After the fix:
+- ✅ Table view displays "Note Title" and "Note Description" columns correctly
+- ✅ Raw JSON view shows format: `[{ "note title": [note description] }]`
+- ✅ Note titles are displayed properly (using keys as titles)
+- ✅ Empty titles are replaced with date format: `"Slote DD/MM"`
+- ✅ Descriptions are extracted from available data (currently empty arrays, but structure is correct)
+
+### Future Improvements
+
+To properly fix the root cause, the Flutter app should be updated to store Note objects correctly:
+1. **Ensure keys are integers**: Use `box.put(note.id, note)` where `note.id` is an integer
+2. **Store binary Note objects**: Hive should store Note objects in binary format (typeId 0) with all fields
+3. **Verify storage format**: The binary file should contain integer keys and binary-encoded Note objects, not string keys with JSON values
+
+The current solution works around the malformed format, but the ideal fix would be to correct the storage format in the Flutter app.
+
+### Related Files
+
+- `src/main/hive-parser.ts` - Binary parser with Note reconstruction logic
+- `src/renderer/services/database-service.ts` - Transformation function
+- `src/renderer/components/TableView.tsx` - Table view displaying transformed format
+- `src/renderer/components/DataViewer.tsx` - Data viewer with Raw JSON transformation
+- `slote_app/lib/src/services/local_db.dart` - Flutter app database service (should store with integer keys)
+- `slote_app/lib/src/model/note.dart` - Note model definition
+

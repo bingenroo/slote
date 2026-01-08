@@ -1,6 +1,6 @@
 import React from 'react';
 import { Box, AppBar, Toolbar, Typography, Button, Alert } from '@mui/material';
-import { FolderOpen, Save, FileDownload, FileUpload } from '@mui/icons-material';
+import { FolderOpen, Save, FileDownload, FileUpload, Sync } from '@mui/icons-material';
 import Sidebar from './Sidebar';
 import DataViewer from './DataViewer';
 import ImportDialog from './ImportDialog';
@@ -14,6 +14,7 @@ interface LayoutProps {
   onSave: () => void;
   onExport: () => void;
   onImport?: (data: any[]) => Promise<void>;
+  onSyncFromEmulator?: () => void;
 }
 
 const Layout: React.FC<LayoutProps> = ({
@@ -24,6 +25,7 @@ const Layout: React.FC<LayoutProps> = ({
   onSave,
   onExport,
   onImport,
+  onSyncFromEmulator,
 }) => {
   const [selectedBox, setSelectedBox] = React.useState<string | null>(null);
   const [importDialogOpen, setImportDialogOpen] = React.useState(false);
@@ -49,6 +51,16 @@ const Layout: React.FC<LayoutProps> = ({
           >
             Open
           </Button>
+          {onSyncFromEmulator && (
+            <Button
+              color="inherit"
+              startIcon={<Sync />}
+              onClick={onSyncFromEmulator}
+              disabled={loading}
+            >
+              Sync from Emulator
+            </Button>
+          )}
           <Button
             color="inherit"
             startIcon={<Save />}

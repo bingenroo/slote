@@ -38,6 +38,18 @@ try {
       value: any
     ): Promise<void> =>
       ipcRenderer.invoke('database:addRecord', boxName, key, value),
+
+    // Emulator sync
+    syncFromEmulator: (): Promise<string[]> =>
+      ipcRenderer.invoke('emulator:sync'),
+
+    // Listen for database updates from main process
+    onDatabaseUpdated: (callback: () => void) => {
+      ipcRenderer.on('database-updated', callback);
+      return () => {
+        ipcRenderer.removeListener('database-updated', callback);
+      };
+    },
   });
 
   // Send confirmation to main process

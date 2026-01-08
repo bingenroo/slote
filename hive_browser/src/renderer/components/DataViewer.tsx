@@ -1,5 +1,19 @@
 import React, { useState, useEffect } from 'react';
-import { Box, Tabs, Tab, Paper, Button, IconButton, Dialog, DialogTitle, DialogContent, DialogActions, DialogContentText, TextField, InputAdornment } from '@mui/material';
+import {
+  Box,
+  Tabs,
+  Tab,
+  Paper,
+  Button,
+  IconButton,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  DialogContentText,
+  TextField,
+  InputAdornment,
+} from '@mui/material';
 import { Delete, Add, Search } from '@mui/icons-material';
 import JsonTreeView from './JsonTreeView';
 import TableView from './TableView';
@@ -30,11 +44,31 @@ const DataViewer: React.FC<DataViewerProps> = ({ boxName }) => {
     loadRecords();
   }, [boxName]);
 
+  // Listen for database updates to reload records
+  useEffect(() => {
+    if (!window.electronAPI || !window.electronAPI.onDatabaseUpdated) {
+      return;
+    }
+    const removeListener = window.electronAPI.onDatabaseUpdated(() => {
+      // Reload records when database is updated
+      loadRecords();
+    });
+    return () => {
+      removeListener();
+    };
+  }, [boxName]);
+
   useEffect(() => {
     if (selectedRecord) {
-      setRawJson(JSON.stringify(selectedRecord.value, null, 2));
+      // For selected record, show transformed format
+      const transformed = DatabaseService.transformToNoteFormat([
+        selectedRecord,
+      ]);
+      setRawJson(JSON.stringify(transformed[0], null, 2));
     } else {
-      setRawJson(JSON.stringify(records.map(r => r.value), null, 2));
+      // For all records, show transformed format
+      const transformed = DatabaseService.transformToNoteFormat(records);
+      setRawJson(JSON.stringify(transformed, null, 2));
     }
   }, [selectedRecord, records]);
 
@@ -83,12 +117,18 @@ const DataViewer: React.FC<DataViewerProps> = ({ boxName }) => {
     if (selectedRecord) {
       try {
         setLoading(true);
-        await window.electronAPI.updateRecord(boxName, selectedRecord.key, selectedRecord.value);
+        await window.electronAPI.updateRecord(
+          boxName,
+          selectedRecord.key,
+          selectedRecord.value
+        );
         await loadRecords();
         alert('Record saved successfully');
       } catch (error) {
         console.error('Failed to save record:', error);
-        alert(`Failed to save record: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        alert(
+          `Failed to save record: ${error instanceof Error ? error.message : 'Unknown error'}`
+        );
       } finally {
         setLoading(false);
       }
@@ -107,7 +147,9 @@ const DataViewer: React.FC<DataViewerProps> = ({ boxName }) => {
       setAddDialogOpen(false);
     } catch (error) {
       console.error('Failed to add record:', error);
-      alert(`Failed to add record: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      alert(
+        `Failed to add record: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
     } finally {
       setLoading(false);
     }
@@ -133,7 +175,9 @@ const DataViewer: React.FC<DataViewerProps> = ({ boxName }) => {
         setRecordToDelete(null);
       } catch (error) {
         console.error('Failed to delete record:', error);
-        alert(`Failed to delete record: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        alert(
+          `Failed to delete record: ${error instanceof Error ? error.message : 'Unknown error'}`
+        );
       } finally {
         setLoading(false);
       }
@@ -141,18 +185,21 @@ const DataViewer: React.FC<DataViewerProps> = ({ boxName }) => {
   };
 
   if (loading) {
-    return (
-      <Box sx={{ p: 3 }}>
-        Loading records...
-      </Box>
-    );
+    return <Box sx={{ p: 3 }}>Loading records...</Box>;
   }
 
   return (
     <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       <Paper sx={{ borderRadius: 0 }}>
         <Box sx={{ display: 'flex', flexDirection: 'column' }}>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 1 }}>
+          <Box
+            sx={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              p: 1,
+            }}
+          >
             <Tabs
               value={viewMode}
               onChange={(_, newValue) => setViewMode(newValue)}
@@ -227,7 +274,9 @@ const DataViewer: React.FC<DataViewerProps> = ({ boxName }) => {
               readOnly={!selectedRecord}
             />
             {selectedRecord && (
-              <Box sx={{ position: 'absolute', top: 10, right: 10, zIndex: 1000 }}>
+              <Box
+                sx={{ position: 'absolute', top: 10, right: 10, zIndex: 1000 }}
+              >
                 <button onClick={handleSave}>Save Changes</button>
               </Box>
             )}
@@ -239,4 +288,3 @@ const DataViewer: React.FC<DataViewerProps> = ({ boxName }) => {
 };
 
 export default DataViewer;
-
