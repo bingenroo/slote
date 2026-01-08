@@ -14,6 +14,7 @@ This repository contains reusable component packages for the Slote application.
 ## Structure
 
 Each package is independent and can be used separately or together. They are designed to be:
+
 - Self-contained
 - Reusable
 - Testable
@@ -34,5 +35,20 @@ dependencies:
 
 ## Development
 
-See individual package READMEs for development instructions.
+### Component Test Platforms
 
+Each component now has a standalone test app in its `example/` directory. These allow you to test and debug components independently without running the full Slote app.
+
+**Quick Start:**
+
+```bash
+cd slote_components/slote_draw/example
+flutter pub get
+flutter run
+```
+
+For detailed documentation, see [COMPONENT_TEST_PLATFORMS.md](COMPONENT_TEST_PLATFORMS.md).
+
+### Individual Package Development
+
+See individual package READMEs for development instructions.
