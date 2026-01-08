@@ -440,7 +440,8 @@ function stopAutoRefresh(): void {
 
 app.whenReady().then(() => {
   createWindow();
-  startAutoRefresh(); // Start auto-refresh polling
+  // Auto-refresh polling disabled - use "Sync from Emulator" button to refresh
+  // startAutoRefresh(); // Disabled - manual sync only
 
   // Sync from emulators on startup (non-blocking)
   syncFromEmulatorsOnStartup();
@@ -709,109 +710,37 @@ ipcMain.handle('emulator:sync', async (): Promise<string[]> => {
   console.log('[MAIN] Manual emulator sync requested');
   try {
     const pulledFiles = await EmulatorSync.syncFromEmulators();
+    const currentFilePath = fileHandler.getCurrentFilePath();
 
     if (pulledFiles.length > 0) {
       showNotification(
         'Sync Complete',
         `Pulled ${pulledFiles.length} database file(s) from emulator(s).`
       );
-      // Automatically open the first (or most recent) synced file
-      if (pulledFiles.length > 0) {
-        const fileToOpen = pulledFiles[0]; // Open the first file
-        console.log('[MAIN] Auto-opening synced file:', fileToOpen);
-        // #region agent log
-        fetch(
-          'http://127.0.0.1:7245/ingest/f06199e7-0954-4ea6-a49f-7cd1f933cda1',
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              location: 'main.ts:412',
-              message: 'About to open synced file',
-              data: { fileToOpen, pulledFilesCount: pulledFiles.length },
-              timestamp: Date.now(),
-              sessionId: 'debug-session',
-              runId: 'run2',
-              hypothesisId: 'I',
-            }),
-          }
-        ).catch(() => {});
-        // #endregion
+
+      // Check if currently open file was updated
+      let shouldRefresh = false;
+      if (currentFilePath && pulledFiles.includes(currentFilePath)) {
+        // Current file was updated - refresh it
+        console.log(
+          '[MAIN] Current file was updated, refreshing:',
+          currentFilePath
+        );
         try {
-          const dbInfo = await fileHandler.openDatabase(fileToOpen);
-          // #region agent log
-          fetch(
-            'http://127.0.0.1:7245/ingest/f06199e7-0954-4ea6-a49f-7cd1f933cda1',
-            {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                location: 'main.ts:416',
-                message: 'File opened successfully',
-                data: {
-                  fileToOpen,
-                  dbInfo: dbInfo
-                    ? {
-                        boxesCount: dbInfo.boxes.length,
-                        boxes: dbInfo.boxes.map((b) => b.name),
-                      }
-                    : null,
-                },
-                timestamp: Date.now(),
-                sessionId: 'debug-session',
-                runId: 'run2',
-                hypothesisId: 'I',
-              }),
-            }
-          ).catch(() => {});
-          // #endregion
-          // Notify renderer that database was updated
-          if (mainWindow) {
-            mainWindow.webContents.send('database-updated');
-            // #region agent log
-            fetch(
-              'http://127.0.0.1:7245/ingest/f06199e7-0954-4ea6-a49f-7cd1f933cda1',
-              {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  location: 'main.ts:438',
-                  message: 'Sent database-updated event to renderer',
-                  data: { fileToOpen },
-                  timestamp: Date.now(),
-                  sessionId: 'debug-session',
-                  runId: 'run2',
-                  hypothesisId: 'I',
-                }),
-              }
-            ).catch(() => {});
-            // #endregion
-          }
+          await fileHandler.openDatabase(currentFilePath);
+          shouldRefresh = true;
         } catch (err) {
-          console.error('[MAIN] Failed to auto-open synced file:', err);
-          // #region agent log
-          fetch(
-            'http://127.0.0.1:7245/ingest/f06199e7-0954-4ea6-a49f-7cd1f933cda1',
-            {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                location: 'main.ts:418',
-                message: 'File open failed',
-                data: {
-                  fileToOpen,
-                  error: err instanceof Error ? err.message : String(err),
-                  errorStack: err instanceof Error ? err.stack : undefined,
-                },
-                timestamp: Date.now(),
-                sessionId: 'debug-session',
-                runId: 'run2',
-                hypothesisId: 'I',
-              }),
-            }
-          ).catch(() => {});
-          // #endregion
-          // Show a notification about the error
+          console.error('[MAIN] Failed to refresh current file:', err);
+        }
+      } else if (pulledFiles.length > 0) {
+        // No current file or different file - open the first synced file
+        const fileToOpen = pulledFiles[0];
+        console.log('[MAIN] Opening synced file:', fileToOpen);
+        try {
+          await fileHandler.openDatabase(fileToOpen);
+          shouldRefresh = true;
+        } catch (err) {
+          console.error('[MAIN] Failed to open synced file:', err);
           const errorMessage = err instanceof Error ? err.message : String(err);
           if (errorMessage.includes('Binary Hive file format')) {
             showNotification(
@@ -824,10 +753,35 @@ ipcMain.handle('emulator:sync', async (): Promise<string[]> => {
               `File synced but failed to open: ${errorMessage.substring(0, 100)}`
             );
           }
-          // Don't throw - sync was successful, just couldn't open the file
         }
       }
+
+      // Notify renderer that database was updated
+      if (shouldRefresh && mainWindow) {
+        mainWindow.webContents.send('database-updated');
+      }
     } else {
+      // Even if no files were pulled, refresh current file if it exists (in case it was updated)
+      if (currentFilePath) {
+        const filename = path.basename(currentFilePath);
+        const deviceId = EmulatorSync.extractDeviceIdFromFilename(filename);
+        if (deviceId) {
+          // Current file is from emulator - refresh it
+          console.log(
+            '[MAIN] Refreshing current emulator file:',
+            currentFilePath
+          );
+          try {
+            await fileHandler.openDatabase(currentFilePath);
+            if (mainWindow) {
+              mainWindow.webContents.send('database-updated');
+            }
+          } catch (err) {
+            console.error('[MAIN] Failed to refresh current file:', err);
+          }
+        }
+      }
+
       showNotification(
         'Sync Complete',
         'No database files found on connected emulator(s).'

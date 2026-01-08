@@ -125,124 +125,21 @@ const App: React.FC = () => {
     try {
       setLoading(true);
       setError(null);
-      // #region agent log
-      fetch(
-        'http://127.0.0.1:7245/ingest/f06199e7-0954-4ea6-a49f-7cd1f933cda1',
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            location: 'App.tsx:119',
-            message: 'handleSyncFromEmulator called',
-            data: {},
-            timestamp: Date.now(),
-            sessionId: 'debug-session',
-            runId: 'run2',
-            hypothesisId: 'J',
-          }),
-        }
-      ).catch(() => {});
-      // #endregion
+      
+      // Sync from emulator - this will pull files and refresh if current file is updated
       const filePaths = await window.electronAPI.syncFromEmulator();
-      // #region agent log
-      fetch(
-        'http://127.0.0.1:7245/ingest/f06199e7-0954-4ea6-a49f-7cd1f933cda1',
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            location: 'App.tsx:127',
-            message: 'syncFromEmulator returned',
-            data: { filePathsCount: filePaths.length, filePaths },
-            timestamp: Date.now(),
-            sessionId: 'debug-session',
-            runId: 'run2',
-            hypothesisId: 'J',
-          }),
-        }
-      ).catch(() => {});
-      // #endregion
+      
+      // The main process will send 'database-updated' event if a file was refreshed
+      // The database listener will automatically update the UI
+      // Just show a notification
       if (filePaths.length > 0) {
-        // Wait a bit for main process to finish opening the file
-        await new Promise((resolve) => setTimeout(resolve, 500));
-        // After sync, refresh database info to show the newly opened file
-        // The main process will auto-open the first file, so we just need to refresh
-        // #region agent log
-        fetch(
-          'http://127.0.0.1:7245/ingest/f06199e7-0954-4ea6-a49f-7cd1f933cda1',
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              location: 'App.tsx:131',
-              message: 'Calling getDatabaseInfo after sync',
-              data: {},
-              timestamp: Date.now(),
-              sessionId: 'debug-session',
-              runId: 'run2',
-              hypothesisId: 'J',
-            }),
-          }
-        ).catch(() => {});
-        // #endregion
-        const db = await window.electronAPI.getDatabaseInfo();
-        // #region agent log
-        fetch(
-          'http://127.0.0.1:7245/ingest/f06199e7-0954-4ea6-a49f-7cd1f933cda1',
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              location: 'App.tsx:133',
-              message: 'getDatabaseInfo returned',
-              data: {
-                db: db
-                  ? {
-                      boxesCount: db.boxes.length,
-                      boxes: db.boxes.map((b) => b.name),
-                    }
-                  : null,
-              },
-              timestamp: Date.now(),
-              sessionId: 'debug-session',
-              runId: 'run2',
-              hypothesisId: 'J',
-            }),
-          }
-        ).catch(() => {});
-        // #endregion
-        setDatabase(db);
-        // Show success message
-        alert(
-          `Synced and opened ${filePaths.length} database file(s) from emulator(s).`
-        );
-      } else {
-        alert('No database files found on connected emulator(s).');
+        // Small delay to ensure database-updated event is processed
+        await new Promise((resolve) => setTimeout(resolve, 300));
       }
     } catch (err) {
       setError(
         err instanceof Error ? err.message : 'Failed to sync from emulator'
       );
-      // #region agent log
-      fetch(
-        'http://127.0.0.1:7245/ingest/f06199e7-0954-4ea6-a49f-7cd1f933cda1',
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            location: 'App.tsx:142',
-            message: 'handleSyncFromEmulator error',
-            data: {
-              error: err instanceof Error ? err.message : String(err),
-            },
-            timestamp: Date.now(),
-            sessionId: 'debug-session',
-            runId: 'run2',
-            hypothesisId: 'J',
-          }),
-        }
-      ).catch(() => {});
-      // #endregion
     } finally {
       setLoading(false);
     }
@@ -359,13 +256,13 @@ const App: React.FC = () => {
 
     // Try to setup listener immediately, or retry after API is available
     let removeListener: (() => void) | null = null;
-    if (window.electronAPI && window.electronAPI.onDatabaseUpdated) {
-      removeListener = setupDatabaseListener();
+    if (window.electronAPI) {
+      removeListener = setupDatabaseListener() || null;
     } else {
       // Retry setting up listener after a delay
       setTimeout(() => {
-        if (window.electronAPI && window.electronAPI.onDatabaseUpdated) {
-          removeListener = setupDatabaseListener();
+        if (window.electronAPI) {
+          removeListener = setupDatabaseListener() || null;
         }
       }, 1000);
     }
