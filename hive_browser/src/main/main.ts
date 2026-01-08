@@ -121,7 +121,8 @@ function createWindow(): void {
           mainWindow.show();
         }
       }, 2000);
-      mainWindow.webContents.openDevTools();
+      // DevTools auto-open disabled - uncomment to enable
+      // mainWindow.webContents.openDevTools();
     }
   } else {
     if (mainWindow) {
@@ -690,6 +691,13 @@ ipcMain.handle(
   'database:deleteRecord',
   async (_event, boxName: string, key: string | number): Promise<void> => {
     fileHandler.deleteRecord(boxName, key);
+  }
+);
+
+ipcMain.handle(
+  'database:deleteAllRecords',
+  async (_event, boxName: string): Promise<void> => {
+    fileHandler.deleteAllRecords(boxName);
   }
 );
 

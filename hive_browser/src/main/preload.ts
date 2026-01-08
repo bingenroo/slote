@@ -32,6 +32,8 @@ try {
       ipcRenderer.invoke('database:updateRecord', boxName, key, value),
     deleteRecord: (boxName: string, key: string | number): Promise<void> =>
       ipcRenderer.invoke('database:deleteRecord', boxName, key),
+    deleteAllRecords: (boxName: string): Promise<void> =>
+      ipcRenderer.invoke('database:deleteAllRecords', boxName),
     addRecord: (
       boxName: string,
       key: string | number,

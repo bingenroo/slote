@@ -16,6 +16,7 @@ declare global {
         value: any
       ) => Promise<void>;
       deleteRecord: (boxName: string, key: string | number) => Promise<void>;
+      deleteAllRecords: (boxName: string) => Promise<void>;
       addRecord: (
         boxName: string,
         key: string | number,
@@ -125,10 +126,10 @@ const App: React.FC = () => {
     try {
       setLoading(true);
       setError(null);
-      
+
       // Sync from emulator - this will pull files and refresh if current file is updated
       const filePaths = await window.electronAPI.syncFromEmulator();
-      
+
       // The main process will send 'database-updated' event if a file was refreshed
       // The database listener will automatically update the UI
       // Just show a notification
@@ -195,53 +196,10 @@ const App: React.FC = () => {
     const setupDatabaseListener = () => {
       if (window.electronAPI && window.electronAPI.onDatabaseUpdated) {
         return window.electronAPI.onDatabaseUpdated(() => {
-          // #region agent log
-          fetch(
-            'http://127.0.0.1:7245/ingest/f06199e7-0954-4ea6-a49f-7cd1f933cda1',
-            {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                location: 'App.tsx:149',
-                message: 'database-updated event received',
-                data: {},
-                timestamp: Date.now(),
-                sessionId: 'debug-session',
-                runId: 'run2',
-                hypothesisId: 'K',
-              }),
-            }
-          ).catch(() => {});
-          // #endregion
           if (isMounted && window.electronAPI) {
             window.electronAPI
               .getDatabaseInfo()
               .then((db) => {
-                // #region agent log
-                fetch(
-                  'http://127.0.0.1:7245/ingest/f06199e7-0954-4ea6-a49f-7cd1f933cda1',
-                  {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                      location: 'App.tsx:162',
-                      message: 'Refreshed database after update event',
-                      data: {
-                        db: db
-                          ? {
-                              boxesCount: db.boxes.length,
-                              boxes: db.boxes.map((b) => b.name),
-                            }
-                          : null,
-                      },
-                      timestamp: Date.now(),
-                      sessionId: 'debug-session',
-                      runId: 'run2',
-                      hypothesisId: 'K',
-                    }),
-                  }
-                ).catch(() => {});
-                // #endregion
                 if (isMounted) {
                   setDatabase(db);
                 }

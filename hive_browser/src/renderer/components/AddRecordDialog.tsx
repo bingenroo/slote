@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Dialog,
   DialogTitle,
@@ -9,7 +9,6 @@ import {
   Box,
   Alert,
 } from '@mui/material';
-import Editor from './Editor';
 
 interface AddRecordDialogProps {
   open: boolean;
@@ -24,39 +23,54 @@ const AddRecordDialog: React.FC<AddRecordDialogProps> = ({
   onSave,
   existingKeys,
 }) => {
-  const [key, setKey] = useState<string>('');
-  const [jsonValue, setJsonValue] = useState('{}');
+  const [title, setTitle] = useState<string>('');
+  const [body, setBody] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+
+  // Generate a unique ID based on existing keys
+  const generateId = (): number => {
+    const numericKeys = existingKeys
+      .filter(k => typeof k === 'number')
+      .map(k => k as number);
+    const maxId = numericKeys.length > 0 ? Math.max(...numericKeys) : 0;
+    return maxId + 1;
+  };
+
+  useEffect(() => {
+    if (open) {
+      // Reset form when dialog opens
+      setTitle('');
+      setBody('');
+      setError(null);
+    }
+  }, [open]);
 
   const handleSave = async () => {
     setError(null);
 
-    // Validate key
-    if (!key.trim()) {
-      setError('Key is required');
-      return;
-    }
+    // Validate title (can be empty, will be replaced with date if empty)
+    const noteId = generateId();
+    const now = Date.now();
+    
+    // Format date as DD/MM for default title if empty
+    const date = new Date(now);
+    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const defaultTitle = title.trim() || `Slote ${day}/${month}`;
 
-    // Check if key already exists
-    const keyValue = isNaN(Number(key)) ? key : Number(key);
-    if (existingKeys.includes(keyValue)) {
-      setError('Key already exists');
-      return;
-    }
-
-    // Validate JSON
-    let parsedValue: any;
-    try {
-      parsedValue = JSON.parse(jsonValue);
-    } catch (e) {
-      setError('Invalid JSON format');
-      return;
-    }
+    // Create Note object
+    const noteValue = {
+      id: noteId,
+      title: defaultTitle,
+      body: body.trim(),
+      drawingData: null,
+      lastMod: now,
+    };
 
     try {
       setSaving(true);
-      await onSave(keyValue, parsedValue);
+      await onSave(noteId, noteValue);
       handleClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save record');
@@ -66,33 +80,40 @@ const AddRecordDialog: React.FC<AddRecordDialogProps> = ({
   };
 
   const handleClose = () => {
-    setKey('');
-    setJsonValue('{}');
+    setTitle('');
+    setBody('');
     setError(null);
     onClose();
   };
 
   return (
-    <Dialog open={open} onClose={handleClose} maxWidth="md" fullWidth>
-      <DialogTitle>Add New Record</DialogTitle>
+    <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
+      <DialogTitle>Add New Note</DialogTitle>
       <DialogContent>
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 1 }}>
           {error && <Alert severity="error">{error}</Alert>}
           
           <TextField
-            label="Key"
-            value={key}
-            onChange={(e) => setKey(e.target.value)}
+            label="Title"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
             fullWidth
-            helperText="Enter a unique key (number or string)"
+            helperText="Leave empty to use date as title (Slote DD/MM)"
+            placeholder="Enter note title (optional)"
           />
 
-          <Box sx={{ height: 400 }}>
-            <Editor
-              value={jsonValue}
-              onChange={(val) => setJsonValue(val || '{}')}
-              readOnly={false}
-            />
+          <TextField
+            label="Description"
+            value={body}
+            onChange={(e) => setBody(e.target.value)}
+            fullWidth
+            multiline
+            rows={6}
+            placeholder="Enter note description"
+          />
+          
+          <Box sx={{ fontSize: '0.875rem', color: 'text.secondary' }}>
+            <strong>Note:</strong> ID, drawing data, and last modified date will be automatically set.
           </Box>
         </Box>
       </DialogContent>
@@ -107,4 +128,3 @@ const AddRecordDialog: React.FC<AddRecordDialogProps> = ({
 };
 
 export default AddRecordDialog;
-

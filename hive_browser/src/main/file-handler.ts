@@ -88,6 +88,15 @@ export class FileHandler {
   }
 
   /**
+   * Delete all records from a box
+   */
+  deleteAllRecords(boxName: string): void {
+    if (this.boxData[boxName]) {
+      this.boxData[boxName] = [];
+    }
+  }
+
+  /**
    * Add a new record to a box
    */
   addRecord(boxName: string, key: string | number, value: any): void {
