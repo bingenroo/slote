@@ -6,7 +6,7 @@ REM If no emulator is specified, launches Medium_Phone_API_36.1 by default
 setlocal enabledelayedexpansion
 
 REM Default emulator
-set "DEFAULT_EMULATOR=Medium_Phone_API_36.1"
+set "DEFAULT_EMULATOR=Medium_Phone_API_36.0"
 
 REM Set Android SDK environment variables (required by emulator)
 if "%ANDROID_HOME%"=="" (
