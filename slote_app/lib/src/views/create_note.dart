@@ -419,8 +419,15 @@ class _CreateNoteViewState extends State<CreateNoteView>
           title: title,
           body: body,
           drawingData: drawingData,
+          lastMod: DateTime.now(),
         );
-        await localDb.saveNote(note: newNote);
+        try {
+          await localDb.saveNote(note: newNote);
+          print('[SAVE] Note saved successfully: ${newNote.id}');
+        } catch (e) {
+          print('[SAVE ERROR] Failed to save note: $e');
+          // Optionally show error to user
+        }
       }
     } else {
       // For new notes - save if there's any content
@@ -432,10 +439,15 @@ class _CreateNoteViewState extends State<CreateNoteView>
           drawingData: drawingData,
           lastMod: DateTime.now(),
         );
-        await localDb.saveNote(note: newNote);
-
-        // Update the current note reference for future saves
-        _currentNote = newNote;
+        try {
+          await localDb.saveNote(note: newNote);
+          print('[SAVE] New note saved successfully: ${newNote.id}');
+          // Update the current note reference for future saves
+          _currentNote = newNote;
+        } catch (e) {
+          print('[SAVE ERROR] Failed to save new note: $e');
+          // Optionally show error to user
+        }
       }
     }
   }

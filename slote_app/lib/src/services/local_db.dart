@@ -1,50 +1,142 @@
-import 'package:hive_flutter/hive_flutter.dart';
+import 'dart:async';
+import 'package:sqflite/sqflite.dart';
+import 'package:path/path.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:slote/src/model/note.dart';
-import 'package:slote/src/services/hive_export.dart';
 
 class LocalDBService {
-  static const String noteBoxName = 'notes';
-  late Future<Box<Note>> box;
+  static const String _dbName = 'notes.db';
+  static const String _tableName = 'notes';
+  static const int _dbVersion = 1;
+  
+  // Singleton instance
+  static LocalDBService? _instance;
+  
+  // Factory constructor to return the singleton instance
+  factory LocalDBService() {
+    _instance ??= LocalDBService._internal();
+    return _instance!;
+  }
+  
+  // Private constructor for singleton
+  LocalDBService._internal();
+  
+  Database? _database;
+  final StreamController<List<Note>> _notesController = StreamController<List<Note>>.broadcast();
 
-  LocalDBService() {
-    box = openDB();
+  Future<Database> get database async {
+    if (_database != null) return _database!;
+    _database = await _initDatabase();
+    return _database!;
   }
 
-  Future<Box<Note>> openDB() async {
-    await Hive.initFlutter();
-    if (!Hive.isAdapterRegistered(0)) {
-      Hive.registerAdapter(NoteAdapter());
+  Future<Database> _initDatabase() async {
+    try {
+      final documentsDirectory = await getApplicationDocumentsDirectory();
+      final path = join(documentsDirectory.path, _dbName);
+      print('[DB] Initializing database at: $path');
+
+      final db = await openDatabase(
+        path,
+        version: _dbVersion,
+        onCreate: _onCreate,
+        onUpgrade: _onUpgrade,
+      );
+      print('[DB] Database initialized successfully');
+      return db;
+    } catch (e, stackTrace) {
+      print('[DB ERROR] Failed to initialize database: $e');
+      print('[DB ERROR] Stack trace: $stackTrace');
+      rethrow;
     }
-    return await Hive.openBox<Note>(noteBoxName);
+  }
+
+  Future<void> _onCreate(Database db, int version) async {
+    await db.execute('''
+      CREATE TABLE $_tableName (
+        id INTEGER PRIMARY KEY,
+        title TEXT NOT NULL,
+        body TEXT NOT NULL,
+        drawingData TEXT,
+        lastMod INTEGER NOT NULL
+      )
+    ''');
+  }
+
+  Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
+    // Handle future migrations here
+    if (oldVersion < newVersion) {
+      // Add migration logic as needed
+    }
   }
 
   Future<void> saveNote({required Note note}) async {
-    final b = await box;
-    await b.put(note.id, note);
-    // Automatically export to JSON for Hive Browser sync
     try {
-      await HiveExporter.exportNotesToJsonForSync();
-    } catch (e) {
-      // Don't fail if export fails, just log it
-      print('[LOCAL-DB] Failed to export to JSON: $e');
+      final db = await database;
+      print('[DB] Saving note: id=${note.id}, title="${note.title}", lastMod=${note.lastMod}');
+      await db.insert(
+        _tableName,
+        note.toMap(),
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+      print('[DB] Note saved successfully');
+      await _notifyListeners();
+    } catch (e, stackTrace) {
+      print('[DB ERROR] Failed to save note: $e');
+      print('[DB ERROR] Stack trace: $stackTrace');
+      rethrow;
     }
   }
 
   Stream<List<Note>> listenAllNotes() async* {
-    final b = await box;
-    yield b.values.toList();
-    yield* b.watch().map((_) => b.values.toList());
+    // Emit initial list
+    final initialNotes = await getAllNotes();
+    yield initialNotes;
+    
+    // Then emit from stream controller
+    yield* _notesController.stream;
+  }
+
+  Future<void> _notifyListeners() async {
+    final notes = await getAllNotes();
+    _notesController.add(notes);
+  }
+
+  Future<List<Note>> getAllNotes() async {
+    final db = await database;
+    final maps = await db.query(
+      _tableName,
+      orderBy: 'lastMod DESC',
+    );
+    return maps.map((map) => Note.fromMap(map)).toList();
+  }
+
+  Future<Note?> getNote(int id) async {
+    final db = await database;
+    final maps = await db.query(
+      _tableName,
+      where: 'id = ?',
+      whereArgs: [id],
+      limit: 1,
+    );
+    if (maps.isEmpty) return null;
+    return Note.fromMap(maps.first);
   }
 
   Future<void> deleteNote({required int id}) async {
-    final b = await box;
-    await b.delete(id);
-    // Automatically export to JSON for Hive Browser sync
-    try {
-      await HiveExporter.exportNotesToJsonForSync();
-    } catch (e) {
-      // Don't fail if export fails, just log it
-      print('[LOCAL-DB] Failed to export to JSON: $e');
-    }
+    final db = await database;
+    await db.delete(
+      _tableName,
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+    await _notifyListeners();
+  }
+
+  Future<void> close() async {
+    await _notesController.close();
+    final db = await database;
+    await db.close();
+    _database = null;
   }
 }

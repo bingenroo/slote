@@ -24,6 +24,10 @@ class _HomeViewState extends State<HomeView> {
   Set<int> _selectedNoteIds = {}; // Track selected notes by ID
   int? _lastNotesCount; // Store for select all logic
   List<int>? _lastNoteIds; // Store for select all logic
+  
+  // Cache the service instance and stream
+  late final LocalDBService _dbService = LocalDBService();
+  late final Stream<List<Note>> _notesStream = _dbService.listenAllNotes();
 
   void _enterSelectionMode(int noteId) {
     setState(() {
@@ -182,7 +186,7 @@ class _HomeViewState extends State<HomeView> {
                         if (shouldDelete == true) {
                           final idsToDelete = _selectedNoteIds.toList();
                           for (final id in idsToDelete) {
-                            await LocalDBService().deleteNote(id: id);
+                            await _dbService.deleteNote(id: id);
                           }
                           setState(() {
                             _selectedNoteIds.clear();
@@ -273,7 +277,7 @@ class _HomeViewState extends State<HomeView> {
             // const EmptyView(),
             Expanded(
               child: StreamBuilder<List<Note>>(
-                stream: LocalDBService().listenAllNotes(),
+                stream: _notesStream,
                 builder: (context, snapshot) {
                   if (snapshot.data == null) {
                     return Center(

@@ -1,26 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:slote/src/app.dart';
-import 'package:hive_flutter/hive_flutter.dart';
-import 'package:slote/src/model/note.dart';
 import 'package:slote_theme/slote_theme.dart';
-// import 'package:slote/src/services/hive_migration.dart';
+import 'package:slote/src/services/hive_to_sqlite_migration.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Hive.initFlutter();
-  if (!Hive.isAdapterRegistered(0)) {
-    Hive.registerAdapter(NoteAdapter());
-  }
 
   // Initialize theme preference before running the app
   await ThemeProvider.initializeTheme();
 
-  // One-time migration: set MIGRATE=1 in your environment to run
-  // const migrate = bool.fromEnvironment('MIGRATE', defaultValue: false);
-  // if (migrate) {
-  //   await migrateNotesFromJson();
-  //   return;
-  // }
+  // One-time migration: set MIGRATE_HIVE_TO_SQLITE=1 in your environment to run
+  const migrate = bool.fromEnvironment('MIGRATE_HIVE_TO_SQLITE', defaultValue: false);
+  if (migrate) {
+    await migrateHiveToSQLite();
+    return;
+  }
+  
   runApp(const MyApp());
 }
 

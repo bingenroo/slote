@@ -9,7 +9,7 @@ This is a **monorepo** containing:
 - **`slote_app/`** - Main Flutter application
 
   - Models, views, controllers
-  - HiveDB services
+  - SQLite database services
   - Platform-specific code (Android, iOS, Web, Windows, macOS, Linux)
 
 - **`slote_components/`** - Reusable component packages
@@ -48,7 +48,7 @@ flutter pub get
 
 ### Android Emulator Setup (From Scratch)
 
-To run the app on Android emulators using the `launch_emulator.sh` script, you need to set up Android Command Line Tools and create an emulator.
+To run the app on Android emulators using the unified command tool (`cmd.py`), you need to set up Android Command Line Tools and create an emulator.
 
 #### Step 1: Install Android Command Line Tools
 
@@ -163,30 +163,36 @@ avdmanager create avd -n Medium_Phone_API_36.1 -k "system-images;android-36;goog
 
 ```bash
 # List available emulators
-flutter emulators
+python3 cmd.py emulator list
 
-# Or use the launch script to check
-cd /Users/bingenro/Documents/Slote
-./launch_emulator.sh
+# Or use Flutter directly
+flutter emulators
 ```
 
 You should see your emulator listed!
 
 ### Running the App
 
-#### Using the Launch Script (Recommended)
+#### Using the Unified Command Tool (Recommended)
 
-**macOS/Linux:**
+The project includes a unified Python command tool (`cmd.py`) that works on all platforms:
+
+**Note:** On macOS/Linux, use `python3` (or run directly as `./cmd.py`). On Windows, use `python`.
 
 ```bash
 # Navigate to project root
 cd /Users/bingenro/Documents/Slote
 
 # Launch default emulator (Medium_Phone_API_36.1)
-./launch_emulator.sh
+python3 cmd.py emulator launch
+# Or on macOS/Linux, you can run directly:
+./cmd.py emulator launch
 
 # Or launch a specific emulator
-./launch_emulator.sh <emulator_id>
+python3 cmd.py emulator launch <emulator_id>
+
+# List available emulators
+python3 cmd.py emulator list
 
 # Wait for emulator to boot, then run the app
 cd slote_app
@@ -194,22 +200,20 @@ flutter pub get
 flutter run
 ```
 
-**Windows:**
+**Database Operations:**
 
-```batch
-REM Navigate to project root
-cd C:\path\to\Slote
+```bash
+# Open database browser (auto-detect platform)
+python3 cmd.py db open
 
-REM Launch default emulator
-launch_emulator.bat
+# Open database from Android device
+python3 cmd.py db open android
 
-REM Or launch a specific emulator
-launch_emulator.bat Medium_Phone_API_36.1
+# Open database from iOS simulator
+python3 cmd.py db open ios
 
-REM Wait for emulator to boot, then run the app
-cd slote_app
-flutter pub get
-flutter run
+# Push database changes back to Android device
+python3 cmd.py db push
 ```
 
 #### Direct Flutter Commands
@@ -230,7 +234,7 @@ flutter pub get
 flutter run
 ```
 
-**Note:** The `launch_emulator.sh` script provides better error diagnostics and automatically handles environment variables. See `slote_app/docs/RUNNING_ON_EMULATOR.md` for detailed troubleshooting.
+**Note:** The `cmd.py` tool provides better error diagnostics and automatically handles environment variables. See `slote_app/docs/RUNNING_ON_EMULATOR.md` for detailed troubleshooting.
 
 ## Development
 
@@ -258,7 +262,6 @@ dependencies:
 - [Repository Restructure Plan](slote_app/docs/REPOSITORY_RESTRUCTURE_PLAN.md)
 - [Concurrent Development Guide](slote_app/docs/CONCURRENT_DEVELOPMENT_GUIDE.md)
 - [Cross-Platform Testing Plan](slote_app/docs/CROSS_PLATFORM_TESTING_PLAN.md)
-- [Hive Browser Plan](slote_app/docs/HIVE_BROWSER_PLAN.md)
 
 ## Project Status
 

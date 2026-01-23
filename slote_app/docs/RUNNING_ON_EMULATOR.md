@@ -28,6 +28,12 @@ emu Pixel_5_API_33          # Launch one (use ID from above)
 cd /Users/bingenro/Documents/Slote/slote_app && flutter run  # Run app
 ```
 
+**One-Liner Workflow:**
+
+```bash
+emu-list && emu <emulator_id> && cd /Users/bingenro/Documents/Slote/slote_app && flutter pub get && flutter run
+```
+
 ### Windows
 
 ```batch
@@ -364,12 +370,12 @@ flutter run
 
 ## Useful Flutter Commands
 
-### Hot Reload & Development
+### Hot Reload & Development (While App Running)
 
-- **Hot Reload**: Press `r` in terminal while app is running
-- **Hot Restart**: Press `R` (capital R)
-- **Open DevTools**: Press `d`
-- **Quit**: Press `q`
+- **`r`** - Hot reload (apply code changes without restarting)
+- **`R`** - Hot restart (full app restart)
+- **`d`** - Open DevTools
+- **`q`** - Quit app
 
 ### Running Modes
 

@@ -754,7 +754,7 @@ if (Platform.isAndroid) {
 import 'package:path_provider/path_provider.dart';
 
 final directory = await getApplicationDocumentsDirectory();
-final path = '${directory.path}/notes.hive';
+final path = '${directory.path}/notes.db';
 ```
 
 ### Issue: Different UI Behaviors

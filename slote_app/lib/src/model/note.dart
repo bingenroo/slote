@@ -1,18 +1,8 @@
-import 'package:hive/hive.dart';
-
-part 'note.g.dart';
-
-@HiveType(typeId: 0)
-class Note extends HiveObject {
-  @HiveField(0)
+class Note {
   int id;
-  @HiveField(1)
   String title;
-  @HiveField(2)
   String body;
-  @HiveField(3)
   String? drawingData;
-  @HiveField(4)
   DateTime lastMod;
 
   Note({

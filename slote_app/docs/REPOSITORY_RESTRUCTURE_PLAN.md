@@ -122,7 +122,7 @@ Restructure the current 3-repo setup into 2 repos with a component-based archite
 - `lib/src/model/note.dart` - Note model
 - `lib/src/model/note.g.dart` - Generated Hive adapter
 - `lib/src/services/local_db.dart` - HiveDB service
-- `lib/src/services/hive_migration.dart` - Database migrations
+- `lib/src/services/hive_to_sqlite_migration.dart` - Database migrations (Hive to SQLite)
 - `lib/src/views/widgets/notes_*.dart` - Note-specific widgets (grid, list, items)
 - Controllers (to be created/identified)
 
@@ -228,7 +228,7 @@ slote_app/
 │       │       └── note_list_item.dart
 │       └── services/
 │           ├── local_db.dart     # HiveDB service
-│           └── hive_migration.dart
+│           └── hive_to_sqlite_migration.dart
 └── pubspec.yaml                  # Dependencies on component packages
 ```
 

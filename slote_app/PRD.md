@@ -583,27 +583,26 @@
 - **Backward Compatibility**: Version migration support
 - **Export Compatibility**: Standard formats (PDF, Word, etc.)
 
-### 6.4 Local Storage (Hive Database)
+### 6.4 Local Storage (SQLite Database)
 
-**Technology**: Hive - A lightweight, fast key-value database for Flutter
+**Technology**: SQLite - A lightweight, fast, cross-platform SQL database
 
 **Purpose**: Local storage for notes and application data
 
 **Implementation**:
 
-- **Database**: Hive boxes for storing Note objects
+- **Database**: SQLite database with `notes` table
 - **Storage Location**: Platform-specific application data directories
 - **Data Model**: Note objects with fields (id, title, body, drawingData, lastMod)
-- **Auto-Export**: Automatic JSON export for Hive Browser synchronization
+- **Database File**: `notes.db` in app documents directory
 - **Migration Support**: Version migration and data migration utilities
 
-**Hive Browser Tool**:
+**Database Browser**:
 
-- Standalone Electron desktop application (`hive_browser/`)
-- View, edit, and manage Hive database files
-- CRUD operations on database records
-- JSON editor with syntax highlighting
-- Search, filter, and export capabilities
+- Use **DB Browser for SQLite** (free, open-source) to view and edit database files
+- Install via Homebrew: `brew install --cask db-browser-for-sqlite`
+- Direct file access - no custom tools needed
+- Standard SQL queries and table views
 - Cross-platform support (Windows, macOS, Linux)
 
 **Benefits**:
@@ -611,10 +610,21 @@
 - Fast, efficient local storage
 - No external database server required
 - Cross-platform compatibility
-- Easy data inspection and debugging via Hive Browser
-- Automatic synchronization with Hive Browser tool
+- Easy data inspection and debugging with standard SQLite tools
+- Standard format - works with any SQLite browser
+- No custom parsing or workarounds needed
 
-**Documentation**: See `hive_browser/README.md` and `slote_app/docs/HIVE_BROWSER_IMPLEMENTATION.md` for details.
+**Accessing Database Files**:
+
+To view/edit the database from an Android emulator:
+1. Pull the database file using ADB:
+   ```bash
+   adb exec-out run-as com.example.slote cat app_flutter/notes.db > notes.db
+   ```
+2. Open in DB Browser for SQLite:
+   ```bash
+   open -a "DB Browser for SQLite" notes.db
+   ```
 
 ### 6.5 Development Infrastructure
 
