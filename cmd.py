@@ -504,6 +504,43 @@ def cmd_emulator_list(args):
         die("Timeout listing emulators")
 
 
+def cmd_run(args):
+    """Handle 'run' command - run Flutter app from slote_app directory."""
+    # Get the script's directory (root of the project)
+    script_dir = Path(__file__).parent.absolute()
+    slote_app_dir = script_dir / "slote_app"
+    
+    if not slote_app_dir.exists():
+        die(f"slote_app directory not found: {slote_app_dir}")
+    
+    if not command_exists("flutter"):
+        die("Flutter not found in PATH. Please install Flutter and add it to your PATH.")
+    
+    # Build flutter run command with any additional arguments
+    flutter_cmd = ["flutter", "run"]
+    
+    # Add any additional arguments passed by the user
+    if args.flutter_args:
+        flutter_cmd.extend(args.flutter_args)
+    
+    info(f"Running Flutter app from: {slote_app_dir}")
+    info(f"Command: {' '.join(flutter_cmd)}")
+    print()
+    
+    try:
+        # Change to slote_app directory and run flutter run
+        # The logs will appear in the root directory's terminal
+        subprocess.run(
+            flutter_cmd,
+            cwd=str(slote_app_dir),
+            check=False  # Don't raise exception on non-zero exit, let user see the output
+        )
+    except KeyboardInterrupt:
+        info("\nFlutter run interrupted by user")
+    except Exception as e:
+        die(f"Failed to run Flutter app: {e}")
+
+
 def main():
     """Main entry point."""
     parser = argparse.ArgumentParser(
@@ -578,6 +615,15 @@ def main():
     # emulator list
     emulator_list_parser = emulator_subparsers.add_parser("list", help="List available emulators")
     emulator_list_parser.set_defaults(func=cmd_emulator_list)
+    
+    # Run command
+    run_parser = subparsers.add_parser("run", help="Run Flutter app from slote_app directory")
+    run_parser.add_argument(
+        "flutter_args",
+        nargs=argparse.REMAINDER,
+        help="Additional arguments to pass to 'flutter run' (e.g., --device-id, --release)"
+    )
+    run_parser.set_defaults(func=cmd_run)
     
     args = parser.parse_args()
     
