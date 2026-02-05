@@ -1,10 +1,10 @@
-# Slote Rich Text Example
+# Slote Rich Text Test
 
 Standalone test app for the `slote_rich_text` component.
 
 ## Purpose
 
-This example app allows you to test and debug the rich text editing functionality independently without running the full Slote app. It provides a focused environment for:
+This test app allows you to test and debug the rich text editing functionality independently without running the full Slote app. It provides a focused environment for:
 
 - Testing text input and editing
 - Testing format toolbar functionality
@@ -12,10 +12,10 @@ This example app allows you to test and debug the rich text editing functionalit
 - Testing text selection
 - Debugging text editor behavior
 
-## Running the Example
+## Running the Test App
 
 ```bash
-cd slote_components/slote_rich_text/example
+cd slote_components/slote_rich_text/test
 flutter pub get
 flutter run
 ```
