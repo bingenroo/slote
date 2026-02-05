@@ -1,10 +1,10 @@
-# Slote Undo/Redo Example
+# Slote Undo/Redo Test
 
 Standalone test app for the `slote_undo_redo` component.
 
 ## Purpose
 
-This example app allows you to test and debug the undo/redo functionality independently without running the full Slote app. It provides a focused environment for:
+This test app allows you to test and debug the undo/redo functionality independently without running the full Slote app. It provides a focused environment for:
 
 - Testing undo operations
 - Testing redo operations
@@ -13,10 +13,10 @@ This example app allows you to test and debug the undo/redo functionality indepe
 - Testing can undo/redo state
 - Testing text editing integration
 
-## Running the Example
+## Running the Test App
 
 ```bash
-cd slote_components/slote_undo_redo/example
+cd slote_components/slote_undo_redo/test
 flutter pub get
 flutter run
 ```

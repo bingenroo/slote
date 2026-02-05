@@ -1,4 +1,4 @@
-name: slote_undo_redo_example
+name: slote_undo_redo_test
 description: Test app for slote_undo_redo component
 publish_to: "none"
 
