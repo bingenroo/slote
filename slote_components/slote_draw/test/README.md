@@ -1,10 +1,10 @@
-# Slote Draw Example
+# Slote Draw Test
 
 Standalone test app for the `slote_draw` component.
 
 ## Purpose
 
-This example app allows you to test and debug the drawing functionality independently without running the full Slote app. It provides a focused environment for:
+This test app allows you to test and debug the drawing functionality independently without running the full Slote app. It provides a focused environment for:
 
 - Testing drawing tools (pen, eraser, highlighter)
 - Testing color selection
@@ -12,10 +12,10 @@ This example app allows you to test and debug the drawing functionality independ
 - Testing canvas interactions
 - Debugging drawing performance
 
-## Running the Example
+## Running the Test App
 
 ```bash
-cd slote_components/slote_draw/example
+cd slote_components/slote_draw/test
 flutter pub get
 flutter run
 ```
