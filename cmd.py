@@ -505,40 +505,161 @@ def cmd_emulator_list(args):
 
 
 def cmd_run(args):
-    """Handle 'run' command - run Flutter app from slote_app directory."""
+    """Handle 'run' command - run Flutter app from repo root."""
     # Get the script's directory (root of the project)
     script_dir = Path(__file__).parent.absolute()
-    slote_app_dir = script_dir / "slote_app"
-    
-    if not slote_app_dir.exists():
-        die(f"slote_app directory not found: {slote_app_dir}")
-    
+    app_dir = script_dir
+
     if not command_exists("flutter"):
         die("Flutter not found in PATH. Please install Flutter and add it to your PATH.")
-    
+
     # Build flutter run command with any additional arguments
     flutter_cmd = ["flutter", "run"]
-    
+
     # Add any additional arguments passed by the user
     if args.flutter_args:
         flutter_cmd.extend(args.flutter_args)
-    
-    info(f"Running Flutter app from: {slote_app_dir}")
+
+    info(f"Running Flutter app from: {app_dir}")
     info(f"Command: {' '.join(flutter_cmd)}")
     print()
-    
+
     try:
-        # Change to slote_app directory and run flutter run
-        # The logs will appear in the root directory's terminal
+        # Change to repo root and run flutter run
         subprocess.run(
             flutter_cmd,
-            cwd=str(slote_app_dir),
+            cwd=str(app_dir),
             check=False  # Don't raise exception on non-zero exit, let user see the output
         )
     except KeyboardInterrupt:
         info("\nFlutter run interrupted by user")
     except Exception as e:
         die(f"Failed to run Flutter app: {e}")
+
+
+# Component test apps (packages that have a runnable test/ app)
+COMPONENT_TEST_APPS = ["viewport", "rich_text", "draw", "undo_redo"]
+
+
+def cmd_bootstrap(args):
+    """Run flutter pub upgrade at repo root and in each component test app (resolve and upgrade dependencies)."""
+    script_dir = Path(__file__).parent.absolute()
+    if not command_exists("flutter"):
+        die("Flutter not found in PATH. Please install Flutter and add it to your PATH.")
+
+    # Root (main app)
+    info("Running flutter pub upgrade at repo root...")
+    result = subprocess.run(
+        ["flutter", "pub", "upgrade"],
+        cwd=str(script_dir),
+        capture_output=True,
+        text=True,
+        timeout=120,
+    )
+    if result.returncode != 0:
+        die(f"flutter pub upgrade failed at root:\n{result.stderr or result.stdout}")
+    info("Done at root.")
+
+    # Each component test app
+    for name in COMPONENT_TEST_APPS:
+        test_dir = script_dir / "components" / name / "test"
+        if not test_dir.exists():
+            info(f"Skipping components/{name}/test (not found)")
+            continue
+        info(f"Running flutter pub upgrade in components/{name}/test...")
+        result = subprocess.run(
+            ["flutter", "pub", "upgrade"],
+            cwd=str(test_dir),
+            capture_output=True,
+            text=True,
+            timeout=120,
+        )
+        if result.returncode != 0:
+            die(f"flutter pub upgrade failed in {test_dir}:\n{result.stderr or result.stdout}")
+    info("Bootstrap complete.")
+
+
+def cmd_component_run(args):
+    """Run a component's test app (flutter run from components/<name>/test)."""
+    script_dir = Path(__file__).parent.absolute()
+    name = (args.name or "").strip().lower()
+    if name not in COMPONENT_TEST_APPS:
+        die(f"Unknown component: {name}. Use one of: {', '.join(COMPONENT_TEST_APPS)}")
+
+    test_dir = script_dir / "components" / name / "test"
+    if not test_dir.exists():
+        die(f"Component test app not found: {test_dir}")
+
+    if not command_exists("flutter"):
+        die("Flutter not found in PATH. Please install Flutter and add it to your PATH.")
+
+    flutter_cmd = ["flutter", "run"]
+    if getattr(args, "flutter_args", None):
+        flutter_cmd.extend(args.flutter_args)
+
+    info(f"Running component test app from: {test_dir}")
+    try:
+        subprocess.run(
+            flutter_cmd,
+            cwd=str(test_dir),
+            check=False,
+        )
+    except KeyboardInterrupt:
+        info("\nInterrupted by user")
+    except Exception as e:
+        die(f"Failed to run component test app: {e}")
+
+
+def cmd_test(args):
+    """Run flutter test at repo root and in each component test app. Fails if any fail."""
+    script_dir = Path(__file__).parent.absolute()
+    if not command_exists("flutter"):
+        die("Flutter not found in PATH. Please install Flutter and add it to your PATH.")
+
+    failed = []
+
+    # Root (main app)
+    info("Running flutter test at repo root...")
+    result = subprocess.run(
+        ["flutter", "test"],
+        cwd=str(script_dir),
+        capture_output=True,
+        text=True,
+        timeout=300,
+    )
+    if result.returncode != 0:
+        failed.append("repo root")
+        if result.stdout:
+            print(result.stdout)
+        if result.stderr:
+            print(result.stderr, file=sys.stderr)
+    else:
+        info("Passed at repo root.")
+
+    for name in COMPONENT_TEST_APPS:
+        test_dir = script_dir / "components" / name / "test"
+        if not test_dir.exists():
+            continue
+        info(f"Running flutter test in components/{name}/test...")
+        result = subprocess.run(
+            ["flutter", "test"],
+            cwd=str(test_dir),
+            capture_output=True,
+            text=True,
+            timeout=300,
+        )
+        if result.returncode != 0:
+            failed.append(f"components/{name}/test")
+            if result.stdout:
+                print(result.stdout)
+            if result.stderr:
+                print(result.stderr, file=sys.stderr)
+        else:
+            info(f"Passed components/{name}/test.")
+
+    if failed:
+        die(f"Tests failed in: {', '.join(failed)}")
+    info("All tests passed.")
 
 
 def main():
@@ -617,13 +738,48 @@ def main():
     emulator_list_parser.set_defaults(func=cmd_emulator_list)
     
     # Run command
-    run_parser = subparsers.add_parser("run", help="Run Flutter app from slote_app directory")
+    run_parser = subparsers.add_parser("run", help="Run Flutter app from repo root")
     run_parser.add_argument(
         "flutter_args",
         nargs=argparse.REMAINDER,
         help="Additional arguments to pass to 'flutter run' (e.g., --device-id, --release)"
     )
     run_parser.set_defaults(func=cmd_run)
+
+    # Bootstrap command
+    bootstrap_parser = subparsers.add_parser(
+        "bootstrap",
+        help="Run flutter pub upgrade at repo root and in each component test app (resolve and upgrade deps)"
+    )
+    bootstrap_parser.set_defaults(func=cmd_bootstrap)
+
+    # Component subcommands
+    component_parser = subparsers.add_parser("component", help="Component test app operations")
+    component_subparsers = component_parser.add_subparsers(dest="component_command", help="Component commands")
+
+    component_run_parser = component_subparsers.add_parser(
+        "run",
+        help="Run a component's test app (e.g. viewport, rich_text, draw, undo_redo)"
+    )
+    component_run_parser.add_argument(
+        "name",
+        choices=COMPONENT_TEST_APPS,
+        help="Component name: viewport, rich_text, draw, undo_redo",
+    )
+    component_run_parser.add_argument(
+        "flutter_args",
+        nargs=argparse.REMAINDER,
+        default=[],
+        help="Arguments to pass to flutter run",
+    )
+    component_run_parser.set_defaults(func=cmd_component_run)
+
+    # Test command
+    test_parser = subparsers.add_parser(
+        "test",
+        help="Run flutter test at repo root and in each component test app",
+    )
+    test_parser.set_defaults(func=cmd_test)
     
     args = parser.parse_args()
     
