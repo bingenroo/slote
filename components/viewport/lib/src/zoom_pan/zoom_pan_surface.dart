@@ -164,8 +164,9 @@ class _ZoomPanSurfaceState extends State<ZoomPanSurface> {
     else if (_gestureHandler.pointerCount == 1 &&
         !widget.isDrawingMode) {
       final newTransform = _gestureHandler.calculatePanTransform();
-      if (newTransform != null && _boundaryManager != null) {
-        final constrainedTransform = _boundaryManager!.constrain(newTransform);
+      final manager = _boundaryManager ?? _tempBoundaryManager();
+      if (newTransform != null && manager != null) {
+        final constrainedTransform = manager.constrain(newTransform);
 
         final originalY = newTransform.getTranslation().y;
         final constrainedY = constrainedTransform.getTranslation().y;
@@ -201,33 +202,51 @@ class _ZoomPanSurfaceState extends State<ZoomPanSurface> {
   }
 
   void _handlePointerSignal(PointerSignalEvent event) {
-    if (_boundaryManager == null) return;
     if (event is! PointerScrollEvent) return;
     final delta = event.scrollDelta;
     if (delta.dy == 0.0 && delta.dx == 0.0) return;
-    _applyScrollDelta(delta);
+    // Use current boundary manager, or a temporary one so we don't drop the first wheel
+    // before first layout (e.g. when _viewport is set but _boundaryManager not yet).
+    final manager = _boundaryManager ?? _tempBoundaryManager();
+    if (manager == null) return;
+    _applyScrollDelta(delta, manager);
+  }
+
+  BoundaryManager? _tempBoundaryManager() {
+    if (_viewport == Size.zero) return null;
+    final contentSize = _contentSize != Size.zero
+        ? _contentSize
+        : Size(_viewport.width, _viewport.height * 2);
+    return BoundaryManager(
+      contentSize: contentSize,
+      viewportSize: _viewport,
+      minScale: widget.minScale,
+      maxScale: widget.maxScale,
+    );
   }
 
   void _handlePointerPanZoomStart(PointerPanZoomStartEvent event) {}
 
   void _handlePointerPanZoomUpdate(PointerPanZoomUpdateEvent event) {
-    if (_boundaryManager == null) return;
     final delta = event.panDelta;
     if (delta.dy == 0.0 && delta.dx == 0.0) return;
-    _applyScrollDelta(delta);
+    final manager = _boundaryManager ?? _tempBoundaryManager();
+    if (manager == null) return;
+    _applyScrollDelta(delta, manager);
   }
 
   void _handlePointerPanZoomEnd(PointerPanZoomEndEvent event) {}
 
-  void _applyScrollDelta(Offset delta) {
-    if (_boundaryManager == null) return;
+  void _applyScrollDelta(Offset delta, [BoundaryManager? manager]) {
+    final boundaryManager = manager ?? _boundaryManager;
+    if (boundaryManager == null) return;
     final scale = _transform.getMaxScaleOnAxis();
     // Scale scroll by 1/scale so zoomed-in view scrolls proportionally (not too fast)
     final scaleFactor = 1.0 / scale;
     final adjustedDelta = Offset(delta.dx * scaleFactor, delta.dy * scaleFactor);
     final newTransform = Matrix4.copy(_transform)
       ..translate(-adjustedDelta.dx, -adjustedDelta.dy);
-    final constrained = _boundaryManager!.constrain(newTransform);
+    final constrained = boundaryManager.constrain(newTransform);
     setState(() {
       _transform = constrained;
     });
@@ -240,10 +259,13 @@ class _ZoomPanSurfaceState extends State<ZoomPanSurface> {
         final viewportSize = Size(constraints.maxWidth, constraints.maxHeight);
         _viewport = viewportSize;
 
-        // Use provided contentHeight, or measured _contentSize, or viewport (first frame only)
+        // Use provided contentHeight, or measured _contentSize, or a fallback larger than
+        // viewport so the first drag/wheel can scroll before ContentMeasurer reports (post-frame).
         final effectiveContentSize = widget.contentHeight != null
             ? Size(viewportSize.width, widget.contentHeight!)
-            : (_contentSize != Size.zero ? _contentSize : viewportSize);
+            : (_contentSize != Size.zero
+                ? _contentSize
+                : Size(viewportSize.width, viewportSize.height * 2));
 
         final boundaryManager = BoundaryManager(
           contentSize: effectiveContentSize,
@@ -256,6 +278,7 @@ class _ZoomPanSurfaceState extends State<ZoomPanSurface> {
         return Stack(
           children: [
             Listener(
+              behavior: HitTestBehavior.translucent,
               onPointerDown: _handlePointerDown,
               onPointerMove: _handlePointerMove,
               onPointerUp: _handlePointerUp,
