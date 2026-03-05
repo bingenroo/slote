@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/gestures.dart';
 import 'boundary_manager.dart';
 import 'gesture_handler.dart';
 import 'content_measurer.dart';
@@ -135,16 +136,13 @@ class _ZoomPanSurfaceState extends State<ZoomPanSurface> {
   void _handlePointerDown(PointerDownEvent event) {
     _gestureHandler.addPointer(event.pointer, event.position);
 
-    // Initialize zoom state if we have 2 pointers and not drawing
-    if (_gestureHandler.pointerCount == 2 && !widget.isDrawingActive) {
+    // Initialize zoom state if we have 2 pointers
+    if (_gestureHandler.pointerCount == 2) {
       _gestureHandler.initializeZoom(_transform);
     }
 
-    // Initialize pan state if we have 1 pointer, not drawing, and zoomed (scale > 1)
-    final scale = _transform.getMaxScaleOnAxis();
-    if (_gestureHandler.pointerCount == 1 &&
-        !widget.isDrawingMode &&
-        scale > 1.0) {
+    // Initialize pan state for 1 pointer (drag-to-scroll at any scale)
+    if (_gestureHandler.pointerCount == 1 && !widget.isDrawingMode) {
       _gestureHandler.initializePan(_transform);
     }
   }
@@ -152,7 +150,7 @@ class _ZoomPanSurfaceState extends State<ZoomPanSurface> {
   void _handlePointerMove(PointerMoveEvent event) {
     _gestureHandler.updatePointer(event.pointer, event.position);
 
-    // Handle 2-finger zoom/pan (only when not drawing)
+    // Handle 2-finger zoom/pan
     if (_gestureHandler.pointerCount == 2 && !widget.isDrawingActive) {
       final newTransform = _gestureHandler.calculateZoomTransform();
       if (newTransform != null) {
@@ -162,10 +160,9 @@ class _ZoomPanSurfaceState extends State<ZoomPanSurface> {
         _constrainTransform();
       }
     }
-    // Handle 1-finger pan only when zoomed (scale > 1) and not drawing
+    // Handle 1-finger pan (drag-to-scroll at any scale when not drawing)
     else if (_gestureHandler.pointerCount == 1 &&
-        !widget.isDrawingMode &&
-        _transform.getMaxScaleOnAxis() > 1.0) {
+        !widget.isDrawingMode) {
       final newTransform = _gestureHandler.calculatePanTransform();
       if (newTransform != null && _boundaryManager != null) {
         final constrainedTransform = _boundaryManager!.constrain(newTransform);
@@ -203,26 +200,58 @@ class _ZoomPanSurfaceState extends State<ZoomPanSurface> {
     }
   }
 
+  void _handlePointerSignal(PointerSignalEvent event) {
+    if (_boundaryManager == null) return;
+    if (event is! PointerScrollEvent) return;
+    final delta = event.scrollDelta;
+    if (delta.dy == 0.0 && delta.dx == 0.0) return;
+    _applyScrollDelta(delta);
+  }
+
+  void _handlePointerPanZoomStart(PointerPanZoomStartEvent event) {}
+
+  void _handlePointerPanZoomUpdate(PointerPanZoomUpdateEvent event) {
+    if (_boundaryManager == null) return;
+    final delta = event.panDelta;
+    if (delta.dy == 0.0 && delta.dx == 0.0) return;
+    _applyScrollDelta(delta);
+  }
+
+  void _handlePointerPanZoomEnd(PointerPanZoomEndEvent event) {}
+
+  void _applyScrollDelta(Offset delta) {
+    if (_boundaryManager == null) return;
+    final scale = _transform.getMaxScaleOnAxis();
+    // Scale scroll by 1/scale so zoomed-in view scrolls proportionally (not too fast)
+    final scaleFactor = 1.0 / scale;
+    final adjustedDelta = Offset(delta.dx * scaleFactor, delta.dy * scaleFactor);
+    final newTransform = Matrix4.copy(_transform)
+      ..translate(-adjustedDelta.dx, -adjustedDelta.dy);
+    final constrained = _boundaryManager!.constrain(newTransform);
+    setState(() {
+      _transform = constrained;
+    });
+    _notifyTransformChanged();
+  }
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        _viewport = Size(constraints.maxWidth, constraints.maxHeight);
+        final viewportSize = Size(constraints.maxWidth, constraints.maxHeight);
+        _viewport = viewportSize;
 
-        // Update boundary manager if content size is available
-        if (widget.contentHeight != null) {
-          _contentSize = Size(_viewport.width, widget.contentHeight!);
-        } else if (_contentSize == Size.zero) {
-          // Only use a default if we have no content size at all
-          _contentSize = _viewport;
-        }
+        // Use provided contentHeight, or measured _contentSize, or viewport (first frame only)
+        final effectiveContentSize = widget.contentHeight != null
+            ? Size(viewportSize.width, widget.contentHeight!)
+            : (_contentSize != Size.zero ? _contentSize : viewportSize);
 
-        _boundaryManager = BoundaryManager(
-          contentSize: _contentSize,
-          viewportSize: _viewport,
+        final boundaryManager = BoundaryManager(
+          contentSize: effectiveContentSize,
+          viewportSize: viewportSize,
           minScale: widget.minScale,
           maxScale: widget.maxScale,
         );
+        _boundaryManager = boundaryManager;
 
         return Stack(
           children: [
@@ -231,6 +260,10 @@ class _ZoomPanSurfaceState extends State<ZoomPanSurface> {
               onPointerMove: _handlePointerMove,
               onPointerUp: _handlePointerUp,
               onPointerCancel: _handlePointerCancel,
+              onPointerSignal: _handlePointerSignal,
+              onPointerPanZoomStart: _handlePointerPanZoomStart,
+              onPointerPanZoomUpdate: _handlePointerPanZoomUpdate,
+              onPointerPanZoomEnd: _handlePointerPanZoomEnd,
               child: SizedBox(
                 width: constraints.maxWidth,
                 height: constraints.maxHeight,
@@ -255,7 +288,7 @@ class _ZoomPanSurfaceState extends State<ZoomPanSurface> {
               TransformAwareScrollbar(
                 transform: _transform,
                 boundaryManager: _boundaryManager!,
-                isVisible: !widget.isDrawingMode,
+                isVisible: true,
                 onTransformApplied: widget.controller?.applyTransform,
               ),
           ],

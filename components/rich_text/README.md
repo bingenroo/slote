@@ -1,4 +1,4 @@
-# slote_rich_text
+# rich_text
 
 A new Flutter project.
 

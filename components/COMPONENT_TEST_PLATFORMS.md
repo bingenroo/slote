@@ -1,212 +1,167 @@
-# Component Test Platforms Documentation
+# Component Example Apps
 
 ## Overview
 
-This document describes the standalone test platforms created for each component in `components/`. These test apps enable independent development and debugging of components without needing to run the full Slote application.
+This document describes the standalone **example apps** for each component in `components/`. Each example app is a runnable Flutter application that demonstrates and exercises the component in isolation, without running the full Slote app.
 
 ## Purpose
 
-Previously, testing components required running the entire main app (at repo root), which included:
+Running the full app (at repo root) for component work can mean:
 
 - Unnecessary code and dependencies
 - Slower startup times
-- More complex debugging environments
-- Difficulty isolating component-specific issues
+- More complex debugging
+- Harder isolation of component-specific issues
 
-The new test platforms provide:
+Example apps provide:
 
-- **Faster Development**: Test components in isolation
-- **Focused Debugging**: Only the component being developed is active
-- **Independent Testing**: Each component can be tested on any platform independently
-- **Standard Pattern**: Follows Flutter package conventions (test/ directories)
-- **Easy Onboarding**: New developers can test components without understanding the full app
+- **Faster development**: Work on one component at a time
+- **Focused debugging**: Only the component under development is active
+- **Platform flexibility**: Run each example on any supported platform
+- **Convention**: Matches Flutter/pub convention (`example/` for runnable demos)
+- **Onboarding**: New developers can try components without learning the full app
 
 ## Architecture
 
-Each component has a `test/` directory containing:
+Each component has an **`example/`** directory containing:
 
-- `lib/main.dart` - Entry point for the test app
-- `lib/test_[component]_screen.dart` - Main test screen widget
-- `pubspec.yaml` - Minimal dependencies (only Flutter SDK and parent component)
-- `README.md` - Component-specific usage instructions
+- `lib/main.dart` - Entry point and demo screen (single file)
+- `pubspec.yaml` - Minimal dependencies (Flutter SDK + parent component)
+- `test/widget_test.dart` - Optional widget test for the example app
+- `README.md` - How to run the example
 
-### File Structure
+### File structure
 
 ```
 components/
   draw/
-    test/
+    example/
       lib/
         main.dart
-        test_draw_screen.dart
+      test/
+        widget_test.dart
       pubspec.yaml
       README.md
     lib/                    # Component code
 
   rich_text/
-    test/
-      lib/
-        main.dart
-        test_rich_text_screen.dart
+    example/
+      lib/main.dart
+      test/widget_test.dart
       pubspec.yaml
       README.md
     lib/
 
   viewport/
-    test/
-      lib/
-        main.dart
-        test_viewport_screen.dart
+    example/
+      lib/main.dart
+      test/widget_test.dart
       pubspec.yaml
       README.md
+      android/   # (viewport example has full platform folders)
+      ios/
+      ...
     lib/
 
   undo_redo/
-    test/
-      lib/
-        main.dart
-        test_undo_redo_screen.dart
+    example/
+      lib/main.dart
+      test/widget_test.dart
       pubspec.yaml
       README.md
     lib/
 ```
 
-## Component Test Platforms
+## Example apps
 
-### 1. slote_draw Test Platform
+### 1. Draw example
 
-**Location**: `components/draw/test/`
+**Location**: `components/draw/example/`
 
-**Features Tested**:
+**Demonstrates**:
 
 - Drawing with pen tool
 - Color selection (8 predefined colors)
-- Stroke width adjustment (1px - 20px)
-- Eraser tool
-- Highlighter tool
-- Clear canvas functionality
-- Drawing mode toggle
-- Stroke rendering and persistence
+- Stroke width (1px–20px)
+- Eraser and highlighter
+- Clear canvas
+- Drawing vs view mode
+- Stroke rendering
 
-**UI Components**:
-
-- Canvas area for drawing
-- Tool selector (pen, highlighter, eraser)
-- Color picker with visual swatches
-- Stroke width slider
-- Clear button
-- Status bar with stroke count and tool info
-
-**Running**:
+**Run**:
 
 ```bash
-cd components/draw/test
+cd components/draw/example
 flutter pub get
 flutter run
 ```
 
-### 2. slote_rich_text Test Platform
+### 2. Rich text example
 
-**Location**: `components/rich_text/test/`
+**Location**: `components/rich_text/example/`
 
-**Features Tested**:
+**Demonstrates**:
 
 - Text input and editing
-- Format toolbar functionality
-- Bold formatting
-- Italic formatting
-- Underline formatting
+- Format toolbar (bold, italic, underline)
 - Text selection
-- Format persistence
+- Character/word stats
 
-**UI Components**:
-
-- Multi-line text editor
-- Format toolbar with bold/italic/underline buttons
-- Visual feedback for active formats
-- Text statistics (characters, words, selection)
-- Clear button
-
-**Running**:
+**Run**:
 
 ```bash
-cd components/rich_text/test
+cd components/rich_text/example
 flutter pub get
 flutter run
 ```
 
-### 3. slote_viewport Test Platform
+### 3. Viewport example
 
-**Location**: `components/viewport/test/`
+**Location**: `components/viewport/example/`
 
-**Features Tested**:
+**Demonstrates**:
 
-- Zoom in/out (pinch gestures and buttons)
-- Pan/drag functionality
-- Scroll behavior
-- Boundary constraints
-- Scrollbar visibility
-- Transform callbacks
-- Content height measurement
-- Viewport height measurement
-- Drawing mode vs view mode switching
+- Zoom (pinch, scale limits)
+- Pan/drag and scroll
+- Scrollbar
+- Boundary behavior
+- Content height and viewport stats
 
-**UI Components**:
-
-- Viewport surface with test content
-- Zoom controls (in/out buttons)
-- Content height adjustment controls
-- Scale indicator
-- Drawing mode toggle
-- Info bar with viewport/content/scale stats
-
-**Running**:
+**Run**:
 
 ```bash
-cd components/viewport/test
+cd components/viewport/example
 flutter pub get
 flutter run
 ```
 
-### 4. slote_undo_redo Test Platform
+### 4. Undo/redo example
 
-**Location**: `components/undo_redo/test/`
+**Location**: `components/undo_redo/example/`
 
-**Features Tested**:
+**Demonstrates**:
 
-- Undo operations
-- Redo operations
-- State management
-- History tracking
-- Can undo/redo state detection
-- Text editing integration
-- History clearing
+- Undo/redo with text editing
+- Can undo/redo state
+- History clear
+- State indicators
 
-**UI Components**:
-
-- Multi-line text editor
-- Undo button (enabled/disabled based on state)
-- Redo button (enabled/disabled based on state)
-- Clear history button
-- State indicators (can undo/redo status)
-- Info bar with text length
-
-**Running**:
+**Run**:
 
 ```bash
-cd components/undo_redo/test
+cd components/undo_redo/example
 flutter pub get
 flutter run
 ```
 
-## Development Workflow
+## Development workflow
 
-### Testing a Component
+### Running an example
 
-1. Navigate to the component's test directory:
+1. Go to the component’s example directory:
 
    ```bash
-   cd components/[component_name]/test
+   cd components/[component_name]/example
    ```
 
 2. Get dependencies:
@@ -215,61 +170,36 @@ flutter run
    flutter pub get
    ```
 
-3. Run the test app:
+3. Run the app:
 
    ```bash
    flutter run
    ```
 
-4. Make changes to the component code in `../lib/`
+4. Edit component code under `../lib/`; the example uses it via the path dependency. Use hot reload/restart to see changes.
 
-5. Hot reload will automatically pick up changes (if using hot reload)
+### Adding or changing example behavior
 
-### Making Changes to Components
+- Edit `example/lib/main.dart` (single file: app setup + demo screen).
+- Keep the example focused on demonstrating the component’s API and behavior.
 
-When modifying component code:
+## Integration testing
 
-1. Edit files in `components/[component_name]/lib/`
-2. The test app will automatically use the updated code (path dependency)
-3. Hot reload or restart the test app to see changes
+Example apps are for **per-component demos and debugging**. For integration (e.g. drawing + text, multiple components together), use the main app at repo root.
 
-### Adding New Test Features
+## Dependencies
 
-To add new test features to a test app:
-
-1. Edit the test screen file: `lib/test_[component]_screen.dart`
-2. Add UI controls or test scenarios as needed
-3. Keep the test focused on the component being tested
-
-## Integration Testing
-
-**Important**: These test platforms are for **component-level testing only**.
-
-Integration testing (e.g., drawing + text overlay, component interactions) should still be done in the main app (repo root) where all components are combined. The test platforms focus on individual component functionality.
-
-## Benefits Achieved
-
-1. **Decentralized Development**: Each component can be developed and tested independently
-2. **Faster Iteration**: No need to navigate through the full app to test component changes
-3. **Focused Debugging**: Only the relevant component code is active during testing
-4. **Standard Pattern**: Follows Flutter package conventions (test/ directories)
-5. **Better Onboarding**: New developers can understand and test components without learning the entire app architecture
-
-## Implementation Details
-
-### Dependencies
-
-Each test app has minimal dependencies:
+Each example has minimal dependencies:
 
 - Flutter SDK
-- Parent component (via path dependency: `path: ../`)
-- Flutter test and lints (dev dependencies only)
+- Parent component (`path: ../`)
+- `flutter_test` and `flutter_lints` as dev dependencies
 
-### Example pubspec.yaml Structure
+### Example pubspec.yaml
 
 ```yaml
-name: slote_[component]_test
-description: Test app for slote_[component] component
+name: [component]_example
+description: Example app for [component] component
 publish_to: "none"
 
 version: 1.0.0+1
@@ -280,7 +210,7 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  slote_[component]:
+  [component]:
     path: ../
 
 dev_dependencies:
@@ -292,71 +222,8 @@ flutter:
   uses-material-design: true
 ```
 
-### Main.dart Structure
+## Related docs
 
-Each test app follows a simple structure:
-
-```dart
-import 'package:flutter/material.dart';
-import 'test_[component]_screen.dart';
-
-void main() {
-  runApp(const MyApp());
-}
-
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Slote [Component] Test',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
-        useMaterial3: true,
-      ),
-      home: const Test[Component]Screen(),
-    );
-  }
-}
-```
-
-## Verification
-
-All test platforms have been verified to:
-
-- ✅ Compile successfully (`flutter analyze` passes)
-- ✅ Resolve dependencies correctly (`flutter pub get` succeeds)
-- ✅ Be self-contained and runnable independently
-- ✅ Follow Flutter package conventions
-
-## Future Enhancements
-
-Potential improvements:
-
-- Add automated widget tests for each component
-- Create a unified test runner that can launch any component test
-- Add performance profiling tools to test platforms
-- Add screenshot testing capabilities
-- Create integration test scenarios that combine multiple components
-
-## Related Documentation
-
-- Individual component READMEs in each `test/` directory
-- Main repository README: `/README.md`
-- Component development guide: `docs/CONCURRENT_DEVELOPMENT_GUIDE.md`
-
-## Implementation Date
-
-January 2025
-
-## Implementation Summary
-
-This implementation successfully created standalone test platforms for all major components:
-
-- `slote_draw` - Drawing functionality testing
-- `slote_rich_text` - Text editing and formatting testing
-- `slote_viewport` - Zoom/pan/viewport testing
-- `slote_undo_redo` - Undo/redo system testing
-
-All platforms are functional, verified, and ready for use in component development workflows.
+- Per-component READMEs in each `example/` directory
+- Main repo README: `/README.md`
+- Component development: `docs/CONCURRENT_DEVELOPMENT_GUIDE.md`

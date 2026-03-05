@@ -541,41 +541,84 @@ def cmd_run(args):
 COMPONENT_TEST_APPS = ["viewport", "rich_text", "draw", "undo_redo"]
 
 
+def get_component_example_dirs():
+    """Discover components that have an example/ app (components/<name>/example with pubspec.yaml)."""
+    script_dir = Path(__file__).parent.absolute()
+    components_dir = script_dir / "components"
+    if not components_dir.is_dir():
+        return {}
+    result = {}
+    for path in components_dir.iterdir():
+        if path.is_dir() and not path.name.startswith("."):
+            example_dir = path / "example"
+            if (example_dir / "pubspec.yaml").is_file():
+                result[path.name] = example_dir
+    return result
+
+
+def cmd_run_in_component_example(args):
+    """Run a command in the component's example directory (e.g. viewport flutter run)."""
+    available = get_component_example_dirs()
+    name = getattr(args, "comp_name", None) or (getattr(args, "name", None) or "").strip().lower()
+    if name not in available:
+        die(f"Unknown or missing example: {name}. Available: {', '.join(sorted(available.keys()))}")
+    example_dir = available[name].resolve()
+    command = getattr(args, "command", None) or []
+    if not command:
+        command = ["flutter", "run"]
+    info(f"Running in {example_dir}: {' '.join(command)}")
+    print()
+    try:
+        subprocess.run(
+            command,
+            cwd=str(example_dir),
+            check=False,
+        )
+    except KeyboardInterrupt:
+        info("\nInterrupted by user")
+    except Exception as e:
+        die(f"Failed to run command: {e}")
+
+
 def cmd_bootstrap(args):
-    """Run flutter pub upgrade at repo root and in each component test app (resolve and upgrade dependencies)."""
+    """Run flutter upgrade once, then flutter pub get at repo root and in every subdirectory that has a pubspec.yaml."""
     script_dir = Path(__file__).parent.absolute()
     if not command_exists("flutter"):
         die("Flutter not found in PATH. Please install Flutter and add it to your PATH.")
 
-    # Root (main app)
-    info("Running flutter pub upgrade at repo root...")
+    # 1) Upgrade Flutter SDK once
+    info("Running flutter upgrade...")
     result = subprocess.run(
-        ["flutter", "pub", "upgrade"],
+        ["flutter", "upgrade"],
         cwd=str(script_dir),
         capture_output=True,
         text=True,
-        timeout=120,
+        timeout=300,
     )
     if result.returncode != 0:
-        die(f"flutter pub upgrade failed at root:\n{result.stderr or result.stdout}")
-    info("Done at root.")
+        die(f"flutter upgrade failed:\n{result.stderr or result.stdout}")
+    info("Flutter upgrade done.")
 
-    # Each component test app
-    for name in COMPONENT_TEST_APPS:
-        test_dir = script_dir / "components" / name / "test"
-        if not test_dir.exists():
-            info(f"Skipping components/{name}/test (not found)")
-            continue
-        info(f"Running flutter pub upgrade in components/{name}/test...")
+    # 2) Find all directories that contain pubspec.yaml (Flutter/Dart packages)
+    pub_dirs = []
+    for path in script_dir.rglob("pubspec.yaml"):
+        pub_dirs.append(path.parent)
+    pub_dirs.sort(key=lambda p: (len(p.parts), str(p)))
+
+    # 3) Run flutter pub get in each
+    for pub_dir in pub_dirs:
+        rel = pub_dir.relative_to(script_dir) if pub_dir != script_dir else Path(".")
+        label = str(rel) if str(rel) != "." else "repo root"
+        info(f"Running flutter pub get in {label}...")
         result = subprocess.run(
-            ["flutter", "pub", "upgrade"],
-            cwd=str(test_dir),
+            ["flutter", "pub", "get"],
+            cwd=str(pub_dir),
             capture_output=True,
             text=True,
             timeout=120,
         )
         if result.returncode != 0:
-            die(f"flutter pub upgrade failed in {test_dir}:\n{result.stderr or result.stdout}")
+            die(f"flutter pub get failed in {pub_dir}:\n{result.stderr or result.stdout}")
     info("Bootstrap complete.")
 
 
@@ -669,7 +712,7 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter
     )
     
-    subparsers = parser.add_subparsers(dest="command", help="Available commands")
+    subparsers = parser.add_subparsers(dest="action", help="Available commands")
     
     # Database subcommands
     db_parser = subparsers.add_parser("db", help="Database operations")
@@ -749,7 +792,7 @@ def main():
     # Bootstrap command
     bootstrap_parser = subparsers.add_parser(
         "bootstrap",
-        help="Run flutter pub upgrade at repo root and in each component test app (resolve and upgrade deps)"
+        help="Run flutter upgrade once, then flutter pub get in every subdirectory with a pubspec.yaml"
     )
     bootstrap_parser.set_defaults(func=cmd_bootstrap)
 
@@ -774,6 +817,21 @@ def main():
     )
     component_run_parser.set_defaults(func=cmd_component_run)
 
+    # Component example dirs: top-level commands like "viewport flutter run" or "draw flutter pub get"
+    for comp_name, example_path in sorted(get_component_example_dirs().items()):
+        comp_parser = subparsers.add_parser(
+            comp_name,
+            help=f"Run command in components/{comp_name}/example (e.g. {comp_name} flutter run)",
+        )
+        comp_parser.add_argument(
+            "command",
+            nargs="*",
+            default=[],
+            metavar="CMD",
+            help="Command to run (default: flutter run); e.g. flutter run, flutter pub get",
+        )
+        comp_parser.set_defaults(func=cmd_run_in_component_example, comp_name=comp_name)
+
     # Test command
     test_parser = subparsers.add_parser(
         "test",
@@ -783,7 +841,7 @@ def main():
     
     args = parser.parse_args()
     
-    if not args.command:
+    if not args.action:
         parser.print_help()
         sys.exit(1)
     

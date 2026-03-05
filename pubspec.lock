@@ -161,6 +161,13 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "4.0.1"
+  draw:
+    dependency: "direct main"
+    description:
+      path: "components/draw"
+      relative: true
+    source: path
+    version: "1.0.0"
   fake_async:
     dependency: transitive
     description:
@@ -781,6 +788,20 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "3.2.2"
+  rich_text:
+    dependency: "direct main"
+    description:
+      path: "components/rich_text"
+      relative: true
+    source: path
+    version: "1.0.0"
+  shared:
+    dependency: "direct main"
+    description:
+      path: "components/shared"
+      relative: true
+    source: path
+    version: "1.0.0"
   shared_preferences:
     dependency: "direct main"
     description:
@@ -842,48 +863,6 @@ packages:
     description: flutter
     source: sdk
     version: "0.0.0"
-  slote_draw:
-    dependency: "direct main"
-    description:
-      path: "components/draw"
-      relative: true
-    source: path
-    version: "1.0.0"
-  slote_rich_text:
-    dependency: "direct main"
-    description:
-      path: "components/rich_text"
-      relative: true
-    source: path
-    version: "1.0.0"
-  slote_shared:
-    dependency: "direct main"
-    description:
-      path: "components/shared"
-      relative: true
-    source: path
-    version: "1.0.0"
-  slote_theme:
-    dependency: "direct main"
-    description:
-      path: "components/theme"
-      relative: true
-    source: path
-    version: "1.0.0"
-  slote_undo_redo:
-    dependency: "direct main"
-    description:
-      path: "components/undo_redo"
-      relative: true
-    source: path
-    version: "1.0.0"
-  slote_viewport:
-    dependency: "direct main"
-    description:
-      path: "components/viewport"
-      relative: true
-    source: path
-    version: "1.0.0"
   source_span:
     dependency: transitive
     description:
@@ -980,6 +959,13 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "0.7.9"
+  theme:
+    dependency: "direct main"
+    description:
+      path: "components/theme"
+      relative: true
+    source: path
+    version: "1.0.0"
   typed_data:
     dependency: transitive
     description:
@@ -996,6 +982,13 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.6.0"
+  undo_redo:
+    dependency: "direct main"
+    description:
+      path: "components/undo_redo"
+      relative: true
+    source: path
+    version: "1.0.0"
   url_launcher:
     dependency: transitive
     description:
@@ -1116,6 +1109,13 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.4.0"
+  viewport:
+    dependency: "direct main"
+    description:
+      path: "components/viewport"
+      relative: true
+    source: path
+    version: "1.0.0"
   visibility_detector:
     dependency: transitive
     description:

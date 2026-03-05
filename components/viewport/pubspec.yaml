@@ -1,4 +1,4 @@
-name: slote_viewport
+name: viewport
 description: Viewport/zoom/pan functionality for Slote
 version: 1.0.0
 publish_to: "none"

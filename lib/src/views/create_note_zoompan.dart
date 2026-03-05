@@ -4,10 +4,10 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lottie/lottie.dart';
 import 'package:slote/src/model/note.dart';
-import 'package:slote_shared/slote_shared.dart';
-import 'package:slote_theme/slote_theme.dart';
+import 'package:shared/shared.dart';
+import 'package:theme/theme.dart';
 import 'package:slote/src/services/local_db.dart';
-import 'package:slote_undo_redo/slote_undo_redo.dart';
+import 'package:undo_redo/undo_redo.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 // import 'dart:developer';
 // TODO: Replace scribble with slote_draw

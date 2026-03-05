@@ -90,12 +90,12 @@ BEGIN
         BLOCK "040904e4"
         BEGIN
             VALUE "CompanyName", "com.example" "\0"
-            VALUE "FileDescription", "slote_undo_redo" "\0"
+            VALUE "FileDescription", "undo_redo" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
-            VALUE "InternalName", "slote_undo_redo" "\0"
+            VALUE "InternalName", "undo_redo" "\0"
             VALUE "LegalCopyright", "Copyright (C) 2026 com.example. All rights reserved." "\0"
-            VALUE "OriginalFilename", "slote_undo_redo.exe" "\0"
-            VALUE "ProductName", "slote_undo_redo" "\0"
+            VALUE "OriginalFilename", "undo_redo.exe" "\0"
+            VALUE "ProductName", "undo_redo" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END
     END

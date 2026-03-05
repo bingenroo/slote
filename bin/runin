@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+# Invoke via symlinks: viewport, draw, rich_text, undo_redo (e.g. viewport flutter run).
+# Component name is the symlink name (basename of $0).
+COMPONENT="$(basename "$0")"
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+exec python3 "$REPO_ROOT/cmd.py" "$COMPONENT" "$@"

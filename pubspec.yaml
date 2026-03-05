@@ -1,5 +1,5 @@
 name: slote
-description: "A new Flutter project."
+description: "Slote - Cross-Platform Note-Taking Application"
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
 publish_to: "none" # Remove this line if you wish to publish to pub.dev
@@ -55,17 +55,17 @@ dependencies:
   vector_math: ^2.1.4
 
   # Component packages
-  slote_viewport:
+  viewport:
     path: components/viewport
-  slote_undo_redo:
+  undo_redo:
     path: components/undo_redo
-  slote_rich_text:
+  rich_text:
     path: components/rich_text
-  slote_draw:
+  draw:
     path: components/draw
-  slote_theme:
+  theme:
     path: components/theme
-  slote_shared:
+  shared:
     path: components/shared
 
 dev_dependencies:

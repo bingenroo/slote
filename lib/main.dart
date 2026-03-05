@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:slote/src/app.dart';
-import 'package:slote_theme/slote_theme.dart';
+import 'package:theme/theme.dart';
 import 'package:slote/src/services/hive_to_sqlite_migration.dart';
 
 void main() async {

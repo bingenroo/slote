@@ -1,6 +1,6 @@
 # Viewport: zoom, pan, and scrollbar sync
 
-This document captures the **design plan** and **implementation summary** for viewport zoom, pan, and scrollbar behavior in `slote_viewport`.
+This document captures the **design plan** and **implementation summary** for viewport zoom, pan, and scrollbar behavior in `viewport`.
 
 ---
 

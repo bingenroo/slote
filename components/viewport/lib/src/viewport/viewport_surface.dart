@@ -11,15 +11,15 @@ class ViewportSurface extends StatefulWidget {
   final double maxScale;
   final bool showScrollbar;
   final double viewportHeight;
-  final double contentHeight;
+  final double? contentHeight;
 
   const ViewportSurface({
     super.key,
     required this.child,
-    required this.isDrawingMode,
-    required this.isDrawingActive,
     required this.viewportHeight,
-    required this.contentHeight,
+    this.contentHeight,
+    this.isDrawingMode = false,
+    this.isDrawingActive = false,
     this.onScaleChanged,
     this.onTransformChanged,
     this.minScale = 1.0,

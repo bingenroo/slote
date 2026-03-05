@@ -1,4 +1,4 @@
-# slote_undo_redo
+# undo_redo
 
 A new Flutter project.
 

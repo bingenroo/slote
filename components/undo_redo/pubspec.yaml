@@ -1,4 +1,4 @@
-name: slote_undo_redo
+name: undo_redo
 description: Generic undo/redo system for Slote
 version: 1.0.0
 publish_to: "none"

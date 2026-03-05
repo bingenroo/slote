@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lottie/lottie.dart';
-import 'package:slote_shared/slote_shared.dart';
+import 'package:shared/shared.dart';
 
 class EmptyView extends StatelessWidget {
   const EmptyView({super.key});

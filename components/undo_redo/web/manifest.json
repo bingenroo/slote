@@ -1,6 +1,6 @@
 {
-    "name": "slote_undo_redo",
-    "short_name": "slote_undo_redo",
+    "name": "undo_redo",
+    "short_name": "undo_redo",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",

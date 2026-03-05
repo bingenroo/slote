@@ -42,7 +42,7 @@ This document is the single entry point for day-to-day development: setup, runni
   ```bash
   python3 cmd.py component run viewport   # or rich_text, draw, undo_redo
   ```
-  Or: `cd components/viewport/test` then `flutter run`.
+  Or: `cd components/viewport/example` then `flutter run`.
 
 - **Edit code** in `components/<name>/lib/`; the test app uses it via path dependency. Use hot reload.
 

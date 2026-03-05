@@ -1,4 +1,4 @@
-name: slote_shared
+name: shared
 description: Shared utilities and resources for Slote
 version: 1.0.0
 publish_to: "none"

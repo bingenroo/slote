@@ -1,6 +1,6 @@
 {
-    "name": "slote_rich_text",
-    "short_name": "slote_rich_text",
+    "name": "rich_text",
+    "short_name": "rich_text",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",

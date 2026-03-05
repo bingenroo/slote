@@ -1,6 +1,6 @@
 {
-    "name": "slote_draw",
-    "short_name": "slote_draw",
+    "name": "draw",
+    "short_name": "draw",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",

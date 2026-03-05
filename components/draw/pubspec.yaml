@@ -1,4 +1,4 @@
-name: slote_draw
+name: draw
 description: Custom drawing implementation for Slote
 version: 1.0.0
 publish_to: "none"

@@ -156,14 +156,14 @@ class IntegrationTestView extends StatelessWidget {
 Each component should have its own test suite:
 
 ```dart
-// slote_rich_text/test/rich_text_test.dart
+// rich_text/example/ or rich_text/test/ (package unit tests)
 void main() {
   test('Rich text editor formats text correctly', () {
     // Test rich text
   });
 }
 
-// slote_viewport/test/viewport_test.dart
+// viewport/example/ or viewport/test/ (package unit tests)
 void main() {
   test('Viewport zooms correctly', () {
     // Test viewport

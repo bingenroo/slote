@@ -4,12 +4,12 @@ This repository contains reusable component packages for the Slote application.
 
 ## Packages
 
-- **slote_viewport**: Viewport/zoom/pan functionality
-- **slote_undo_redo**: Generic undo/redo system
-- **slote_rich_text**: Rich text editing (Word-style)
-- **slote_draw**: Custom drawing implementation
-- **slote_theme**: Theming system
-- **slote_shared**: Shared utilities and resources
+- **viewport**: Viewport/zoom/pan functionality
+- **undo_redo**: Generic undo/redo system
+- **rich_text**: Rich text editing (Word-style)
+- **draw**: Custom drawing implementation
+- **theme**: Theming system
+- **shared**: Shared utilities and resources
 
 ## Structure
 
@@ -20,36 +20,36 @@ Each package is independent and can be used separately or together. They are des
 - Testable
 - Independently versioned
 
-## Component Test Platforms
+## Component example apps
 
-Each component now includes a standalone test application in its `test/` directory, enabling independent development and debugging without running the full Slote app.
+Each component includes a standalone **example app** in its `example/` directory for developing and trying the component without running the full Slote app.
 
-### Available Test Platforms
+### Available example apps
 
-- **draw/test/** - Test drawing tools, colors, stroke width, eraser, highlighter
-- **rich_text/test/** - Test text editing, formatting toolbar, bold/italic/underline
-- **viewport/test/** - Test zoom, pan, scroll, boundary constraints
-- **undo_redo/test/** - Test undo/redo operations, state management, history
+- **draw/example/** – Drawing tools, colors, stroke width, eraser, highlighter
+- **rich_text/example/** – Text editing, format toolbar, bold/italic/underline
+- **viewport/example/** – Zoom, pan, scroll, boundary constraints
+- **undo_redo/example/** – Undo/redo, state management, history
 
-### Quick Start
+### Quick start
 
-To run any component's test app:
+To run any component’s example app:
 
 ```bash
-cd components/[component_name]/test
+cd components/[component_name]/example
 flutter pub get
 flutter run
 ```
 
 ### Benefits
 
-- **Faster Development**: Test components in isolation without loading the full app
-- **Focused Debugging**: Only the component being developed is active
-- **Independent Testing**: Each component can be tested on any platform independently
-- **Standard Pattern**: Follows Flutter package conventions (test/ directories)
-- **Easy Onboarding**: New developers can test components without understanding the full app
+- **Faster development**: Try components in isolation
+- **Focused debugging**: Only the component you’re working on is active
+- **Platform flexibility**: Run each example on any supported platform
+- **Convention**: Matches Flutter’s `example/` directory convention
+- **Onboarding**: New developers can try components without the full app
 
-For detailed documentation, see [COMPONENT_TEST_PLATFORMS.md](COMPONENT_TEST_PLATFORMS.md).
+For full details, see [COMPONENT_TEST_PLATFORMS.md](COMPONENT_TEST_PLATFORMS.md) (component example apps).
 
 ## Usage
 
@@ -57,9 +57,9 @@ Each package can be used as a path dependency in `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  slote_viewport:
+  viewport:
     path: components/viewport
-  slote_undo_redo:
+  undo_redo:
     path: components/undo_redo
   # ... etc
 ```
@@ -78,4 +78,4 @@ See individual package READMEs for development instructions.
 
 ### Integration Testing
 
-Integration testing (e.g., drawing + text overlay, component interactions) should be done in the main app (repo root) where all components are combined. Component test platforms focus on individual component functionality only.
+Integration testing (e.g., drawing + text overlay, component interactions) should be done in the main app (repo root) where all components are combined. Component example apps focus on individual component functionality only.

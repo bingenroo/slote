@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:slote/src/model/note.dart';
-import 'package:slote_shared/slote_shared.dart';
+import 'package:shared/shared.dart';
 import 'package:slote/src/services/local_db.dart';
 import 'package:slote/src/views/create_note.dart';
 import 'package:slote/src/views/widgets/notes_grid.dart';
@@ -9,7 +9,7 @@ import 'package:slote/src/views/widgets/notes_list.dart';
 import 'package:lottie/lottie.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:provider/provider.dart';
-import 'package:slote_theme/slote_theme.dart';
+import 'package:theme/theme.dart';
 
 class HomeView extends StatefulWidget {
   const HomeView({super.key});

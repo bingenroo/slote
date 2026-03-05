@@ -1,4 +1,4 @@
-name: slote_rich_text
+name: rich_text
 description: Rich text editing (Word-style) for Slote
 version: 1.0.0
 publish_to: "none"

@@ -1,4 +1,4 @@
-# slote_draw
+# draw
 
 A new Flutter project.
 

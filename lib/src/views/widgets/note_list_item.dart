@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:slote/src/model/note.dart';
 import 'package:slote/src/views/create_note.dart';
-import 'package:slote_shared/slote_shared.dart';
-import 'package:slote_theme/slote_theme.dart';
+import 'package:shared/shared.dart';
+import 'package:theme/theme.dart';
 
 class NoteListItem extends StatelessWidget {
   const NoteListItem({
