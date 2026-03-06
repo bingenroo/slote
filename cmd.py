@@ -6,6 +6,7 @@ A cross-platform command-line interface for database operations and emulator man
 """
 
 import argparse
+import json
 import os
 import platform
 import re
@@ -13,6 +14,13 @@ import shutil
 import subprocess
 import sys
 from pathlib import Path
+from urllib.request import Request, urlopen
+from urllib.error import URLError
+
+try:
+    import pyperclip
+except ImportError:
+    pyperclip = None
 
 # Constants
 PACKAGE_NAME = "com.example.slote"
@@ -705,6 +713,149 @@ def cmd_test(args):
     info("All tests passed.")
 
 
+OLLAMA_DEFAULT_MODEL = "qwen2.5-coder:7b"
+OLLAMA_BASE_URL = "http://localhost:11434"
+
+
+def _git_check_repo():
+    """Ensure cwd is a git repo. Dies if not."""
+    result = subprocess.run(
+        ["git", "rev-parse", "--is-inside-work-tree"],
+        capture_output=True,
+        text=True,
+        timeout=5,
+    )
+    if result.returncode != 0:
+        die("Not a git repository.")
+
+
+def _git_collect_context():
+    """Run git status and git diff in cwd. Return (status_and_diff_string, status_short_string)."""
+    out = []
+    status_short = ""
+    for cmd in [["git", "status"], ["git", "diff"]]:
+        r = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+        out.append(r.stdout or "")
+        if r.stderr:
+            out.append(r.stderr)
+        if cmd == ["git", "status"]:
+            r2 = subprocess.run(
+                ["git", "status", "--short"],
+                capture_output=True,
+                text=True,
+                timeout=5,
+            )
+            status_short = (r2.stdout or "").strip()
+    return "\n".join(out).strip() or "(no changes)", status_short
+
+
+def _generate_heuristic(status_short, short):
+    """Build a conventional-commit style message from git status --short output."""
+    files = []
+    for line in status_short.splitlines():
+        line = line.rstrip()
+        if len(line) >= 4 and line[0] in " MADRCU?" and line[1] in " MADRCU?" and (len(line) == 3 or line[2].isspace()):
+            path = line[3:].strip().split()
+            if path:
+                files.append(path[0])
+    if not files:
+        header = "chore: update"
+    else:
+        first = files[0].lower()
+        if "test" in first or "spec" in first:
+            header = "test: update"
+        elif "doc" in first or "readme" in first or ".md" in first:
+            header = "docs: update"
+        elif "fix" in first or "bug" in first:
+            header = "fix: update"
+        else:
+            header = "chore: update"
+        if len(files) <= 2:
+            header = header.replace("update", files[0].split("/")[-1].split("\\")[-1])
+    if short:
+        return header
+    body = "\n".join(f"- {f}" for f in files[:15])
+    if len(files) > 15:
+        body += f"\n- ... and {len(files) - 15} more"
+    return f"{header}\n\n{body}"
+
+
+def _generate_ollama(context, short, model):
+    """Call Ollama /api/generate. Return message or None on failure."""
+    prompt = (
+        "Generate a git commit message from the following git status and diff. "
+        "Reply with ONLY the commit message, no explanation.\n"
+    )
+    if short:
+        prompt += "Use a single line (conventional commit style, e.g. type: description).\n"
+    else:
+        prompt += (
+            "Use a conventional commit header (type: description) on the first line, "
+            "then a blank line, then bullet points summarizing the changes.\n"
+        )
+    prompt += "\n---\n" + context
+
+    body = json.dumps({
+        "model": model,
+        "prompt": prompt,
+        "stream": False,
+    }).encode("utf-8")
+    try:
+        req = Request(
+            f"{OLLAMA_BASE_URL}/api/generate",
+            data=body,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urlopen(req, timeout=90) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+        text = (data.get("response") or "").strip()
+        if not text:
+            return None
+        return text
+    except (URLError, OSError, ValueError, KeyError):
+        return None
+
+
+def _copy_to_clipboard(text):
+    """Copy text to clipboard if pyperclip available; else return False."""
+    if pyperclip:
+        try:
+            pyperclip.copy(text)
+            return True
+        except Exception:
+            pass
+    return False
+
+
+def cmd_commit(args):
+    """Generate commit message from git status/diff, preview and copy to clipboard."""
+    if getattr(args, "set_message", None):
+        message = args.set_message.strip()
+        if not message:
+            die("Empty message for --set.")
+    else:
+        _git_check_repo()
+        context, status_short = _git_collect_context()
+        short = getattr(args, "short", False)
+        model = os.environ.get("COMMIT_LLM_MODEL", OLLAMA_DEFAULT_MODEL)
+        message = _generate_ollama(context, short, model)
+        if message is None:
+            info("Ollama not available, using heuristic.")
+            message = _generate_heuristic(status_short, short)
+
+    # Preview
+    print("Commit message (copied to clipboard):")
+    print("-" * 40)
+    print(message)
+    print("-" * 40)
+
+    if _copy_to_clipboard(message):
+        info("Copied to clipboard. Use git commit to paste.")
+    else:
+        info("Install pyperclip to copy to clipboard; paste manually: pip install pyperclip")
+
+
 def main():
     """Main entry point."""
     parser = argparse.ArgumentParser(
@@ -838,6 +989,24 @@ def main():
         help="Run flutter test at repo root and in each component test app",
     )
     test_parser.set_defaults(func=cmd_test)
+
+    # Commit command: generate message from git status/diff, preview + clipboard
+    commit_parser = subparsers.add_parser(
+        "commit",
+        help="Generate commit message from git status/diff; preview in terminal and copy to clipboard",
+    )
+    commit_parser.add_argument(
+        "-s", "--short",
+        action="store_true",
+        help="Generate a one-line commit message",
+    )
+    commit_parser.add_argument(
+        "--set",
+        dest="set_message",
+        metavar="MESSAGE",
+        help="Use this message instead of generating (preview + copy only)",
+    )
+    commit_parser.set_defaults(func=cmd_commit)
     
     args = parser.parse_args()
     

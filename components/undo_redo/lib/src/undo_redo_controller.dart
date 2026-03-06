@@ -121,15 +121,6 @@ class UndoRedoController<T extends UndoRedoState> extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Clear history
-  void clearHistory() {
-    final currentState = _getCurrentStateFromHistory();
-    _history.clear();
-    _history.add(currentState);
-    _currentIndex = 0;
-    notifyListeners();
-  }
-
   /// Get current history index
   int get currentIndex => _currentIndex;
 
@@ -197,10 +188,6 @@ class TextUndoRedoController extends ChangeNotifier {
 
   void redo() {
     _undoRedoController.redo();
-  }
-
-  void clearHistory() {
-    _undoRedoController.clearHistory();
   }
 
   @override

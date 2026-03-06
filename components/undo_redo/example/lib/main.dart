@@ -113,13 +113,6 @@ class _UndoRedoExampleScreenState extends State<_UndoRedoExampleScreen> {
                             : Colors.grey,
                       ),
                     ),
-                    ElevatedButton.icon(
-                      icon: const Icon(Icons.clear_all),
-                      label: const Text('Clear History'),
-                      onPressed: () {
-                        _undoRedoController.clearHistory();
-                      },
-                    ),
                   ],
                 );
               },

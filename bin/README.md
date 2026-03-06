@@ -35,8 +35,12 @@ From the Slote repo root you can always run:
 ```bash
 ./bin/emulator launch
 ./bin/bootstrap
+./bin/commit
+./bin/commit -s
 ./bin/viewport flutter run
 ./bin/draw flutter pub get
 ```
+
+**commit** — Generate a git commit message from the current repo’s `git status` and `git diff`, preview it in the terminal, and copy it to the clipboard. Runs in the **current directory**, so you can use it from any repo (e.g. from another project under Documents). Use **commit -s** for a one-line message. Requires Ollama running locally (or falls back to a heuristic). Optional: `COMMIT_LLM_MODEL` (default `qwen2.5-coder:7b`), and `pip install pyperclip` for clipboard copy.
 
 See the main [README.md](../README.md) for full setup and troubleshooting (e.g. “No AVD specified”).
