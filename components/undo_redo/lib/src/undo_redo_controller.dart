@@ -50,14 +50,17 @@ class UndoRedoController<T extends UndoRedoState> extends ChangeNotifier {
       return;
     }
 
-    final currentState = _getCurrentState();
+    // Compare against the state we're currently at in history (the previous state),
+    // not getCurrentState(), since the listener fires after the source already updated.
+    final previousState = _currentIndex >= 0 && _currentIndex < _history.length
+        ? _history[_currentIndex]
+        : _getCurrentState();
 
-    // Check if state has changed
     if (_stateEquals != null) {
-      if (_stateEquals!(currentState, newState)) {
+      if (_stateEquals!(previousState, newState)) {
         return;
       }
-    } else if (currentState == newState) {
+    } else if (previousState == newState) {
       return;
     }
 
