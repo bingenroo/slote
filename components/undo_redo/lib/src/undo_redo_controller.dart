@@ -95,7 +95,12 @@ class UndoRedoController<T extends UndoRedoState> extends ChangeNotifier {
     if (!canUndo) return;
 
     _currentIndex--;
-    _restoreState(_history[_currentIndex]);
+    try {
+      _isUpdatingFromHistory = true;
+      _restoreState(_history[_currentIndex]);
+    } finally {
+      _isUpdatingFromHistory = false;
+    }
     notifyListeners();
   }
 
@@ -104,7 +109,12 @@ class UndoRedoController<T extends UndoRedoState> extends ChangeNotifier {
     if (!canRedo) return;
 
     _currentIndex++;
-    _restoreState(_history[_currentIndex]);
+    try {
+      _isUpdatingFromHistory = true;
+      _restoreState(_history[_currentIndex]);
+    } finally {
+      _isUpdatingFromHistory = false;
+    }
     notifyListeners();
   }
 

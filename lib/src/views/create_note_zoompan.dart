@@ -1311,9 +1311,9 @@ class _CreateNoteViewState extends State<CreateNoteView>
     _bodyController.removeListener(_scheduleAutoSave);
     _scribbleNotifier.removeListener(_scheduleAutoSave);
     _titleController.dispose();
+    _unifiedUndoRedoController.dispose();
     _bodyController.dispose();
     _scrollController.dispose();
-    _unifiedUndoRedoController.dispose();
     _scribbleNotifier.dispose();
 
     super.dispose();
