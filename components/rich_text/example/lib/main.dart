@@ -29,58 +29,28 @@ class _RichTextExampleScreen extends StatefulWidget {
 }
 
 class _RichTextExampleScreenState extends State<_RichTextExampleScreen> {
-  late TextEditingController _textController;
-  bool _isBold = false;
-  bool _isItalic = false;
-  bool _isUnderline = false;
+  late RichTextController _controller;
+  String _debouncedMarkdown = '';
 
   @override
   void initState() {
     super.initState();
-    _textController = TextEditingController(
-      text: 'Start typing here to test rich text formatting...\n\n'
-          'Select text and use the toolbar to apply formatting.',
+    _controller = RichTextController(
+      initialMarkdown:
+          'Start typing here. Use the toolbar for **bold**, *italic*, __underline__.\n\n'
+          'With cursor in place, Bold puts you in bold for the next typing.',
+      debounceMarkdownDuration: const Duration(milliseconds: 200),
+      onMarkdownChanged: (markdown) {
+        setState(() => _debouncedMarkdown = markdown);
+      },
     );
-    _textController.addListener(_updateFormatting);
+    _debouncedMarkdown = _controller.markdown;
   }
 
   @override
   void dispose() {
-    _textController.removeListener(_updateFormatting);
-    _textController.dispose();
+    _controller.dispose();
     super.dispose();
-  }
-
-  void _updateFormatting() {
-    setState(() {});
-  }
-
-  void _toggleBold() {
-    setState(() {
-      _isBold = !_isBold;
-    });
-    _applyFormatting();
-  }
-
-  void _toggleItalic() {
-    setState(() {
-      _isItalic = !_isItalic;
-    });
-    _applyFormatting();
-  }
-
-  void _toggleUnderline() {
-    setState(() {
-      _isUnderline = !_isUnderline;
-    });
-    _applyFormatting();
-  }
-
-  void _applyFormatting() {
-    final selection = _textController.selection;
-    if (selection.isValid && !selection.isCollapsed) {
-      setState(() {});
-    }
   }
 
   @override
@@ -92,9 +62,9 @@ class _RichTextExampleScreenState extends State<_RichTextExampleScreen> {
           IconButton(
             icon: const Icon(Icons.clear),
             onPressed: () {
-              _textController.clear();
+              _controller.loadMarkdown('');
             },
-            tooltip: 'Clear Text',
+            tooltip: 'Clear',
           ),
         ],
       ),
@@ -108,45 +78,76 @@ class _RichTextExampleScreenState extends State<_RichTextExampleScreen> {
                 bottom: BorderSide(color: Colors.grey[300]!),
               ),
             ),
-            child: FormatToolbar(
-              onBold: _toggleBold,
-              onItalic: _toggleItalic,
-              onUnderline: _toggleUnderline,
-              isBold: _isBold,
-              isItalic: _isItalic,
-              isUnderline: _isUnderline,
-            ),
+            child: FormatToolbar(controller: _controller),
           ),
           Expanded(
-            child: Container(
+            child: SingleChildScrollView(
               padding: const EdgeInsets.all(16),
-              child: RichTextEditor(
-                controller: _textController,
-                onChanged: (text) {},
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  RichTextEditor(
+                    controller: _controller,
+                  ),
+                  const SizedBox(height: 24),
+                  const Divider(),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Markdown output (debounced, DB-ready)',
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                          color: Colors.grey[600],
+                        ),
+                  ),
+                  const SizedBox(height: 8),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.grey[100],
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.grey[300]!),
+                    ),
+                    child: SelectableText(
+                      _debouncedMarkdown.isEmpty ? '(empty)' : _debouncedMarkdown,
+                      style: const TextStyle(
+                        fontFamily: 'monospace',
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
           Container(
             padding: const EdgeInsets.all(8),
             color: Colors.grey[200],
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  'Characters: ${_textController.text.length}',
-                  style: const TextStyle(fontSize: 12),
-                ),
-                const SizedBox(width: 16),
-                Text(
-                  'Words: ${_textController.text.split(RegExp(r'\s+')).where((w) => w.isNotEmpty).length}',
-                  style: const TextStyle(fontSize: 12),
-                ),
-                const SizedBox(width: 16),
-                Text(
-                  'Selection: ${_textController.selection.isCollapsed ? "None" : "${_textController.selection.start}-${_textController.selection.end}"}',
-                  style: const TextStyle(fontSize: 12),
-                ),
-              ],
+            child: ListenableBuilder(
+              listenable: _controller.selectionStyleListenable,
+              builder: (context, _) {
+                final plain = _controller.quillController.document.toPlainText();
+                final words = plain.split(RegExp(r'\s+')).where((w) => w.isNotEmpty).length;
+                final sel = _controller.quillController.selection;
+                return Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      'Characters: ${plain.length}',
+                      style: const TextStyle(fontSize: 12),
+                    ),
+                    const SizedBox(width: 16),
+                    Text(
+                      'Words: $words',
+                      style: const TextStyle(fontSize: 12),
+                    ),
+                    const SizedBox(width: 16),
+                    Text(
+                      'Selection: ${sel.isCollapsed ? "cursor @ ${sel.start}" : "${sel.start}-${sel.end}"}',
+                      style: const TextStyle(fontSize: 12),
+                    ),
+                  ],
+                );
+              },
             ),
           ),
         ],

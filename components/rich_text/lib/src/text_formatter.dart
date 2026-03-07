@@ -15,7 +15,7 @@ class TextFormatter {
     final selected = text.substring(start, end);
     final before = text.substring(0, start);
     final after = text.substring(end);
-    return '${before}*$selected*$after';
+    return '$before*$selected*$after';
   }
 
   /// Apply underline formatting to selected text

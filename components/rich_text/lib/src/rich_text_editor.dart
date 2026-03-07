@@ -1,57 +1,75 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_quill/flutter_quill.dart';
 
-/// Rich text editor widget for Word-style formatting
+import 'rich_text_controller.dart';
+
+/// WYSIWYG rich text editor (no visible markdown markers).
+///
+/// Uses [RichTextController] for document and formatting. Collapsed cursor +
+/// format button toggles style for subsequent typing (option A). Selection +
+/// format button toggles style on the range (no stacking).
 class RichTextEditor extends StatefulWidget {
-  final String? initialText;
-  final ValueChanged<String>? onChanged;
-  final TextEditingController? controller;
-
   const RichTextEditor({
     super.key,
-    this.initialText,
-    this.onChanged,
-    this.controller,
+    required this.controller,
+    this.focusNode,
+    this.scrollController,
+    this.config = const QuillEditorConfig(),
   });
+
+  /// Rich text controller (markdown export, toolbar state, format toggles).
+  final RichTextController controller;
+
+  /// Optional focus node. One is created internally if null.
+  final FocusNode? focusNode;
+
+  /// Optional scroll controller for the editor scroll view.
+  final ScrollController? scrollController;
+
+  /// Editor configuration (e.g. placeholder, padding).
+  final QuillEditorConfig config;
 
   @override
   State<RichTextEditor> createState() => _RichTextEditorState();
 }
 
 class _RichTextEditorState extends State<RichTextEditor> {
-  late TextEditingController _controller;
+  late FocusNode _focusNode;
+  late ScrollController _scrollController;
+  bool _ownsFocusNode = false;
+  bool _ownsScrollController = false;
 
   @override
   void initState() {
     super.initState();
-    _controller = widget.controller ??
-        TextEditingController(text: widget.initialText ?? '');
-    _controller.addListener(_onTextChanged);
+    if (widget.focusNode != null) {
+      _focusNode = widget.focusNode!;
+    } else {
+      _focusNode = FocusNode();
+      _ownsFocusNode = true;
+    }
+    if (widget.scrollController != null) {
+      _scrollController = widget.scrollController!;
+    } else {
+      _scrollController = ScrollController();
+      _ownsScrollController = true;
+    }
   }
 
   @override
   void dispose() {
-    if (widget.controller == null) {
-      _controller.dispose();
-    } else {
-      _controller.removeListener(_onTextChanged);
-    }
+    if (_ownsFocusNode) _focusNode.dispose();
+    if (_ownsScrollController) _scrollController.dispose();
     super.dispose();
-  }
-
-  void _onTextChanged() {
-    widget.onChanged?.call(_controller.text);
   }
 
   @override
   Widget build(BuildContext context) {
-    return TextField(
-      controller: _controller,
-      maxLines: null,
-      decoration: const InputDecoration(
-        border: InputBorder.none,
-        hintText: 'Start typing...',
-      ),
+    return QuillEditor.basic(
+      controller: widget.controller.quillController,
+      focusNode: _focusNode,
+      scrollController: _scrollController,
+      config: widget.config,
     );
   }
 }
-
