@@ -13,7 +13,6 @@ import re
 import shutil
 import subprocess
 import sys
-import time
 from pathlib import Path
 from urllib.request import Request, urlopen
 from urllib.error import URLError
@@ -714,71 +713,90 @@ def cmd_test(args):
     info("All tests passed.")
 
 
-OLLAMA_DEFAULT_MODEL = "qwen2.5-coder:7b"
-OLLAMA_BASE_URL = "http://localhost:11434"
+OPENAI_DEFAULT_MODEL = "gpt-4o-mini"
+ANTHROPIC_DEFAULT_MODEL = "claude-3-5-haiku-20241022"
 
 
-def _ollama_reachable():
-    """Return True if Ollama API is reachable."""
-    try:
-        req = Request(f"{OLLAMA_BASE_URL}/api/tags", method="GET")
-        with urlopen(req, timeout=3) as _:
-            return True
-    except (URLError, OSError):
-        return False
-
-
-def _ollama_ensure_running():
-    """
-    If Ollama is already reachable, return None.
-    Otherwise start 'ollama serve' in the background, wait for it to be ready (up to 30s), and return the process.
-    Caller must terminate the returned process when done (e.g. in a finally block).
-    """
-    if _ollama_reachable():
-        return None
-    if not shutil.which("ollama"):
-        return None
-    try:
-        proc = subprocess.Popen(
-            ["ollama", "serve"],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            start_new_session=True,
+def _build_commit_prompt(context, short):
+    """Build the commit-message prompt (shared by OpenAI and Anthropic)."""
+    prompt = (
+        "Generate a git commit message from the following git status and diff. "
+        "Reply with ONLY the commit message, no explanation.\n"
+    )
+    if short:
+        prompt += "Use a single line (conventional commit style, e.g. type: description).\n"
+    else:
+        prompt += (
+            "Format exactly like this: first line is a conventional commit header (type: description), "
+            "then a blank line, then bullet points (one per line starting with '- ') summarizing the changes. "
+            "Do not use markdown (no ** or backticks). Example:\n"
+            "refactor(ui): improve button layout\n\n"
+            "- align primary actions to the right\n"
+            "- add spacing between icon and label\n"
         )
-    except (OSError, FileNotFoundError):
-        return None
-    deadline = time.monotonic() + 30
-    while time.monotonic() < deadline:
-        if proc.poll() is not None:
+    prompt += "\n---\n" + context
+    return prompt
+
+
+def _generate_openai(context, short, model, api_key):
+    """Call OpenAI chat/completions. Return message or None on failure."""
+    prompt = _build_commit_prompt(context, short)
+    body = json.dumps({
+        "model": model,
+        "messages": [{"role": "user", "content": prompt}],
+        "max_tokens": 500,
+    }).encode("utf-8")
+    try:
+        req = Request(
+            "https://api.openai.com/v1/chat/completions",
+            data=body,
+            headers={
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {api_key}",
+            },
+            method="POST",
+        )
+        with urlopen(req, timeout=60) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+        choice = (data.get("choices") or [None])[0]
+        if not choice:
             return None
-        if _ollama_reachable():
-            return proc
-        time.sleep(0.5)
-    try:
-        proc.terminate()
-        proc.wait(timeout=5)
-    except (OSError, subprocess.TimeoutExpired):
-        try:
-            proc.kill()
-        except OSError:
-            pass
-    return None
+        text = (choice.get("message") or {}).get("content") or ""
+        text = text.strip()
+        return text if text else None
+    except (URLError, OSError, ValueError, KeyError):
+        return None
 
 
-def _ollama_pull(model):
-    """Run 'ollama pull <model>'. Return True if pull succeeded (exit 0), False otherwise."""
-    if not shutil.which("ollama"):
-        return False
+def _generate_anthropic(context, short, model, api_key):
+    """Call Anthropic messages API. Return message or None on failure."""
+    prompt = _build_commit_prompt(context, short)
+    body = json.dumps({
+        "model": model,
+        "max_tokens": 500,
+        "messages": [{"role": "user", "content": prompt}],
+    }).encode("utf-8")
     try:
-        result = subprocess.run(
-            ["ollama", "pull", model],
-            capture_output=True,
-            text=True,
-            timeout=600,
+        req = Request(
+            "https://api.anthropic.com/v1/messages",
+            data=body,
+            headers={
+                "Content-Type": "application/json",
+                "x-api-key": api_key,
+                "anthropic-version": "2023-06-01",
+            },
+            method="POST",
         )
-        return result.returncode == 0
-    except (OSError, subprocess.TimeoutExpired):
-        return False
+        with urlopen(req, timeout=60) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+        content = data.get("content") or []
+        if not content:
+            return None
+        text = (content[0].get("text") if isinstance(content[0], dict) else "") or ""
+        text = text.strip()
+        return text if text else None
+    except (URLError, OSError, ValueError, KeyError):
+        return None
 
 
 def _git_check_repo():
@@ -844,49 +862,6 @@ def _generate_heuristic(status_short, short):
     return f"{header}\n\n{body}"
 
 
-def _generate_ollama(context, short, model):
-    """Call Ollama /api/generate. Return message or None on failure."""
-    prompt = (
-        "Generate a git commit message from the following git status and diff. "
-        "Reply with ONLY the commit message, no explanation.\n"
-    )
-    if short:
-        prompt += "Use a single line (conventional commit style, e.g. type: description).\n"
-    else:
-        prompt += (
-            "Format exactly like this: first line is a conventional commit header (type: description), "
-            "then a blank line, then bullet points (one per line starting with '- ') summarizing the changes. "
-            "Do not use markdown (no ** or backticks). Example:\n"
-            "refactor(ui): improve button layout\n\n"
-            "- align primary actions to the right\n"
-            "- add spacing between icon and label\n"
-        )
-    prompt += "\n---\n" + context
-
-    body = json.dumps({
-        "model": model,
-        "prompt": prompt,
-        "stream": False,
-    }).encode("utf-8")
-    try:
-        req = Request(
-            f"{OLLAMA_BASE_URL}/api/generate",
-            data=body,
-            headers={"Content-Type": "application/json"},
-            method="POST",
-        )
-        with urlopen(req, timeout=90) as resp:
-            data = json.loads(resp.read().decode("utf-8"))
-        if data.get("error"):
-            return None
-        text = (data.get("response") or "").strip()
-        if not text:
-            return None
-        return text
-    except (URLError, OSError, ValueError, KeyError):
-        return None
-
-
 def _copy_to_clipboard(text):
     """Copy text to clipboard if pyperclip available; else return False."""
     if pyperclip:
@@ -908,33 +883,24 @@ def cmd_commit(args):
         _git_check_repo()
         context, status_short = _git_collect_context()
         short = getattr(args, "short", False)
-        model = os.environ.get("COMMIT_LLM_MODEL", OLLAMA_DEFAULT_MODEL)
-        ollama_proc = _ollama_ensure_running()
-        try:
-            message = _generate_ollama(context, short, model)
+        openai_key = os.environ.get("OPENAI_API_KEY")
+        anthropic_key = os.environ.get("ANTHROPIC_API_KEY")
+
+        if openai_key:
+            model = os.environ.get("OPENAI_MODEL", OPENAI_DEFAULT_MODEL)
+            message = _generate_openai(context, short, model, openai_key)
             if message is None:
-                if _ollama_reachable():
-                    info(f"Model {model} not found; pulling...")
-                    if _ollama_pull(model):
-                        message = _generate_ollama(context, short, model)
-                    if message is None:
-                        info("Ollama generate failed after pull; using heuristic.")
-                elif not shutil.which("ollama"):
-                    info("Ollama not in PATH; install it (e.g. brew install ollama) or use heuristic.")
-                else:
-                    info("Ollama not available, using heuristic.")
-                if message is None:
-                    message = _generate_heuristic(status_short, short)
-        finally:
-            if ollama_proc is not None:
-                try:
-                    ollama_proc.terminate()
-                    ollama_proc.wait(timeout=10)
-                except (OSError, subprocess.TimeoutExpired):
-                    try:
-                        ollama_proc.kill()
-                    except OSError:
-                        pass
+                info("OpenAI request failed; using heuristic.")
+                message = _generate_heuristic(status_short, short)
+        elif anthropic_key:
+            model = os.environ.get("ANTHROPIC_MODEL", ANTHROPIC_DEFAULT_MODEL)
+            message = _generate_anthropic(context, short, model, anthropic_key)
+            if message is None:
+                info("Anthropic request failed; using heuristic.")
+                message = _generate_heuristic(status_short, short)
+        else:
+            info("No OPENAI_API_KEY or ANTHROPIC_API_KEY; using heuristic.")
+            message = _generate_heuristic(status_short, short)
 
     # Preview
     print("Commit message (copied to clipboard):")
@@ -1085,7 +1051,9 @@ def main():
     # Commit command: generate message from git status/diff, preview + clipboard
     commit_parser = subparsers.add_parser(
         "commit",
-        help="Generate commit message from git status/diff; preview in terminal and copy to clipboard",
+        help="Generate commit message from git status/diff; preview in terminal and copy to clipboard. "
+        "Uses OPENAI_API_KEY or ANTHROPIC_API_KEY; optional OPENAI_MODEL / ANTHROPIC_MODEL. "
+        "Falls back to heuristic if unset or on error.",
     )
     commit_parser.add_argument(
         "-s", "--short",

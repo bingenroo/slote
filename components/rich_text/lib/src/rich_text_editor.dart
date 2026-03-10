@@ -54,6 +54,16 @@ class _RichTextEditorState extends State<RichTextEditor> {
       _scrollController = ScrollController();
       _ownsScrollController = true;
     }
+    // Re-sync selection after first layout so tap/click position and cursor stay aligned.
+    // Without this, the first few interactions can use wrong offsets (cursor jumps / wrong line breaks).
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final qc = widget.controller.quillController;
+      final sel = qc.selection;
+      if (sel.isValid) {
+        qc.updateSelection(sel, ChangeSource.local);
+      }
+    });
   }
 
   @override

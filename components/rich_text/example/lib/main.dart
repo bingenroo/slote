@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:rich_text/rich_text.dart';
 
@@ -53,6 +54,14 @@ class _RichTextExampleScreenState extends State<_RichTextExampleScreen> {
     super.dispose();
   }
 
+  static bool _isDesktopOrWeb(BuildContext context) {
+    if (kIsWeb) return true;
+    final platform = Theme.of(context).platform;
+    return platform == TargetPlatform.windows ||
+        platform == TargetPlatform.macOS ||
+        platform == TargetPlatform.linux;
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -80,16 +89,31 @@ class _RichTextExampleScreenState extends State<_RichTextExampleScreen> {
             ),
             child: FormatToolbar(controller: _controller),
           ),
+          // Give the editor a bounded height so it gets correct layout and tap/Enter
+          // positions. Nesting QuillEditor inside SingleChildScrollView causes the
+          // first line break to be inserted in the wrong place (middle of line).
           Expanded(
-            child: SingleChildScrollView(
+            flex: 3,
+            child: Padding(
               padding: const EdgeInsets.all(16),
+              child: RichTextEditor(
+                controller: _controller,
+                    config: richTextEditorConfig(
+                      context,
+                      enableIndentOnTab: _isDesktopOrWeb(context),
+                      controller: _controller,
+                    ),
+              ),
+            ),
+          ),
+          Expanded(
+            flex: 1,
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  RichTextEditor(
-                    controller: _controller,
-                  ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 8),
                   const Divider(),
                   const SizedBox(height: 8),
                   Text(
@@ -115,6 +139,7 @@ class _RichTextExampleScreenState extends State<_RichTextExampleScreen> {
                       ),
                     ),
                   ),
+                  const SizedBox(height: 16),
                 ],
               ),
             ),

@@ -97,6 +97,10 @@ With this, the app does not bottleneck on markdown: editing stays responsive, an
 - `markdown_quill` – Delta ↔ Markdown (full markdown).
 - `markdown` – Parser for Markdown → Delta.
 
+## Docs
+
+- **[Flutter Quill ↔ Markdown rendering](docs/markdown-rendering.md)** – How Quill document ↔ Markdown conversion works, where it lives (`RichTextController`), custom handlers, debouncing, and end-to-end flow.
+
 ## Example
 
 See `example/` for a runnable app: toolbar, WYSIWYG editor, and debounced Markdown preview.

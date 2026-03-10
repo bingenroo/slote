@@ -14,10 +14,15 @@ class SelectionStyleState {
     this.isUnderline = false,
     this.isStrikethrough = false,
     this.isInlineCode = false,
+    this.isSubscript = false,
+    this.isSuperscript = false,
     this.headerLevel,
     this.isBlockQuote = false,
     this.isCodeBlock = false,
     this.listType,
+    this.sizeLabel,
+    this.alignment,
+    this.indentLevel = 0,
   });
 
   final bool isBold;
@@ -25,12 +30,22 @@ class SelectionStyleState {
   final bool isUnderline;
   final bool isStrikethrough;
   final bool isInlineCode;
+  final bool isSubscript;
+  final bool isSuperscript;
   /// 1, 2, or 3 for H1/H2/H3; null for paragraph.
   final int? headerLevel;
   final bool isBlockQuote;
   final bool isCodeBlock;
-  /// 'bullet' or 'ordered' for list; null for normal block.
+  /// 'bullet', 'ordered', 'checked', or 'unchecked' for list; null for normal block.
   final String? listType;
+  /// 'small', 'normal', 'large', 'huge' for font size.
+  final String? sizeLabel;
+  /// Current block alignment.
+  final TextAlign? alignment;
+  /// Current block indent level (0, 1, 2, 3).
+  final int indentLevel;
+
+  bool get isChecklist => listType == 'checked' || listType == 'unchecked';
 
   SelectionStyleState copyWith({
     bool? isBold,
@@ -38,10 +53,15 @@ class SelectionStyleState {
     bool? isUnderline,
     bool? isStrikethrough,
     bool? isInlineCode,
+    bool? isSubscript,
+    bool? isSuperscript,
     int? headerLevel,
     bool? isBlockQuote,
     bool? isCodeBlock,
     String? listType,
+    String? sizeLabel,
+    TextAlign? alignment,
+    int? indentLevel,
   }) {
     return SelectionStyleState(
       isBold: isBold ?? this.isBold,
@@ -49,10 +69,15 @@ class SelectionStyleState {
       isUnderline: isUnderline ?? this.isUnderline,
       isStrikethrough: isStrikethrough ?? this.isStrikethrough,
       isInlineCode: isInlineCode ?? this.isInlineCode,
+      isSubscript: isSubscript ?? this.isSubscript,
+      isSuperscript: isSuperscript ?? this.isSuperscript,
       headerLevel: headerLevel ?? this.headerLevel,
       isBlockQuote: isBlockQuote ?? this.isBlockQuote,
       isCodeBlock: isCodeBlock ?? this.isCodeBlock,
       listType: listType ?? this.listType,
+      sizeLabel: sizeLabel ?? this.sizeLabel,
+      alignment: alignment ?? this.alignment,
+      indentLevel: indentLevel ?? this.indentLevel,
     );
   }
 }
@@ -97,7 +122,38 @@ class RichTextController extends ChangeNotifier {
     final listAttr = attrs[Attribute.list.key];
     if (listAttr != null && listAttr.value != null) {
       final v = listAttr.value.toString();
-      if (v == 'bullet' || v == 'ordered') listType = v;
+      if (v == 'bullet' || v == 'ordered' || v == 'checked' || v == 'unchecked') listType = v;
+    }
+    String? sizeLabel;
+    final sizeAttr = attrs[Attribute.size.key];
+    if (sizeAttr != null && sizeAttr.value != null) {
+      final v = sizeAttr.value.toString();
+      if (v == 'small' || v == 'large' || v == 'huge') sizeLabel = v;
+    } else {
+      sizeLabel = 'normal';
+    }
+    TextAlign? alignment;
+    final alignAttr = attrs[Attribute.align.key];
+    if (alignAttr != null && alignAttr.value != null) {
+      switch (alignAttr.value.toString()) {
+        case 'left':
+          alignment = TextAlign.left;
+          break;
+        case 'center':
+          alignment = TextAlign.center;
+          break;
+        case 'right':
+          alignment = TextAlign.right;
+          break;
+        case 'justify':
+          alignment = TextAlign.justify;
+          break;
+      }
+    }
+    int indentLevel = 0;
+    final indentAttr = attrs[Attribute.indent.key];
+    if (indentAttr != null && indentAttr.value != null && indentAttr.value is int) {
+      indentLevel = indentAttr.value as int;
     }
     return SelectionStyleState(
       isBold: attrs.containsKey(Attribute.bold.key),
@@ -105,10 +161,15 @@ class RichTextController extends ChangeNotifier {
       isUnderline: attrs.containsKey(Attribute.underline.key),
       isStrikethrough: attrs.containsKey(Attribute.strikeThrough.key),
       isInlineCode: attrs.containsKey(Attribute.inlineCode.key),
+      isSubscript: attrs[Attribute.script.key] == Attribute.subscript,
+      isSuperscript: attrs[Attribute.script.key] == Attribute.superscript,
       headerLevel: headerLevel,
       isBlockQuote: attrs.containsKey(Attribute.blockQuote.key),
       isCodeBlock: attrs.containsKey(Attribute.codeBlock.key),
       listType: listType,
+      sizeLabel: sizeLabel,
+      alignment: alignment,
+      indentLevel: indentLevel,
     );
   }
 
@@ -148,6 +209,12 @@ class RichTextController extends ChangeNotifier {
   /// Toggle strikethrough at current selection.
   void toggleStrikethrough() => _toggleAttribute(Attribute.strikeThrough);
 
+  /// Toggle subscript at current selection.
+  void toggleSubscript() => _toggleScriptAttribute(Attribute.subscript);
+
+  /// Toggle superscript at current selection.
+  void toggleSuperscript() => _toggleScriptAttribute(Attribute.superscript);
+
   /// Toggle inline code at current selection.
   void toggleInlineCode() => _toggleAttribute(Attribute.inlineCode);
 
@@ -170,11 +237,184 @@ class RichTextController extends ChangeNotifier {
   /// Toggle code block at current line(s).
   void toggleCodeBlock() => _toggleBlockAttribute(Attribute.codeBlock);
 
+  /// Insert a horizontal rule (divider) on a new line at the end of the current block.
+  /// The rule is always placed after the current paragraph with consistent weight.
+  void insertHorizontalRule() {
+    const dividerType = 'divider';
+    final offset = _endOfCurrentBlock(_quillController.selection.start);
+    _quillController.replaceText(offset, 0, '\n', null);
+    _quillController.replaceText(
+      offset + 1,
+      0,
+      BlockEmbed(dividerType, 'hr'),
+      TextSelection.collapsed(offset: offset + 2),
+    );
+  }
+
+  /// Insert a table with [columnCount] columns and [rowCount] rows (including header)
+  /// on a new line at the end of the current block.
+  /// [rowCount] and [columnCount] must be at least 1.
+  void insertTableWithSize(int columnCount, int rowCount) {
+    final cols = columnCount.clamp(1, 20);
+    final rows = rowCount.clamp(1, 30);
+    final tableMarkdown = _buildTableMarkdown(cols, rows);
+    final offset = _endOfCurrentBlock(_quillController.selection.start);
+    _quillController.replaceText(offset, 0, '\n', null);
+    _quillController.replaceText(
+      offset + 1,
+      0,
+      EmbeddableTable(tableMarkdown),
+      TextSelection.collapsed(offset: offset + 2),
+    );
+    // Ensure a newline after the table so the embed is alone on its line.
+    _quillController.replaceText(offset + 2, 0, '\n', null);
+    final docLength = _quillController.document.length;
+    final sel = (offset + 3).clamp(0, docLength);
+    _quillController.updateSelection(
+      TextSelection.collapsed(offset: sel),
+      ChangeSource.local,
+    );
+  }
+
+  int _endOfCurrentBlock(int fromOffset) {
+    final plain = _quillController.document.toPlainText();
+    final nextNewline = plain.indexOf('\n', fromOffset);
+    if (nextNewline == -1) return _quillController.document.length;
+    return nextNewline;
+  }
+
+  static String _buildTableMarkdown(int cols, int rows) {
+    final sb = StringBuffer();
+    final headerCells = List.filled(cols, ' ');
+    sb.writeln('|${headerCells.join('|')}|');
+    sb.writeln('|${List.filled(cols, '---').join('|')}|');
+    for (var r = 0; r < rows - 1; r++) {
+      sb.writeln('|${List.filled(cols, ' ').join('|')}|');
+    }
+    return sb.toString();
+  }
+
+  /// Insert a 2×2 table at the end of the current block (convenience method).
+  void insertTable() {
+    insertTableWithSize(2, 2);
+  }
+
+  /// Replaces the table embed at [offset] with a new table whose markdown is [newMarkdown].
+  /// Used when the user edits cell content in the table. [offset] should be the document
+  /// offset of the embed (e.g. from selection when the table is focused).
+  void replaceTableEmbedAt(int offset, String newMarkdown) {
+    _quillController.replaceText(offset, 1, EmbeddableTable(newMarkdown), null);
+  }
+
   /// Toggle bullet list. If current block is already bullet list, clears to paragraph.
+  /// Only the list attribute is changed; existing line style (formatting, etc.) is preserved.
   void toggleBulletList() => _toggleBlockAttribute(Attribute.ul);
 
   /// Toggle ordered list. If current block is already ordered list, clears to paragraph.
+  /// Only the list attribute is changed; existing line style is preserved.
   void toggleOrderedList() => _toggleBlockAttribute(Attribute.ol);
+
+  /// Toggle checklist (todo list) at current line(s). New checklist items are unchecked by default.
+  void toggleChecklist() {
+    final style = _quillController.getSelectionStyle();
+    final current = style.attributes[Attribute.list.key];
+    final isChecklist = current != null &&
+        (current.value == Attribute.checked.value ||
+            current.value == Attribute.unchecked.value);
+    if (isChecklist) {
+      _quillController.formatSelection(Attribute.clone(Attribute.list, null));
+    } else {
+      _quillController.formatSelection(Attribute.unchecked);
+    }
+  }
+
+  /// Apply block alignment.
+  void applyAlignment(TextAlign align) {
+    final attr = align == TextAlign.center
+        ? Attribute.centerAlignment
+        : align == TextAlign.right
+            ? Attribute.rightAlignment
+            : align == TextAlign.justify
+                ? Attribute.justifyAlignment
+                : Attribute.leftAlignment;
+    _quillController.formatSelection(attr);
+  }
+
+  /// Apply font size: 'small', 'normal', 'large', or 'huge'.
+  void applySize(String size) {
+    if (size == 'normal') {
+      _quillController.formatSelection(Attribute.clone(Attribute.size, null));
+    } else if (size == 'small' || size == 'large' || size == 'huge') {
+      _quillController.formatSelection(Attribute.clone(Attribute.size, size));
+    }
+  }
+
+  /// Apply link to current selection. [url] must not be null or empty.
+  void applyLink(String url) {
+    if (url.trim().isEmpty) return;
+    _quillController.formatSelection(Attribute.clone(Attribute.link, url.trim()));
+  }
+
+  /// Clear all formatting on the current selection.
+  void clearFormatting() {
+    final style = _quillController.getSelectionStyle();
+    for (final attr in style.attributes.values) {
+      _quillController.formatSelection(Attribute.clone(attr, null));
+    }
+  }
+
+  /// Inserts a line break at the current selection and moves the cursor after it.
+  ///
+  /// Use for consistent Enter behavior:
+  /// - At end of paragraph (cursor at [document.length] or end of block): creates
+  ///   a new line below and moves the cursor there.
+  /// - In the middle of a line: splits the line at the cursor; text after the
+  ///   cursor moves to the new line and the cursor is placed at the start of
+  ///   that new line.
+  void insertLineBreak() {
+    final sel = _quillController.selection;
+    final offset = sel.baseOffset;
+    final newOffset = offset + 1;
+    _quillController.replaceText(
+      offset,
+      0,
+      '\n',
+      TextSelection.collapsed(offset: newOffset),
+    );
+    // Explicitly apply cursor so it stays correct (avoids cursor jumping after insert).
+    _quillController.updateSelection(
+      TextSelection.collapsed(offset: newOffset),
+      ChangeSource.local,
+    );
+  }
+
+  /// Increase indent of current block(s). Does nothing if already at max level.
+  void increaseIndent() {
+    final style = _quillController.getSelectionStyle();
+    final current = style.attributes[Attribute.indent.key];
+    int level = 0;
+    if (current != null && current.value is int) {
+      level = current.value as int;
+    }
+    if (level >= 3) return;
+    _quillController.formatSelection(Attribute.getIndentLevel(level + 1));
+  }
+
+  /// Decrease indent of current block(s). Does nothing if already at 0.
+  void decreaseIndent() {
+    final style = _quillController.getSelectionStyle();
+    final current = style.attributes[Attribute.indent.key];
+    int level = 0;
+    if (current != null && current.value is int) {
+      level = current.value as int;
+    }
+    if (level <= 0) return;
+    if (level == 1) {
+      _quillController.formatSelection(Attribute.clone(Attribute.indent, null));
+    } else {
+      _quillController.formatSelection(Attribute.getIndentLevel(level - 1));
+    }
+  }
 
   void _toggleAttribute(Attribute attribute) {
     final style = _quillController.getSelectionStyle();
@@ -191,6 +431,15 @@ class RichTextController extends ChangeNotifier {
         (attribute.value == null || current.value == attribute.value);
     _quillController.formatSelection(
       isActive ? Attribute.clone(attribute, null) : attribute,
+    );
+  }
+
+  void _toggleScriptAttribute(Attribute scriptAttr) {
+    final style = _quillController.getSelectionStyle();
+    final current = style.attributes[Attribute.script.key];
+    final isActive = current != null && current.value == scriptAttr.value;
+    _quillController.formatSelection(
+      isActive ? Attribute.clone(Attribute.script, null) : scriptAttr,
     );
   }
 
@@ -214,11 +463,25 @@ class RichTextController extends ChangeNotifier {
         afterContent: (attr, node, out) => out.write('__'),
       ),
     },
+    customEmbedHandlers: {
+      EmbeddableTable.tableType: EmbeddableTable.toMdSyntax,
+    },
   );
 
+  /// Markdown document that parses table syntax into [EmbeddableTable] elements
+  /// so [MarkdownToDelta] can produce table embeds when loading/pasting.
+  static final md.Document _markdownDocument = md.Document(
+        blockSyntaxes: [
+          const EmbeddableTableSyntax(),
+        ],
+      );
+
   static final MarkdownToDelta _markdownToDelta = MarkdownToDelta(
-    markdownDocument: md.Document(),
-  );
+        markdownDocument: _markdownDocument,
+        customElementToEmbeddable: {
+          EmbeddableTable.tableType: EmbeddableTable.fromMdSyntax,
+        },
+      );
 
   static QuillController _createController(String initialMarkdown) {
     Delta delta;
@@ -229,9 +492,10 @@ class RichTextController extends ChangeNotifier {
       if (delta.isEmpty) delta = Delta()..insert('\n');
     }
     final document = Document.fromDelta(delta);
+    final endOffset = document.length;
     return QuillController(
       document: document,
-      selection: const TextSelection.collapsed(offset: 0),
+      selection: TextSelection.collapsed(offset: endOffset),
     );
   }
 
