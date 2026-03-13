@@ -13,6 +13,7 @@ QuillEditorConfig richTextEditorConfig(
   BuildContext context, {
   bool enableIndentOnTab = false,
   RichTextController? controller,
+  EditorFocusRequester? editorFocusRequester,
 }) {
   final defaultStyles = DefaultStyles.getInstance(context);
   final theme = Theme.of(context);
@@ -203,8 +204,17 @@ QuillEditorConfig richTextEditorConfig(
   return QuillEditorConfig(
     customStyles: customStyles,
     enableAlwaysIndentOnTab: enableIndentOnTab,
+    textCapitalization: TextCapitalization.none,
     embedBuilders: [
       const HorizontalRuleEmbedBuilder(),
+      SyntaxCodeBlockEmbedBuilder(
+        onReplaceCodeBlock: controller != null
+            ? (offset, language, code) =>
+                controller.replaceSyntaxCodeBlockAt(offset, language, code)
+            : null,
+        controller: controller,
+        editorFocusRequester: editorFocusRequester,
+      ),
       // Table disabled for now; code kept in embed_builders.dart for future use.
       // TableEmbedBuilder(
       //   onReplaceTable: controller != null

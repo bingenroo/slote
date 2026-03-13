@@ -6,8 +6,22 @@ void main() {
   runApp(const RichTextExampleApp());
 }
 
-class RichTextExampleApp extends StatelessWidget {
+class RichTextExampleApp extends StatefulWidget {
   const RichTextExampleApp({super.key});
+
+  @override
+  State<RichTextExampleApp> createState() => _RichTextExampleAppState();
+}
+
+class _RichTextExampleAppState extends State<RichTextExampleApp> {
+  ThemeMode _themeMode = ThemeMode.light;
+
+  void _toggleTheme() {
+    setState(() {
+      _themeMode =
+          _themeMode == ThemeMode.light ? ThemeMode.dark : ThemeMode.light;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -17,13 +31,20 @@ class RichTextExampleApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
         useMaterial3: true,
       ),
-      home: const _RichTextExampleScreen(),
+      darkTheme: ThemeData(
+        colorScheme: ColorScheme.dark(primary: Colors.blue),
+        useMaterial3: true,
+      ),
+      themeMode: _themeMode,
+      home: _RichTextExampleScreen(onToggleTheme: _toggleTheme),
     );
   }
 }
 
 class _RichTextExampleScreen extends StatefulWidget {
-  const _RichTextExampleScreen();
+  const _RichTextExampleScreen({required this.onToggleTheme});
+
+  final VoidCallback onToggleTheme;
 
   @override
   State<_RichTextExampleScreen> createState() => _RichTextExampleScreenState();
@@ -31,6 +52,7 @@ class _RichTextExampleScreen extends StatefulWidget {
 
 class _RichTextExampleScreenState extends State<_RichTextExampleScreen> {
   late RichTextController _controller;
+  final EditorFocusRequester _editorFocusRequester = EditorFocusRequester();
   String _debouncedMarkdown = '';
 
   @override
@@ -64,10 +86,22 @@ class _RichTextExampleScreenState extends State<_RichTextExampleScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Scaffold(
       appBar: AppBar(
         title: const Text('Rich Text Example'),
         actions: [
+          IconButton(
+            icon: Icon(
+              theme.brightness == Brightness.dark
+                  ? Icons.light_mode
+                  : Icons.dark_mode,
+            ),
+            onPressed: widget.onToggleTheme,
+            tooltip: theme.brightness == Brightness.dark
+                ? 'Switch to light mode'
+                : 'Switch to dark mode',
+          ),
           IconButton(
             icon: const Icon(Icons.clear),
             onPressed: () {
@@ -82,9 +116,9 @@ class _RichTextExampleScreenState extends State<_RichTextExampleScreen> {
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: Colors.grey[200],
+              color: theme.colorScheme.surfaceContainerHighest,
               border: Border(
-                bottom: BorderSide(color: Colors.grey[300]!),
+                bottom: BorderSide(color: theme.dividerColor),
               ),
             ),
             child: FormatToolbar(controller: _controller),
@@ -98,11 +132,13 @@ class _RichTextExampleScreenState extends State<_RichTextExampleScreen> {
               padding: const EdgeInsets.all(16),
               child: RichTextEditor(
                 controller: _controller,
-                    config: richTextEditorConfig(
-                      context,
-                      enableIndentOnTab: _isDesktopOrWeb(context),
-                      controller: _controller,
-                    ),
+                config: richTextEditorConfig(
+                  context,
+                  enableIndentOnTab: _isDesktopOrWeb(context),
+                  controller: _controller,
+                  editorFocusRequester: _editorFocusRequester,
+                ),
+                editorFocusRequester: _editorFocusRequester,
               ),
             ),
           ),
@@ -118,8 +154,8 @@ class _RichTextExampleScreenState extends State<_RichTextExampleScreen> {
                   const SizedBox(height: 8),
                   Text(
                     'Markdown output (debounced, DB-ready)',
-                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                          color: Colors.grey[600],
+                    style: theme.textTheme.titleSmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
                         ),
                   ),
                   const SizedBox(height: 8),
@@ -127,15 +163,16 @@ class _RichTextExampleScreenState extends State<_RichTextExampleScreen> {
                     width: double.infinity,
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: Colors.grey[100],
+                      color: theme.colorScheme.surfaceContainerLow,
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.grey[300]!),
+                      border: Border.all(color: theme.colorScheme.outline),
                     ),
                     child: SelectableText(
                       _debouncedMarkdown.isEmpty ? '(empty)' : _debouncedMarkdown,
-                      style: const TextStyle(
+                      style: theme.textTheme.bodyMedium?.copyWith(
                         fontFamily: 'monospace',
                         fontSize: 12,
+                        color: theme.colorScheme.onSurface,
                       ),
                     ),
                   ),
@@ -146,7 +183,7 @@ class _RichTextExampleScreenState extends State<_RichTextExampleScreen> {
           ),
           Container(
             padding: const EdgeInsets.all(8),
-            color: Colors.grey[200],
+            color: theme.colorScheme.surfaceContainerHighest,
             child: ListenableBuilder(
               listenable: _controller.selectionStyleListenable,
               builder: (context, _) {
@@ -158,17 +195,17 @@ class _RichTextExampleScreenState extends State<_RichTextExampleScreen> {
                   children: [
                     Text(
                       'Characters: ${plain.length}',
-                      style: const TextStyle(fontSize: 12),
+                      style: theme.textTheme.bodySmall,
                     ),
                     const SizedBox(width: 16),
                     Text(
                       'Words: $words',
-                      style: const TextStyle(fontSize: 12),
+                      style: theme.textTheme.bodySmall,
                     ),
                     const SizedBox(width: 16),
                     Text(
                       'Selection: ${sel.isCollapsed ? "cursor @ ${sel.start}" : "${sel.start}-${sel.end}"}',
-                      style: const TextStyle(fontSize: 12),
+                      style: theme.textTheme.bodySmall,
                     ),
                   ],
                 );

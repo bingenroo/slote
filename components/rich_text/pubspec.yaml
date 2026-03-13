@@ -10,6 +10,7 @@ dependencies:
   flutter:
     sdk: flutter
   flutter_quill: ^11.0.0
+  highlight: ^0.7.0
   lucide_icons: ^0.257.0
   markdown: ^7.0.0
   markdown_quill: ^4.0.0

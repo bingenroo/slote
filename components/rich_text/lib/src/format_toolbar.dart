@@ -54,13 +54,14 @@ class FormatToolbar extends StatelessWidget {
   }
 
   Widget _moreMarkdownButton(BuildContext context, Color color, RichTextController controller) {
+    final theme = Theme.of(context);
     return PopupMenuButton<String>(
       tooltip: 'Insert block',
-      icon: Icon(LucideIcons.plus, size: 22, color: color),
+      icon: Icon(LucideIcons.plus, size: 22, color: theme.colorScheme.onSurface),
       onSelected: (value) {
         switch (value) {
           case 'codeblock':
-            controller.toggleCodeBlock();
+            controller.insertSyntaxCodeBlock();
             break;
           case 'horizontalrule':
             controller.insertHorizontalRule();

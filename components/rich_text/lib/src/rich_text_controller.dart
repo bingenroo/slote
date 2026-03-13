@@ -6,6 +6,26 @@ import 'package:flutter_quill/quill_delta.dart';
 import 'package:markdown/markdown.dart' as md;
 import 'package:markdown_quill/markdown_quill.dart';
 
+import 'fenced_code_embed_syntax.dart';
+import 'syntax_code_block.dart';
+
+/// Allows code block (and other embeds) to request focus back to the main editor
+/// when exiting with arrow keys. The [RichTextEditor] registers its focus callback
+/// so only one cursor is visible and keyboard navigation works.
+class EditorFocusRequester {
+  void Function()? _requestFocus;
+
+  /// Called by the editor to register its focus callback. Do not call from app code.
+  void setRequestFocus(void Function()? fn) {
+    _requestFocus = fn;
+  }
+
+  /// Request focus for the main editor (e.g. when exiting a code block).
+  void requestFocus() {
+    _requestFocus?.call();
+  }
+}
+
 /// Style flags for the current selection/caret, used by the format toolbar.
 class SelectionStyleState {
   const SelectionStyleState({
@@ -251,7 +271,37 @@ class RichTextController extends ChangeNotifier {
     );
   }
 
-  /// Insert a table with [columnCount] columns and [rowCount] rows (including header)
+  /// Insert a syntax-highlighted code block on a new line at the end of the current block.
+  /// Use [language] (e.g. 'cpp', 'dart') for highlighting; the footer shows a language selector.
+  void insertSyntaxCodeBlock({String language = 'plaintext', String code = ''}) {
+    final data = language.isEmpty ? code : '$language\n$code';
+    final offset = _endOfCurrentBlock(_quillController.selection.start);
+    _quillController.replaceText(offset, 0, '\n', null);
+    _quillController.replaceText(
+      offset + 1,
+      0,
+      BlockEmbed(syntaxCodeBlockType, data),
+      TextSelection.collapsed(offset: offset + 2),
+    );
+  }
+
+  /// Replaces the syntax code block embed at [offset] with the same code but [language].
+  /// Used when the user changes the language in the block's footer dropdown.
+  void replaceSyntaxCodeBlockAt(int offset, String language, String code) {
+    final data = language.isEmpty ? code : '$language\n$code';
+    _quillController.replaceText(offset, 1, BlockEmbed(syntaxCodeBlockType, data), null);
+  }
+
+  /// Moves the Quill selection to a collapsed cursor at [offset].
+  /// Use when handing focus to/from an embed so the editor shows a single cursor.
+  void moveSelectionTo(int offset) {
+    final docLength = _quillController.document.length;
+    final clamped = offset.clamp(0, docLength);
+    _quillController.updateSelection(
+      TextSelection.collapsed(offset: clamped),
+      ChangeSource.local,
+    );
+  }
   /// on a new line at the end of the current block.
   /// [rowCount] and [columnCount] must be at least 1.
   void insertTableWithSize(int columnCount, int rowCount) {
@@ -465,13 +515,27 @@ class RichTextController extends ChangeNotifier {
     },
     customEmbedHandlers: {
       EmbeddableTable.tableType: EmbeddableTable.toMdSyntax,
+      syntaxCodeBlockType: _syntaxCodeBlockToMdSyntax,
     },
   );
 
-  /// Markdown document that parses table syntax into [EmbeddableTable] elements
-  /// so [MarkdownToDelta] can produce table embeds when loading/pasting.
+  static void _syntaxCodeBlockToMdSyntax(dynamic embed, StringSink out) {
+    final data = embed.data is String
+        ? embed.data as String
+        : (embed is Map ? embed['data'] as String? : null) ?? '';
+    final idx = data.indexOf('\n');
+    final lang = idx >= 0 ? data.substring(0, idx) : '';
+    final code = idx >= 0 ? data.substring(idx + 1) : data;
+    out.writeln('```$lang');
+    out.write(code);
+    if (code.isNotEmpty && !code.endsWith('\n')) out.writeln();
+    out.writeln('```');
+  }
+
+  /// Markdown document that parses table and fenced code into embeds.
   static final md.Document _markdownDocument = md.Document(
         blockSyntaxes: [
+          const FencedCodeToEmbedSyntax(),
           const EmbeddableTableSyntax(),
         ],
       );
@@ -479,9 +543,17 @@ class RichTextController extends ChangeNotifier {
   static final MarkdownToDelta _markdownToDelta = MarkdownToDelta(
         markdownDocument: _markdownDocument,
         customElementToEmbeddable: {
+          syntaxCodeBlockType: _syntaxCodeBlockFromAttrs,
           EmbeddableTable.tableType: EmbeddableTable.fromMdSyntax,
         },
       );
+
+  static BlockEmbed _syntaxCodeBlockFromAttrs(Map<String, String> attrs) {
+    final language = attrs['language'] ?? '';
+    final code = attrs['data'] ?? '';
+    final data = language.isEmpty ? code : '$language\n$code';
+    return BlockEmbed(syntaxCodeBlockType, data);
+  }
 
   static QuillController _createController(String initialMarkdown) {
     Delta delta;

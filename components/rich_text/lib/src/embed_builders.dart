@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_quill/flutter_quill.dart';
-import 'package:markdown_quill/markdown_quill.dart';
+
+import 'rich_text_controller.dart';
+import 'syntax_code_block.dart';
+
 /// Type key for horizontal rule block embed (must match [horizontalRule] / markdown_quill).
 const String horizontalRuleType = 'divider';
 
@@ -37,6 +40,188 @@ class HorizontalRuleEmbedBuilder extends EmbedBuilder {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// Syntax-highlighted code block embed (from markdown ```lang ... ``` or toolbar).
+class SyntaxCodeBlockEmbedBuilder extends EmbedBuilder {
+  const SyntaxCodeBlockEmbedBuilder({
+    this.onReplaceCodeBlock,
+    this.controller,
+    this.editorFocusRequester,
+  });
+
+  /// When set, the block footer shows a language dropdown; on change this is called to update the embed.
+  final void Function(int embedOffset, String language, String code)? onReplaceCodeBlock;
+
+  /// When set with [editorFocusRequester], selection is synced so only one cursor shows and arrow keys exit the block.
+  final RichTextController? controller;
+
+  /// When set with [controller], code block can request focus back to the editor when exiting with arrow keys.
+  final EditorFocusRequester? editorFocusRequester;
+
+  @override
+  String get key => syntaxCodeBlockType;
+
+  @override
+  Widget build(BuildContext context, EmbedContext embedContext) {
+    final value = embedContext.node.value;
+    final data = _getEmbedData(value);
+    final firstNewline = data.indexOf('\n');
+    final language = firstNewline >= 0 ? data.substring(0, firstNewline).trim() : '';
+    final code = firstNewline >= 0 ? data.substring(firstNewline + 1) : data;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final offset = embedContext.node.documentOffset;
+    void onLanguageChanged(String newLanguage) {
+      onReplaceCodeBlock?.call(offset, newLanguage, code);
+    }
+    void onCodeChanged(String newCode) {
+      onReplaceCodeBlock?.call(offset, language, newCode);
+    }
+
+    final codeBlockWidget = SyntaxCodeBlockWidget(
+      code: code,
+      language: language,
+      isDark: isDark,
+      onLanguageChanged: onReplaceCodeBlock != null ? onLanguageChanged : null,
+      onCodeChanged: onReplaceCodeBlock != null ? onCodeChanged : null,
+      embedOffset: offset,
+      onFocusGained: (controller != null && editorFocusRequester != null)
+          ? () => controller!.moveSelectionTo(offset)
+          : null,
+      onExitUp: (controller != null && editorFocusRequester != null)
+          ? () {
+              controller!.moveSelectionTo(offset);
+              editorFocusRequester!.requestFocus();
+            }
+          : null,
+      onExitDown: (controller != null && editorFocusRequester != null)
+          ? () {
+              controller!.moveSelectionTo(offset + 1);
+              editorFocusRequester!.requestFocus();
+            }
+          : null,
+    );
+
+    if (controller != null && editorFocusRequester != null) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: _CodeBlockFocusSync(
+          quillController: controller!.quillController,
+          embedOffset: offset,
+          code: code,
+          language: language,
+          isDark: isDark,
+          onLanguageChanged: onReplaceCodeBlock != null ? onLanguageChanged : null,
+          onCodeChanged: onReplaceCodeBlock != null ? onCodeChanged : null,
+          onFocusGained: () => controller!.moveSelectionTo(offset),
+          onExitUp: () {
+            controller!.moveSelectionTo(offset);
+            editorFocusRequester!.requestFocus();
+          },
+          onExitDown: () {
+            controller!.moveSelectionTo(offset + 1);
+            editorFocusRequester!.requestFocus();
+          },
+        ),
+      );
+    }
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: codeBlockWidget,
+    );
+  }
+
+  static String _getEmbedData(dynamic value) {
+    if (value == null) return '';
+    if (value is Map && value.containsKey('data')) return (value['data'] as String?) ?? '';
+    try {
+      if (value.data is String) return value.data as String;
+    } catch (_) {}
+    return '';
+  }
+}
+
+/// Listens to Quill selection and hands focus to the code block when selection lands on the embed
+/// (arrow down), so the editor doesn't replace the embed with selected text.
+class _CodeBlockFocusSync extends StatefulWidget {
+  const _CodeBlockFocusSync({
+    required this.quillController,
+    required this.embedOffset,
+    required this.code,
+    required this.language,
+    required this.isDark,
+    this.onLanguageChanged,
+    this.onCodeChanged,
+    required this.onFocusGained,
+    required this.onExitUp,
+    required this.onExitDown,
+  });
+
+  final QuillController quillController;
+  final int embedOffset;
+  final String code;
+  final String language;
+  final bool isDark;
+  final void Function(String newLanguage)? onLanguageChanged;
+  final void Function(String newCode)? onCodeChanged;
+  final VoidCallback onFocusGained;
+  final VoidCallback onExitUp;
+  final VoidCallback onExitDown;
+
+  @override
+  State<_CodeBlockFocusSync> createState() => _CodeBlockFocusSyncState();
+}
+
+class _CodeBlockFocusSyncState extends State<_CodeBlockFocusSync> {
+  VoidCallback? _requestCodeBlockFocus;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.quillController.addListener(_onSelectionChanged);
+  }
+
+  @override
+  void didUpdateWidget(covariant _CodeBlockFocusSync oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.quillController != widget.quillController ||
+        oldWidget.embedOffset != widget.embedOffset) {
+      oldWidget.quillController.removeListener(_onSelectionChanged);
+      widget.quillController.addListener(_onSelectionChanged);
+    }
+  }
+
+  @override
+  void dispose() {
+    widget.quillController.removeListener(_onSelectionChanged);
+    super.dispose();
+  }
+
+  void _onSelectionChanged() {
+    final sel = widget.quillController.selection;
+    if (sel.isCollapsed && sel.start == widget.embedOffset && _requestCodeBlockFocus != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _requestCodeBlockFocus?.call();
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SyntaxCodeBlockWidget(
+      code: widget.code,
+      language: widget.language,
+      isDark: widget.isDark,
+      onLanguageChanged: widget.onLanguageChanged,
+      onCodeChanged: widget.onCodeChanged,
+      embedOffset: widget.embedOffset,
+      onFocusGained: widget.onFocusGained,
+      onExitUp: widget.onExitUp,
+      onExitDown: widget.onExitDown,
+      registerRequestFocus: (fn) => _requestCodeBlockFocus = fn,
     );
   }
 }

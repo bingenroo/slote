@@ -4,7 +4,7 @@
 
 ### Version: 2.0
 
-### Last Updated: March 2025
+### Last Updated: March 12, 2025
 
 ---
 
@@ -89,16 +89,17 @@ Custom drawing for Slote.
 
 ### 2.4 Component: `rich_text` (`components/rich_text`)
 
-Rich text editing (Word-style).
+Rich text editing (Word-style), built on Flutter Quill with markdown load/save.
 
-| Feature                | Description                                                                                                       |
-| ---------------------- | ----------------------------------------------------------------------------------------------------------------- |
-| **RichTextController** | Holds content, selection, and markdown; `loadMarkdown`, debounced `onMarkdownChanged`.                            |
-| **RichTextEditor**     | Editable field with formatting applied via controller.                                                            |
-| **Format toolbar**     | UI for bold, italic, underline (and formatting actions).                                                          |
-| **Formatters**         | `Bold`, `Italic`, `Underline`; `TextFormatter` coordinates formatting.                                            |
-| **FormattedText**      | Renders formatted spans.                                                                                          |
-| **Example app**        | `example/`: editor with toolbar, bold/italic/underline, clear; shows debounced markdown and character/word stats. |
+| Feature                | Description                                                                                                                                 |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| **RichTextController** | Wraps QuillController; holds content, selection, and markdown; `loadMarkdown`, debounced `onMarkdownChanged`; selection style state for toolbar. |
+| **RichTextEditor**     | Quill-based editable field with custom embed builders; supports `EditorFocusRequester` for code-block focus sync.                            |
+| **Format toolbar**     | Bold, italic, underline, font size, headings (H1/H2/H3), checklist, bullet/numbered lists, link, alignment, clear formatting, indent/outdent; “+” menu to insert code block, horizontal rule (table disabled for now). |
+| **Embed builders**     | **Horizontal rule** (divider); **syntax-highlighted code block** (from markdown ```lang … ``` or toolbar): language dropdown, Copy, editable code, arrow-key exit into/out of block; table embed exists but is commented out. |
+| **Code blocks**        | `SyntaxCodeBlockWidget`, `FencedCodeToEmbedSyntax` (markdown fenced code → embed); highlight-based syntax coloring (VS Code–style), multiple languages. |
+| **Formatters**         | Bold, italic, underline (and other inline/block attributes via Quill).                                                                     |
+| **Example app**        | `example/`: editor with toolbar, bold/italic/underline, headings, lists, insert code block and horizontal rule; debounced markdown and character/word stats. |
 
 **Note**: The main app’s create note screen currently uses a plain `TextFormField` for the body, not the `rich_text` component. Integration of `rich_text` into the note editor is for future work.
 
@@ -674,10 +675,10 @@ To enable faster, decentralized development, each component in `components/` now
 
 **Implemented Test Platforms**:
 
-1. **slote_draw/example/** - Drawing functionality testing (pen, eraser, highlighter, color selection, stroke width)
-2. **slote_rich_text/example/** - Text editing and formatting testing (bold, italic, underline, format toolbar)
-3. **slote_viewport/example/** - Zoom/pan/viewport testing (zoom controls, content height, boundary constraints)
-4. **slote_undo_redo/example/** - Undo/redo system testing (state management, history tracking)
+1. **draw/example/** - Drawing functionality testing (pen, eraser, highlighter, color selection, stroke width)
+2. **rich_text/example/** - Text editing and formatting testing (bold, italic, underline, headings, lists, code block, horizontal rule, format toolbar)
+3. **viewport/example/** - Zoom/pan/viewport testing (zoom controls, content height, boundary constraints)
+4. **undo_redo/example/** - Undo/redo system testing (state management, history tracking)
 
 **Usage**:
 
@@ -757,9 +758,10 @@ Slote targets Android, iOS, web, and desktop from a single Flutter codebase. The
 - Calendar integration
 - Reminders and notifications
 - Markdown live preview
-- Code syntax highlighting
 - Mind mapping
 - Whiteboard mode
+
+_(Code syntax highlighting is implemented in the `rich_text` component: fenced code blocks with language selection and copy.)_
 
 ### 12.2 Platform Expansion
 

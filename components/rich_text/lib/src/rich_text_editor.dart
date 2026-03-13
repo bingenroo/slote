@@ -15,6 +15,7 @@ class RichTextEditor extends StatefulWidget {
     this.focusNode,
     this.scrollController,
     this.config = const QuillEditorConfig(),
+    this.editorFocusRequester,
   });
 
   /// Rich text controller (markdown export, toolbar state, format toggles).
@@ -28,6 +29,9 @@ class RichTextEditor extends StatefulWidget {
 
   /// Editor configuration (e.g. placeholder, padding).
   final QuillEditorConfig config;
+
+  /// When set, code blocks (and other embeds) can request focus back to this editor (e.g. arrow-key exit).
+  final EditorFocusRequester? editorFocusRequester;
 
   @override
   State<RichTextEditor> createState() => _RichTextEditorState();
@@ -54,6 +58,9 @@ class _RichTextEditorState extends State<RichTextEditor> {
       _scrollController = ScrollController();
       _ownsScrollController = true;
     }
+    widget.editorFocusRequester?.setRequestFocus(() {
+      if (mounted) FocusScope.of(context).requestFocus(_focusNode);
+    });
     // Re-sync selection after first layout so tap/click position and cursor stay aligned.
     // Without this, the first few interactions can use wrong offsets (cursor jumps / wrong line breaks).
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -64,6 +71,16 @@ class _RichTextEditorState extends State<RichTextEditor> {
         qc.updateSelection(sel, ChangeSource.local);
       }
     });
+  }
+
+  @override
+  void didUpdateWidget(covariant RichTextEditor oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.editorFocusRequester != widget.editorFocusRequester) {
+      widget.editorFocusRequester?.setRequestFocus(() {
+        if (mounted) FocusScope.of(context).requestFocus(_focusNode);
+      });
+    }
   }
 
   @override
