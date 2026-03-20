@@ -1,5 +1,5 @@
 name: rich_text
-description: Rich text editing (Word-style) for Slote
+description: Placeholder for Slote rich text; see example/ for AppFlowy editor demo.
 version: 1.0.0
 publish_to: "none"
 
@@ -9,11 +9,6 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  flutter_quill: ^11.0.0
-  highlight: ^0.7.0
-  lucide_icons: ^0.257.0
-  markdown: ^7.0.0
-  markdown_quill: ^4.0.0
 
 dev_dependencies:
   flutter_test:
@@ -22,4 +17,3 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
-

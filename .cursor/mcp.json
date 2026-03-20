@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "context-mesh": {
+      "command": "/Users/bingenro/.local/bin/context-mesh",
+      "args": [
+        "mcp"
+      ]
+    }
+  }
+}

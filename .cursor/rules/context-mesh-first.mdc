@@ -1,0 +1,13 @@
+---
+description: Use Context Mesh MCP tools before reading or grepping files
+alwaysApply: true
+---
+
+# Use Context Mesh first for codebase context
+
+This project has **Context Mesh** (MCP server). Use its tools *before* using Read or Grep to understand the codebase.
+
+1. **First**: Call `search_code("query")` for natural-language or keyword search, or `get_symbol("SymbolName")` / `get_callers("SymbolName")` for definitions and usages. Use `get_dependents(file)` and `get_dependencies(file)` for impact and imports.
+2. **Then**: Use Read or Grep only for the specific files or line ranges you identified. Avoid reading many whole files or grepping blindly.
+
+This reduces tokens and improves context quality.

@@ -86,3 +86,9 @@ coverage/
 !**/ios/**/default.pbxuser
 !**/ios/**/default.perspectivev3
 
+
+# ContextMesh
+.context/
+CLAUDE.md
+.mcp.json
+.claude/
