@@ -12,7 +12,8 @@ void main() {
       expect(find.text('Rich text'), findsWidgets);
     });
 
-    testWidgets('BIUS toolbar tooltips are present', (WidgetTester tester) async {
+    testWidgets('formatting toolbar tooltips are present',
+        (WidgetTester tester) async {
       await tester.pumpWidget(const RichTextEditorApp());
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 100));
@@ -21,6 +22,10 @@ void main() {
       expect(find.byTooltip('Italic'), findsOneWidget);
       expect(find.byTooltip('Underline'), findsOneWidget);
       expect(find.byTooltip('Strikethrough'), findsOneWidget);
+      expect(find.byTooltip('Link'), findsOneWidget);
+      expect(find.byTooltip('Highlight'), findsOneWidget);
+      expect(find.byTooltip('Text color'), findsOneWidget);
+      expect(find.byTooltip('Clear formatting'), findsOneWidget);
     });
 
     testWidgets('tearing down app after pump does not throw',

@@ -72,7 +72,8 @@ class _RichTextEditorScreenState extends State<RichTextEditorScreen> {
             child: AppFlowyEditor(
               editorState: es,
               editorStyle: const EditorStyle.mobile(),
-              commandShortcutEvents: standardCommandShortcutsWithSharedBius(),
+              commandShortcutEvents:
+                  standardCommandShortcutsWithSloteInlineHandlers(),
             ),
           ),
           const Divider(height: 1),
