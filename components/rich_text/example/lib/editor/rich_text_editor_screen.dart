@@ -1,11 +1,15 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:appflowy_editor/appflowy_editor.dart';
 import 'package:flutter/material.dart';
+import 'package:rich_text/rich_text.dart';
 
+import 'document_json_log.dart';
 import 'format_toolbar.dart';
 
-/// Editor page: [EditorState] lifecycle, [AppFlowyEditor], and [FormatToolbar].
+/// Editor page: [RichTextEditorController], [AppFlowyEditor], [FormatToolbar],
+/// and debounced document JSON appended to a log (see [appendRichTextDocumentJsonLog]).
 class RichTextEditorScreen extends StatefulWidget {
   const RichTextEditorScreen({super.key});
 
@@ -29,45 +33,53 @@ class _RichTextEditorScreenState extends State<RichTextEditorScreen> {
   }
 }''';
 
-  final Map<String, Object> _initialDocument =
-      Map<String, Object>.from(jsonDecode(_seedDocumentJson));
-
-  late final EditorState _editorState;
+  late final RichTextEditorController _controller;
   late final Listenable _formatBarListenable;
 
   @override
   void initState() {
     super.initState();
-    _editorState = EditorState(document: Document.fromJson(_initialDocument));
+    final initial =
+        jsonDecode(_seedDocumentJson) as Map<String, dynamic>;
+    _controller = RichTextEditorController.fromJson(
+      initial,
+      onDocumentJsonChanged: (json) {
+        unawaited(appendRichTextDocumentJsonLog(json));
+      },
+    );
     _formatBarListenable = Listenable.merge([
-      _editorState.selectionNotifier,
-      _editorState.toggledStyleNotifier,
+      _controller.editorState.selectionNotifier,
+      _controller.editorState.toggledStyleNotifier,
     ]);
   }
 
   @override
   void dispose() {
-    _editorState.dispose();
+    _controller.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    final es = _controller.editorState;
     return Scaffold(
-      appBar: AppBar(title: const Text('Rich text')),
+      appBar: AppBar(
+        title: const Text('Rich text'),
+      ),
       body: Column(
         children: [
           Expanded(
             child: AppFlowyEditor(
-              editorState: _editorState,
+              editorState: es,
               editorStyle: const EditorStyle.mobile(),
+              commandShortcutEvents: standardCommandShortcutsWithSharedBius(),
             ),
           ),
           const Divider(height: 1),
           SafeArea(
             top: false,
             child: FormatToolbar(
-              editorState: _editorState,
+              editorState: es,
               listenable: _formatBarListenable,
             ),
           ),

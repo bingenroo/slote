@@ -11,6 +11,10 @@ dependencies:
   flutter:
     sdk: flutter
   appflowy_editor: ^6.2.0
+  path_provider: ^2.1.5
+  universal_io: ^2.2.2
+  rich_text:
+    path: ..
 
 dev_dependencies:
   flutter_test:

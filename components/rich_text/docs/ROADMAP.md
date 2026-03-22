@@ -12,7 +12,7 @@ This document is the **canonical plan** for Slote’s rich-text subsystem: edito
 |--------|-----------|
 | **Source of truth** | **AppFlowy Document JSON** for pixel-accurate round-trip in the app. Use Markdown (or Delta) only for **import/export or migration**, not as the live model. |
 | **Editor** | [`appflowy_editor`](https://pub.dev/packages/appflowy_editor) — compose UI (toolbars, shortcuts) against `EditorState` APIs. |
-| **Package layout** | Today `lib/` is a **placeholder**; the **spike and iteration** live in [`example/`](../example). Promote APIs to `lib/rich_text.dart` as phases land. |
+| **Package layout** | **`lib/`** now exports AppFlowy helpers (`RichTextEditorController`, BIUS entry points, shortcut wiring). The **example** app composes the full editor UI and depends on `package:rich_text`. |
 | **Legacy** | Pre–AppFlowy Quill implementation is **archived in writing only**: [IMPLEMENTATION.md](../IMPLEMENTATION.md) (no longer the active stack). |
 
 ---
@@ -22,7 +22,7 @@ This document is the **canonical plan** for Slote’s rich-text subsystem: edito
 | Item | State |
 |------|--------|
 | **Active spike** | [`example/lib/main.dart`](../example/lib/main.dart) — `EditorState` from JSON, `AppFlowyEditor`, fixed **BIUS** toolbar (`toggleAttribute` + caret-aware active state). |
-| **Phase (AppFlowy checklist)** | **Phase 2 complete.** **Next: Phase 3** — single owner of `EditorState`, `transactionStream` + debounced document JSON callback, clean `dispose`. |
+| **Phase (AppFlowy checklist)** | **Phases 3–4 complete** in `package:rich_text` + example: `RichTextEditorController`, debounced JSON, shared BIUS entry points + command shortcuts. |
 | **Main Slote app** | Note body still uses plain text / Quill at root; **integration** of this editor is a separate milestone (see PRD). |
 
 ---

@@ -1,5 +1,6 @@
 import 'package:appflowy_editor/appflowy_editor.dart';
 import 'package:flutter/material.dart';
+import 'package:rich_text/rich_text.dart';
 
 /// Fixed BIUS bar using [EditorState.toggleAttribute] (same entry point as
 /// AppFlowy’s format toolbar / markdown commands).
@@ -105,9 +106,7 @@ class FormatToolbar extends StatelessWidget {
       isSelected: active,
       style: style,
       onPressed: enabled
-          ? () {
-              editorState.toggleAttribute(attributeKey);
-            }
+          ? () => applyBiusToggle(editorState, attributeKey)
           : null,
       icon: Icon(icon),
     );

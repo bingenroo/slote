@@ -97,6 +97,6 @@ Use this list to track progress locally (e.g. in PRs or issues).
 
 - [x] **Phase 1 (solo):** JSON round-trip, delta inspection, persistence validation in the example app.
 - [x] **Phase 2:** Minimal BIUS toolbar wired to editor APIs.
-- [ ] **Phase 3:** Controller + `transactionStream` + debounced JSON callback + clean dispose.
-- [ ] **Phase 4:** BIUS shortcuts/commands aligned with toolbar behavior.
+- [x] **Phase 3:** Controller + `transactionStream` + debounced JSON callback + clean dispose.
+- [x] **Phase 4:** BIUS shortcuts/commands aligned with toolbar behavior.
 - [ ] **Deferred:** Broader features per [ROADMAP.md](ROADMAP.md) after the above are stable.
