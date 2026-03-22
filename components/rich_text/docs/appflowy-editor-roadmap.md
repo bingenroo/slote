@@ -1,8 +1,10 @@
-# AppFlowy Editor integration roadmap (rich_text)
+# AppFlowy Editor integration roadmap (`rich_text`)
 
-This document records the divide-and-conquer plan for integrating [appflowy_editor](https://pub.dev/packages/appflowy_editor) in `components/rich_text`. It supersedes ad-hoc notes for phases, deferred work, and repo touchpoints.
+**Full product and feature roadmap:** see **[ROADMAP.md](ROADMAP.md)** (end-to-end phases, feature waves, listeners, `undo_redo` consolidation).
 
-**Canonical direction:** Prefer **AppFlowy Document JSON** as the eventual source of truth for pixel-perfect round-trip. Use Markdown or Delta only for migration when needed ([importing.md](https://raw.githubusercontent.com/AppFlowy-IO/appflowy-editor/main/documentation/importing.md)).
+This file stays focused on **AppFlowy Editor** milestones: Document JSON, BIUS, controller/debounce, shortcuts, and short-term deferred items.
+
+**Canonical direction:** Prefer **AppFlowy Document JSON** as the source of truth for pixel-perfect round-trip. Use Markdown or Delta only for migration when needed ([importing.md](https://raw.githubusercontent.com/AppFlowy-IO/appflowy-editor/main/documentation/importing.md)).
 
 ---
 
@@ -10,6 +12,7 @@ This document records the divide-and-conquer plan for integrating [appflowy_edit
 
 - **Phase 1:** Work alone on AppFlowy JSON (load, edit, export, debug). No bulk assistant implementation until Phase 1 is done.
 - **Phases 2–4:** Implement incrementally with review; after each phase, run the example app and tests before the next.
+- **Later waves:** Extended inline, blocks, media, TOC, theming — scheduled in [ROADMAP.md](ROADMAP.md).
 
 ---
 
@@ -67,9 +70,9 @@ flowchart LR
 
 ---
 
-## Future roadmap (out of current scope)
+## AppFlowy-only deferred (superseded by ROADMAP.md for detail)
 
-Implement later; no requirement in the initial AppFlowy pass.
+The numbered list below is the **original** narrow scope; the **full** backlog (tables, callouts, LaTeX, TOC, etc.) lives in [ROADMAP.md](ROADMAP.md).
 
 1. **Block components** — tables, checklist, numbered/bullet lists, quote, code blocks, etc. (extend `blockComponentBuilders` / custom blocks per AppFlowy docs).
 2. **Encryption / decryption** — logic lives in another component; integrate at the app boundary with the debounced JSON payload, not inside `rich_text` core.
@@ -82,7 +85,7 @@ Implement later; no requirement in the initial AppFlowy pass.
 
 | Area | Path |
 |------|------|
-| Dependency | [`pubspec.yaml`](../pubspec.yaml) — add `appflowy_editor` if the editor lives in `lib/`, not only the example. |
+| Dependency | [`pubspec.yaml`](../pubspec.yaml) — add `appflowy_editor` when the editor lives in `lib/`, not only the example. |
 | Public API | [`lib/rich_text.dart`](../lib/rich_text.dart) — export controller/widget when added. |
 | Spike / evolution | [`example/lib/main.dart`](../example/lib/main.dart) — evolve through phases. |
 
@@ -92,8 +95,8 @@ Implement later; no requirement in the initial AppFlowy pass.
 
 Use this list to track progress locally (e.g. in PRs or issues).
 
-- [ ] **Phase 1 (solo):** JSON round-trip, delta inspection, persistence validation in the example app.
-- [ ] **Phase 2:** Minimal BIUS toolbar wired to editor APIs.
+- [x] **Phase 1 (solo):** JSON round-trip, delta inspection, persistence validation in the example app.
+- [x] **Phase 2:** Minimal BIUS toolbar wired to editor APIs.
 - [ ] **Phase 3:** Controller + `transactionStream` + debounced JSON callback + clean dispose.
 - [ ] **Phase 4:** BIUS shortcuts/commands aligned with toolbar behavior.
-- [ ] **Deferred:** Future roadmap items only after the above are stable.
+- [ ] **Deferred:** Broader features per [ROADMAP.md](ROADMAP.md) after the above are stable.

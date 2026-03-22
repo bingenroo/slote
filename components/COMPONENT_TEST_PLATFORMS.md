@@ -100,12 +100,13 @@ flutter run
 
 **Location**: `components/rich_text/example/`
 
-**Demonstrates**:
+**Demonstrates** (AppFlowy spike):
 
-- Text input and editing
-- Format toolbar (bold, italic, underline)
-- Text selection
-- Character/word stats
+- `EditorState` + Document JSON load
+- `AppFlowyEditor` with BIUS toolbar (`toggleAttribute`)
+- Caret-aware format toggle state
+
+**Roadmap**: `components/rich_text/docs/ROADMAP.md`
 
 **Run**:
 
@@ -138,6 +139,8 @@ flutter run
 ### 4. Undo/redo example
 
 **Location**: `components/undo_redo/example/`
+
+**Note:** Intended for **plain `TextEditingController`** undo. **Planned removal** after the note body uses AppFlowy (`EditorState` history) — see `components/rich_text/docs/ROADMAP.md`.
 
 **Demonstrates**:
 

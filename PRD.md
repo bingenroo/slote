@@ -4,7 +4,7 @@
 
 ### Version: 2.0
 
-### Last Updated: March 12, 2025
+### Last Updated: March 22, 2025
 
 ---
 
@@ -89,19 +89,19 @@ Custom drawing for Slote.
 
 ### 2.4 Component: `rich_text` (`components/rich_text`)
 
-Rich text editing (Word-style), built on Flutter Quill with markdown load/save.
+Rich text editing for Slote, moving to **AppFlowy Editor** with **Document JSON** as the canonical model (markdown/Delta only for import/export or migration where needed).
 
-| Feature                | Description                                                                                                                                 |
-| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| **RichTextController** | Wraps QuillController; holds content, selection, and markdown; `loadMarkdown`, debounced `onMarkdownChanged`; selection style state for toolbar. |
-| **RichTextEditor**     | Quill-based editable field with custom embed builders; supports `EditorFocusRequester` for code-block focus sync.                            |
-| **Format toolbar**     | Bold, italic, underline, font size, headings (H1/H2/H3), checklist, bullet/numbered lists, link, alignment, clear formatting, indent/outdent; “+” menu to insert code block, horizontal rule (table disabled for now). |
-| **Embed builders**     | **Horizontal rule** (divider); **syntax-highlighted code block** (from markdown ```lang … ``` or toolbar): language dropdown, Copy, editable code, arrow-key exit into/out of block; table embed exists but is commented out. |
-| **Code blocks**        | `SyntaxCodeBlockWidget`, `FencedCodeToEmbedSyntax` (markdown fenced code → embed); highlight-based syntax coloring (VS Code–style), multiple languages. |
-| **Formatters**         | Bold, italic, underline (and other inline/block attributes via Quill).                                                                     |
-| **Example app**        | `example/`: editor with toolbar, bold/italic/underline, headings, lists, insert code block and horizontal rule; debounced markdown and character/word stats. |
+| Area | Description |
+| ---- | ----------- |
+| **`lib/`** | **Placeholder** today; public API (`RichTextController`, editor widget, exports) will be added as the AppFlowy integration is promoted from the example. |
+| **`example/`** | **Active spike** — `EditorState` + `AppFlowyEditor`, load from JSON, BIUS toolbar (`toggleAttribute`), caret-aware format indicators; this is the engineering sandbox until `lib/` ships. |
+| **Roadmap** | **[components/rich_text/docs/ROADMAP.md](components/rich_text/docs/ROADMAP.md)** — end-to-end phases: foundation (JSON, BIUS, debounced JSON callback, shortcuts), then extended inline (super/subscript, links, fonts, colors, alignment, clear formatting), blocks (headings H1–H6, lists, quote, divider, code, tables, callouts), media (images), formula (LaTeX), outline/TOC, theming bridge. |
+| **AppFlowy checklist** | **[components/rich_text/docs/appflowy-editor-roadmap.md](components/rich_text/docs/appflowy-editor-roadmap.md)** — Phases 1–4 (JSON confidence, BIUS toolbar, controller + `transactionStream` debounce, shortcut parity). |
+| **Legacy** | Former **Quill + markdown** design is **archived in prose** only: [components/rich_text/IMPLEMENTATION.md](components/rich_text/IMPLEMENTATION.md) (not the active codebase in `lib/`). |
 
-**Note**: The main app’s create note screen currently uses a plain `TextFormField` for the body, not the `rich_text` component. Integration of `rich_text` into the note editor is for future work.
+**Root app** still uses **flutter_quill** / plain body fields in places; **target** is to persist rich content as **AppFlowy Document JSON** (or a versioned `.slote` envelope) once `rich_text` is integrated into the note editor.
+
+**Undo/redo (rich text):** Provided by **AppFlowy `EditorState` history** for all editor transactions. The separate **`undo_redo`** package (see §2.6) is for **plain text fields** today and is **planned for removal** from the app once the note body uses AppFlowy end-to-end — see ROADMAP “Undo/redo” section.
 
 ### 2.5 Component: `viewport` (`components/viewport`)
 
@@ -121,7 +121,7 @@ Zoom and pan for a scrollable content area.
 
 ### 2.6 Component: `undo_redo` (`components/undo_redo`)
 
-Generic undo/redo and text-specific + unified controllers.
+Generic undo/redo and text-specific + unified controllers — used by the **main app** for **plain `TextEditingController` / `TextFormField`** note body text today.
 
 | Feature                       | Description                                                                                                                       |
 | ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
@@ -131,7 +131,7 @@ Generic undo/redo and text-specific + unified controllers.
 | **UndoRedoState**             | Base and `TextState` for text undo.                                                                                               |
 | **Example app**               | `example/`: text field with undo/redo, clear history, state indicators.                                                           |
 
-The main app uses `UnifiedUndoRedoController` in the note screen for text undo/redo; drawing undo is planned when scribble is replaced by `draw`.
+**Consolidation plan:** When the note body uses **AppFlowy** from `rich_text`, **undo/redo for typing and formatting** should come from **`EditorState`** (single transaction history). At that point, **remove** `UnifiedUndoRedoController` from note screens for the body field, drop the **`undo_redo`** path dependency if nothing else imports it, and **delete or archive** `components/undo_redo`. Drawing undo remains with **`draw`** / stroke stack until explicitly unified. Detailed checklist: [components/rich_text/docs/ROADMAP.md](components/rich_text/docs/ROADMAP.md) (“Undo/redo”).
 
 ### 2.7 Component: `theme` (`components/theme`)
 
@@ -166,9 +166,9 @@ Cross-platform CLI for database and emulator workflows (e.g. pull SQLite DB from
 | ------------- | ---------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
 | **App**       | Home, create note, SQLite, theme, zoom/pan in note, text + drawing (scribble/stub), undo/redo (text) | Open existing note from list; folders; .slote format; PDF export |
 | **draw**      | Full component + example                                                                             | Wired into note editor (replace scribble)                        |
-| **rich_text** | Full component + example                                                                             | Wired into note editor (replace plain TextFormField)             |
+| **rich_text** | **Spike in `example/`** (AppFlowy + BIUS); `lib/` placeholder until API promotion                    | Integrate into note editor; Document JSON persistence            |
 | **viewport**  | Full component + example                                                                             | Optional: reuse in note screen instead of custom ZoomPanSurface  |
-| **undo_redo** | Text + unified wrapper + example                                                                     | Drawing undo when using `draw`                                   |
+| **undo_redo** | Text + unified wrapper + example (**planned deprecation** once body uses AppFlowy undo)               | Remove after `rich_text` integration; drawing undo via `draw`    |
 | **theme**     | In use                                                                                               | —                                                                |
 | **shared**    | In use                                                                                               | —                                                                |
 
@@ -333,7 +333,9 @@ The following sections align with the **Cleaned Up Feature List** and roadmap ph
 
 ### 7.2 Rich Text Formatting
 
-**MVP:** Bold, italic, underline, headings (H1/H2/H3), highlight, bullet/numbered lists. Basic doc elements: dividers, code blocks, blockquotes, tables. Highlight-to-apply toolbar. Find (Ctrl+F). Not full MS Word — keep it lightweight.
+**Engineering direction:** **`components/rich_text`** on **AppFlowy Editor**, **Document JSON** as canonical storage; phased delivery in [components/rich_text/docs/ROADMAP.md](components/rich_text/docs/ROADMAP.md) (inline → blocks → media → LaTeX/TOC, etc.).
+
+**MVP (product):** Bold, italic, underline, headings (H1/H2/H3), highlight, bullet/numbered lists. Basic doc elements: dividers, code blocks, blockquotes, tables. Highlight-to-apply toolbar. Find (Ctrl+F). Not full MS Word — keep it lightweight.
 
 **v1.1:** Find and Replace (Ctrl+H). Table of contents with scroll hover preview.
 
@@ -676,9 +678,9 @@ To enable faster, decentralized development, each component in `components/` now
 **Implemented Test Platforms**:
 
 1. **draw/example/** - Drawing functionality testing (pen, eraser, highlighter, color selection, stroke width)
-2. **rich_text/example/** - Text editing and formatting testing (bold, italic, underline, headings, lists, code block, horizontal rule, format toolbar)
+2. **rich_text/example/** - AppFlowy editor spike (Document JSON, BIUS toolbar); full feature set tracked in `components/rich_text/docs/ROADMAP.md`
 3. **viewport/example/** - Zoom/pan/viewport testing (zoom controls, content height, boundary constraints)
-4. **undo_redo/example/** - Undo/redo system testing (state management, history tracking)
+4. **undo_redo/example/** - Undo/redo for plain text fields (planned removal after AppFlowy body integration — see `rich_text` ROADMAP)
 
 **Usage**:
 
@@ -761,7 +763,7 @@ Slote targets Android, iOS, web, and desktop from a single Flutter codebase. The
 - Mind mapping
 - Whiteboard mode
 
-_(Code syntax highlighting is implemented in the `rich_text` component: fenced code blocks with language selection and copy.)_
+_(Code syntax highlighting was specified for the legacy Quill path; the AppFlowy spike will add fenced code blocks first, then optional highlight/intellisense per [components/rich_text/docs/ROADMAP.md](components/rich_text/docs/ROADMAP.md).)_
 
 ### 12.2 Platform Expansion
 

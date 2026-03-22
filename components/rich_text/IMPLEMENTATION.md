@@ -1,6 +1,8 @@
 # Rich Text Implementation Record
 
-This document preserves what was implemented before the full dependency gutting.
+**Current direction:** AppFlowy Editor + Document JSON — see **[docs/ROADMAP.md](docs/ROADMAP.md)**.
+
+This document preserves what was implemented before the full dependency gutting (legacy Quill stack).
 
 ## Architecture
 

@@ -5,8 +5,8 @@ This repository contains reusable component packages for the Slote application.
 ## Packages
 
 - **viewport**: Viewport/zoom/pan functionality
-- **undo_redo**: Generic undo/redo system
-- **rich_text**: Rich text editing (Word-style)
+- **undo_redo**: Generic undo/redo for plain text fields (**planned deprecation** once the note body uses AppFlowy from `rich_text` — see `rich_text/docs/ROADMAP.md`)
+- **rich_text**: Rich text (**AppFlowy Editor**, Document JSON); **`example/`** is the active spike; **`lib/`** placeholder until API promotion — see `rich_text/docs/ROADMAP.md`
 - **draw**: Custom drawing implementation
 - **theme**: Theming system
 - **shared**: Shared utilities and resources
@@ -27,9 +27,9 @@ Each component includes a standalone **example app** in its `example/` directory
 ### Available example apps
 
 - **draw/example/** – Drawing tools, colors, stroke width, eraser, highlighter
-- **rich_text/example/** – Text editing, format toolbar, bold/italic/underline
+- **rich_text/example/** – AppFlowy editor spike (JSON, BIUS toolbar); roadmap: `rich_text/docs/ROADMAP.md`
 - **viewport/example/** – Zoom, pan, scroll, boundary constraints
-- **undo_redo/example/** – Undo/redo, state management, history
+- **undo_redo/example/** – Plain-text undo/redo (legacy path; remove after AppFlowy body integration)
 
 ### Quick start
 

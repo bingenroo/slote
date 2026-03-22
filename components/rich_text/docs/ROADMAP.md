@@ -1,0 +1,147 @@
+# Rich text — end-to-end roadmap (`components/rich_text`)
+
+This document is the **canonical plan** for Slote’s rich-text subsystem: editor stack, features, phases, listeners, and how **undo/redo** fits relative to [`components/undo_redo`](../../undo_redo).
+
+**Implementation detail (AppFlowy):** [appflowy-editor-roadmap.md](appflowy-editor-roadmap.md) tracks AppFlowy-specific milestones (JSON spike, BIUS, controller, shortcuts).
+
+---
+
+## Direction
+
+| Topic | Decision |
+|--------|-----------|
+| **Source of truth** | **AppFlowy Document JSON** for pixel-accurate round-trip in the app. Use Markdown (or Delta) only for **import/export or migration**, not as the live model. |
+| **Editor** | [`appflowy_editor`](https://pub.dev/packages/appflowy_editor) — compose UI (toolbars, shortcuts) against `EditorState` APIs. |
+| **Package layout** | Today `lib/` is a **placeholder**; the **spike and iteration** live in [`example/`](../example). Promote APIs to `lib/rich_text.dart` as phases land. |
+| **Legacy** | Pre–AppFlowy Quill implementation is **archived in writing only**: [IMPLEMENTATION.md](../IMPLEMENTATION.md) (no longer the active stack). |
+
+---
+
+## Current status (rolling)
+
+| Item | State |
+|------|--------|
+| **Active spike** | [`example/lib/main.dart`](../example/lib/main.dart) — `EditorState` from JSON, `AppFlowyEditor`, fixed **BIUS** toolbar (`toggleAttribute` + caret-aware active state). |
+| **Phase (AppFlowy checklist)** | **Phase 2 complete.** **Next: Phase 3** — single owner of `EditorState`, `transactionStream` + debounced document JSON callback, clean `dispose`. |
+| **Main Slote app** | Note body still uses plain text / Quill at root; **integration** of this editor is a separate milestone (see PRD). |
+
+---
+
+## Phased delivery (high level)
+
+Phases build on each other; run the example app and tests after each major phase.
+
+### Wave A — Foundation (AppFlowy Phases 1–4)
+
+| Step | Scope |
+|------|--------|
+| **A1 — Document JSON confidence** | Load/save `Document.fromJson` / `toJson`, observe deltas per keystroke, validate undo with built-in history. *(Aligns with AppFlowy Phase 1.)* |
+| **A2 — Inline BIUS** | Toolbar + parity shortcuts for Bold, Italic, Underline, Strikethrough. *(AppFlowy Phase 2–4.)* |
+| **A3 — Controller + persistence hook** | One owner of `EditorState`; debounced emission of canonical JSON for DB/API/logging; subscription cleanup. *(AppFlowy Phase 3.)* |
+| **A4 — Keyboard parity** | BIUS (and later shared) commands: toolbar and shortcuts call the **same** `EditorState` entry points. *(AppFlowy Phase 4.)* |
+
+### Wave B — Extended inline & typography
+
+| Feature | Notes |
+|---------|--------|
+| **Superscript / subscript** | Custom delta attributes + rendering; align with AppFlowy attribute keys / slice rules. |
+| **Links** | Inline `href` (or package equivalent); dialog or paste handler. |
+| **Font size, font family** | Partial attributes + `EditorStyle` / custom spans as needed. |
+| **Text color, highlight** | Use / extend built-in color attributes where available. |
+| **Alignment** | Typically **per-block** (paragraph) attributes + layout. |
+| **Clear formatting** | Single command stripping partial styles on selection; respects `EditorState` history. |
+
+### Wave C — Structural blocks
+
+| Feature | Notes |
+|---------|--------|
+| **Headings H1–H6** | Block type / heading level. |
+| **Bullet, numbered, checkbox lists** | Built-in or extended block components. |
+| **Quote blocks** | Blockquote component. |
+| **Horizontal rule / divider** | Insert block or equivalent. |
+| **Code blocks** | Fenced-style block; **start plain**, then optional syntax highlight (see Wave E). |
+| **Tables** | Custom or package block builders; higher complexity — schedule after lists/headings. |
+| **Callouts** | Custom block + styling. |
+| **Images** | Embed block; storage policy at app boundary (paths, blobs, encryption). |
+
+### Wave D — Advanced content
+
+| Feature | Notes |
+|---------|--------|
+| **Formula (LaTeX)** | Inline or block embed; renderer + editing UX. |
+| **Outline / TOC** | **Chrome**, not a single delta: walk document (on debounced `transactionStream` or equivalent), show headings hierarchy, jump on tap. |
+
+### Wave E — Editor polish & theming
+
+| Item | Notes |
+|------|--------|
+| **Theming bridge** | `EditorStyle` / `BlockComponentConfiguration` ↔ Slote `theme` component. |
+| **Mobile vs desktop** | `EditorStyle.mobile()` vs desktop, floating toolbars, safe areas. |
+| **Performance** | Large docs: avoid rebuilding full chrome on every keystroke; debounce heavy readers (TOC, JSON export). |
+
+### Wave F — Cross-cutting (from PRD / security)
+
+| Item | Notes |
+|------|--------|
+| **Encryption** | Lives **outside** rich_text core; operate on serialized JSON at app boundary ([roadmap note](appflowy-editor-roadmap.md)). |
+| **Draw / ink** | Stays in **`components/draw`**; overlay or attachment model at note level — not inside rich_text core. |
+
+---
+
+## Listeners: what uses what
+
+Use **narrow** signals for interactive toolbars; **one debounced pipe** for expensive work.
+
+| UI / concern | Typical signals |
+|--------------|-----------------|
+| **Inline toolbar (BIUS, colors, …)** | `selectionNotifier`, `toggledStyleNotifier`, plus **derived state** from node at caret (e.g. `delta.sliceAttributes`). Add `transactionStream` only if you observe staleness. |
+| **Persistence / preview / TOC** | **`transactionStream`** (debounced ~200 ms) → emit JSON, refresh outline. |
+| **Undo / redo buttons (editor)** | **`EditorState` undo manager** (or package API) for can-undo/can-redo — not the generic `undo_redo` package (see below). |
+
+---
+
+## Undo/redo: `undo_redo` vs AppFlowy
+
+### Today
+
+- **`components/undo_redo`**: Generic stack + **`TextUndoRedoController` / `UnifiedUndoRedoController`** used by the **main app** for **plain `TextFormField`-style** body text (`create_note*.dart`).
+- **AppFlowy `EditorState`**: Own **transaction history**; undo/redo replays edits made through the editor. **All rich-text actions** (BIUS, blocks, links, …) should go through **transactions** so **one** history stack covers them.
+
+### Recommendation
+
+1. **Do not duplicate** document undo inside `undo_redo` when the note body is AppFlowy-driven. Wire **Undo/Redo** toolbar actions to **`EditorState`** (same stack as typing).
+2. **After** the note body uses AppFlowy end-to-end, **remove** `UnifiedUndoRedoController` (and `undo_redo` imports) from note screens for that field.
+3. **Deprecate `components/undo_redo`** when nothing in the repo imports it:
+   - Either **delete** the package and drop the path dependency from root `pubspec.yaml`, **or**
+   - **Move** a tiny generic helper into `rich_text/lib/src/` if a non-editor widget still needs stack-based undo (unlikely for v1).
+4. **Drawing undo** remains owned by **`draw`** / stroke model until a product decision unifies stacks; not blocked on `undo_redo`.
+
+### Planned removal checklist (execute when integrating rich_text into the app)
+
+- [ ] Note body uses `EditorState` / `AppFlowyEditor` from `rich_text`.
+- [ ] Undo/redo UI calls editor history, verified across BIUS + blocks.
+- [ ] Remove `package:undo_redo/undo_redo.dart` from `create_note*.dart` (and any other callers).
+- [ ] Remove `undo_redo` from root `pubspec.yaml` if unused.
+- [ ] Delete or archive `components/undo_redo` and update [PRD.md](../../../PRD.md), [components/README.md](../../README.md), and [COMPONENT_TEST_PLATFORMS.md](../../COMPONENT_TEST_PLATFORMS.md).
+
+---
+
+## Repo touchpoints
+
+| Area | Path |
+|------|------|
+| Spike / daily dev | [`example/`](../example) |
+| Future public API | [`lib/rich_text.dart`](../lib/rich_text.dart) |
+| AppFlowy phase checklist | [appflowy-editor-roadmap.md](appflowy-editor-roadmap.md) |
+| Legacy Quill record | [IMPLEMENTATION.md](../IMPLEMENTATION.md) |
+
+---
+
+## Related Slote docs
+
+- **[PRD.md](../../../PRD.md)** — product scope, component inventory, MVP alignment.
+- **[README.md](../README.md)** — package overview and links.
+
+---
+
+_Roadmap versions with the product; prefer this file and the AppFlowy checklist for engineering planning._
