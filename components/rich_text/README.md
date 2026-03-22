@@ -100,6 +100,7 @@ With this, the app does not bottleneck on markdown: editing stays responsive, an
 ## Docs
 
 - **[Flutter Quill ↔ Markdown rendering](docs/markdown-rendering.md)** – How Quill document ↔ Markdown conversion works, where it lives (`RichTextController`), custom handlers, debouncing, and end-to-end flow.
+- **[AppFlowy Editor integration roadmap](docs/appflowy-editor-roadmap.md)** – Phased plan for Document JSON, BIUS toolbar, debounced controller, shortcuts, and deferred features (blocks, crypto, draw, theming).
 
 ## Example
 
