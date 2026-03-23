@@ -11,6 +11,7 @@ dependencies:
   flutter:
     sdk: flutter
   appflowy_editor: ^6.2.0
+  url_launcher: ^6.3.1
   path_provider: ^2.1.5
   universal_io: ^2.2.2
   rich_text:

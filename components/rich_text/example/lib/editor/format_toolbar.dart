@@ -89,15 +89,16 @@ class FormatToolbar extends StatelessWidget {
                     ),
                   ),
                   const VerticalDivider(width: 16),
-                  // Link, highlight, text color, clear use [EditorState.formatDelta]
-                  // / dialog helpers from `package:rich_text` (range selection only).
+                  // Link, highlight, and text color use format drawers + formatDelta
+                  // from `package:rich_text` (range selection only).
                   _formatToggle(
                     context: context,
                     enabled: rangeSelection,
                     selected: isLinkActiveInSelection(editorState),
                     icon: Icons.link,
                     tooltip: 'Link',
-                    onPressed: () => sloteShowLinkDialog(editorState),
+                    onPressed: () =>
+                        sloteShowLinkDialog(editorState, hostContext: context),
                   ),
                   _formatToggle(
                     context: context,
@@ -105,18 +106,22 @@ class FormatToolbar extends StatelessWidget {
                     selected: isHighlightActiveInSelection(editorState),
                     icon: Icons.highlight,
                     tooltip: 'Highlight',
-                    onPressed: () =>
-                        unawaited(sloteToggleHighlight(editorState)),
+                    onPressed: () => showSloteColorFormatDrawer(
+                      editorState,
+                      hostContext: context,
+                    ),
                   ),
                   _formatToggle(
                     context: context,
                     enabled: rangeSelection,
                     selected:
-                        isSloteSpikeTextColorActiveInSelection(editorState),
+                        isUniformTextColorActiveInSelection(editorState),
                     icon: Icons.format_color_text,
                     tooltip: 'Text color',
-                    onPressed: () =>
-                        unawaited(sloteToggleTextColor(editorState)),
+                    onPressed: () => showSloteColorFormatDrawer(
+                      editorState,
+                      hostContext: context,
+                    ),
                   ),
                   _formatToggle(
                     context: context,
@@ -238,18 +243,17 @@ bool isHighlightActiveInSelection(EditorState editorState) {
   );
 }
 
-/// Non-collapsed selection only; all runs use [sloteSpikeTextColorHex].
-bool isSloteSpikeTextColorActiveInSelection(EditorState editorState) {
+/// Non-collapsed selection only; every run has the same non-null text color.
+bool isUniformTextColorActiveInSelection(EditorState editorState) {
   final selection = editorState.selection;
   if (selection == null || selection.isCollapsed) return false;
-  final hex = sloteSpikeTextColorHex;
   final nodes = editorState.getNodesInSelection(selection);
   return nodes.allSatisfyInSelection(
     selection,
     (delta) =>
         delta.isNotEmpty &&
         delta.everyAttributes(
-          (attr) => attr[AppFlowyRichTextKeys.textColor] == hex,
+          (attr) => attr[AppFlowyRichTextKeys.textColor] != null,
         ),
   );
 }

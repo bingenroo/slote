@@ -45,9 +45,9 @@ Phases build on each other; run the example app and tests after each major phase
 | Feature | Notes |
 |---------|--------|
 | **Superscript / subscript** | Custom delta attributes + rendering; align with AppFlowy attribute keys / slice rules. |
-| **Links** | Inline `href` (or package equivalent); dialog or paste handler. |
+| **Links** | Inline `href` (or package equivalent); dialog or paste handler. **Near-term focus — activation:** tap should **open the URL in the system default browser** (e.g. `url_launcher`); today tap often **only selects** the linked word—tune gesture handling / recognizers so follow-through wins where appropriate. |
 | **Font size, font family** | Partial attributes + `EditorStyle` / custom spans as needed. |
-| **Text color, highlight** | Use / extend built-in color attributes where available. |
+| **Text color, highlight** | Use / extend built-in color attributes where available. **Near-term focus — picker UX:** match **Google Docs–style mobile** behavior: a **bottom sheet** (slide-up formatting panel from the bottom; often described informally as a mobile “formatting drawer”) with swatches/options—not separate modal dialogues for raw hex input; desktop can use compact menus or the same sheet for parity. **Touchpoint:** [`example/lib/editor/format_toolbar.dart`](../example/lib/editor/format_toolbar.dart). |
 | **Alignment** | Typically **per-block** (paragraph) attributes + layout. |
 | **Clear formatting** | Single command stripping partial styles on selection; respects `EditorState` history. |
 

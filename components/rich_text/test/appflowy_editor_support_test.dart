@@ -91,5 +91,40 @@ void main() {
         isNot(contains(AppFlowyRichTextKeys.backgroundColor)),
       );
     });
+
+    test('sloteApplyTextColor sets and clears font_color on range', () async {
+      final es = EditorState.blank(withInitialText: false);
+      final t = es.transaction;
+      t.insertNode([0], paragraphNode(text: 'hello'));
+      await es.apply(t);
+      final sel =
+          Selection.single(path: [0], startOffset: 0, endOffset: 5).normalized;
+      es.selection = sel;
+
+      await sloteApplyTextColor(es, sel, kSloteSpikeTextColor.toHex());
+      expect(
+        jsonEncode(es.document.toJson()),
+        contains(AppFlowyRichTextKeys.textColor),
+      );
+
+      await sloteApplyTextColor(es, sel, null);
+      expect(
+        jsonEncode(es.document.toJson()),
+        isNot(contains('"${AppFlowyRichTextKeys.textColor}"')),
+      );
+    });
+
+    test('sloteApplyLinkHref sets href on range', () async {
+      final es = EditorState.blank(withInitialText: false);
+      final t = es.transaction;
+      t.insertNode([0], paragraphNode(text: 'link'));
+      await es.apply(t);
+      final sel =
+          Selection.single(path: [0], startOffset: 0, endOffset: 4).normalized;
+      es.selection = sel;
+
+      await sloteApplyLinkHref(es, sel, 'https://example.com');
+      expect(jsonEncode(es.document.toJson()), contains('https://example.com'));
+    });
   });
 }

@@ -62,6 +62,13 @@ class _RichTextEditorScreenState extends State<RichTextEditorScreen> {
   @override
   Widget build(BuildContext context) {
     final es = _controller.editorState;
+    final useDesktopChrome =
+        MediaQuery.sizeOf(context).width >= 600;
+    final editorStyle =
+        (useDesktopChrome ? EditorStyle.desktop() : EditorStyle.mobile())
+            .copyWith(
+      textSpanDecorator: sloteTextSpanDecoratorForAttribute,
+    );
     return Scaffold(
       appBar: AppBar(
         title: const Text('Rich text'),
@@ -71,7 +78,7 @@ class _RichTextEditorScreenState extends State<RichTextEditorScreen> {
           Expanded(
             child: AppFlowyEditor(
               editorState: es,
-              editorStyle: const EditorStyle.mobile(),
+              editorStyle: editorStyle,
               commandShortcutEvents:
                   standardCommandShortcutsWithSloteInlineHandlers(),
             ),
