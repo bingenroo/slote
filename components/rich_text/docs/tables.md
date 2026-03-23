@@ -1,6 +1,8 @@
 # Tables in the rich text editor
 
-This document describes how tables work end-to-end in the rich_text component: data model, insertion, rendering, editing, and Markdown round-trip.
+This document describes how tables worked end-to-end in the rich_text component (legacy Quill/Markdown pipeline): data model, insertion, rendering, editing, and Markdown round-trip.
+
+**ARCHIVED (legacy):** the current `rich_text` package is AppFlowy Editor + AppFlowy `Document` JSON. The table implementation described here is preserved for reference only.
 
 ## 1. What a table is in the document
 

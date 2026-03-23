@@ -2,6 +2,8 @@
 
 This doc explains how the rich_text component uses **Flutter Quill** with **Markdown** as the storage format: editing in Quill, persisting and loading as Markdown.
 
+**ARCHIVED (legacy):** the current `rich_text` package is AppFlowy Editor + AppFlowy `Document` JSON. This Quill/Markdown pipeline is preserved for reference only in `IMPLEMENTATION.md`.
+
 ## What “Markdown rendering” means here
 
 - **Edit** in a WYSIWYG editor (Quill) — no visible `*` / `**` markers.
@@ -12,7 +14,7 @@ So “rendering” here is: **Quill document ↔ Markdown string** — conversio
 
 ## Where it lives
 
-All conversion and APIs live in **`RichTextController`** (`lib/src/rich_text_controller.dart`). It:
+In the archived Quill stack, conversion and APIs lived in **`RichTextController`** (see `IMPLEMENTATION.md`). It:
 
 - Holds a **QuillController** (in-memory document).
 - Uses **`markdown_quill`** to convert **Delta → Markdown** and **Markdown → Delta**.
