@@ -53,6 +53,8 @@ dependencies:
   flutter_quill: ^11.4.2
   flutter_quill_extensions: ^11.0.0
   vector_math: ^2.1.4
+  appflowy_editor: ^6.2.0
+  url_launcher: ^6.3.2
 
   # Component packages
   viewport:

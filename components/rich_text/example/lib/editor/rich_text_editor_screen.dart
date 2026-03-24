@@ -50,6 +50,7 @@ class _RichTextEditorScreenState extends State<RichTextEditorScreen> {
     _formatBarListenable = Listenable.merge([
       _controller.editorState.selectionNotifier,
       _controller.editorState.toggledStyleNotifier,
+      _controller.undoRedoListenable,
     ]);
   }
 

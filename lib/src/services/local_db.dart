@@ -3,11 +3,12 @@ import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:slote/src/model/note.dart';
+import 'package:slote/src/services/slote_rich_text_storage.dart';
 
 class LocalDBService {
   static const String _dbName = 'notes.db';
   static const String _tableName = 'notes';
-  static const int _dbVersion = 1;
+  static const int _dbVersion = 2;
   
   // Singleton instance
   static LocalDBService? _instance;
@@ -64,9 +65,21 @@ class LocalDBService {
   }
 
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
-    // Handle future migrations here
-    if (oldVersion < newVersion) {
-      // Add migration logic as needed
+    if (oldVersion < 2) {
+      // Phase-one rich text migration: normalize all note bodies to AppFlowy
+      // document JSON strings; invalid/non-json bodies become empty documents.
+      final rows = await db.query(_tableName, columns: ['id', 'body']);
+      for (final row in rows) {
+        final id = row['id'];
+        final body = row['body'] as String? ?? '';
+        final normalizedBody = normalizeNoteBodyToDocumentJsonString(body);
+        await db.update(
+          _tableName,
+          {'body': normalizedBody},
+          where: 'id = ?',
+          whereArgs: [id],
+        );
+      }
     }
   }
 

@@ -127,6 +127,67 @@ and converted to markdown fenced blocks:
 - Indent/outdent
 - Insert menu: code block, horizontal line, table
 
+## Wave B (AppFlowy): link activation + format drawers (colors + link)
+
+### Link tap behavior
+
+- Quick tap on a run carrying `href` launches the URL via `editorLaunchUrl(href)`.
+  - Custom span decorator: [slote_text_span_decorator.dart#L16-L61](lib/src/appflowy/slote_text_span_decorator.dart#L16-L61)
+- Long press (~500ms) opens the link edit drawer (bottom sheet).
+  - Implemented in the same decorator: [slote_text_span_decorator.dart#L36-L54](lib/src/appflowy/slote_text_span_decorator.dart#L36-L54)
+- The example wires `editorLaunchUrl` using `url_launcher`:
+  - [example/lib/main.dart#L8-L24](example/lib/main.dart#L8-L24)
+
+### Link editing drawer (format drawer, not dialog)
+
+- Drawer shell (shared chrome: handle + padding + safe keyboard insets):
+  - [slote_format_drawers.dart#L7-L65](lib/src/appflowy/slote_format_drawers.dart#L7-L65)
+- Link drawer entrypoint:
+  - [slote_format_drawers.dart#L86-L113](lib/src/appflowy/slote_format_drawers.dart#L86-L113)
+- Drawer body:
+  - URL `TextField` + `Cancel`/`Apply`:
+    - [slote_format_drawers.dart#L115-L180](lib/src/appflowy/slote_format_drawers.dart#L115-L180)
+- Apply semantics:
+  - Apply clears `href` when the field is empty (`''` to `null`) by calling:
+    - `sloteApplyLinkHref`:
+      - [slote_format_drawers.dart#L145-L154](lib/src/appflowy/slote_format_drawers.dart#L145-L154)
+      - and `sloteApplyLinkHref` itself:
+        - [slote_delta_format.dart#L4-L13](lib/src/appflowy/slote_delta_format.dart#L4-L13)
+
+### Text color + highlight drawer (Google Docs-style)
+
+- Combined drawer entrypoint:
+  - [slote_format_drawers.dart#L205-L228](lib/src/appflowy/slote_format_drawers.dart#L205-L228)
+- Content:
+  - Text color swatches + None clear:
+    - [slote_format_drawers.dart#L231-L286](lib/src/appflowy/slote_format_drawers.dart#L231-L286)
+  - Highlight swatches + None clear:
+    - [slote_format_drawers.dart#L290-L311](lib/src/appflowy/slote_format_drawers.dart#L290-L311)
+- Apply calls:
+  - Text color:
+    - [slote_delta_format.dart#L27-L37](lib/src/appflowy/slote_delta_format.dart#L27-L37)
+  - Highlight:
+    - [slote_delta_format.dart#L16-L25](lib/src/appflowy/slote_delta_format.dart#L16-L25)
+
+### Toolbar + shortcuts wiring
+
+- Toolbar Link button opens the link drawer as a bottom sheet:
+  - [format_toolbar.dart#L94-L102](example/lib/editor/format_toolbar.dart#L94-L102)
+- Toolbar Highlight + Text color buttons open the combined color drawer:
+  - [format_toolbar.dart#L103-L124](example/lib/editor/format_toolbar.dart#L103-L124)
+- Text color selected state now represents a uniform non-null `font_color` across the selection (instead of a single fixed hex), via:
+  - `isUniformTextColorActiveInSelection` in [format_toolbar.dart](example/lib/editor/format_toolbar.dart)
+- Keyboard shortcuts:
+  - `toggle highlight` and Slote-added text-color chord open the combined color drawer:
+    - [appflowy_editor_support.dart#L115-L129](lib/src/appflowy/appflowy_editor_support.dart#L115-L129)
+  - `link menu` opens the link drawer:
+    - [appflowy_editor_support.dart#L139-L145](lib/src/appflowy/appflowy_editor_support.dart#L139-L145)
+
+### Editor style and decorator integration (example)
+
+- Example chooses desktop vs mobile editor style and injects the Slote link decorator:
+  - [rich_text_editor_screen.dart#L65-L71](example/lib/editor/rich_text_editor_screen.dart#L65-L71)
+
 ## Fenced Code Syntax Parser
 
 `FencedCodeToEmbedSyntax` was a custom markdown `BlockSyntax` that:

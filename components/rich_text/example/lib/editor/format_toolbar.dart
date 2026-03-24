@@ -36,6 +36,23 @@ class FormatToolbar extends StatelessWidget {
                 children: [
                   _formatToggle(
                     context: context,
+                    enabled: sloteEditorCanUndo(editorState),
+                    selected: false,
+                    icon: Icons.undo,
+                    tooltip: 'Undo',
+                    onPressed: () => sloteEditorUndo(editorState),
+                  ),
+                  _formatToggle(
+                    context: context,
+                    enabled: sloteEditorCanRedo(editorState),
+                    selected: false,
+                    icon: Icons.redo,
+                    tooltip: 'Redo',
+                    onPressed: () => sloteEditorRedo(editorState),
+                  ),
+                  const VerticalDivider(width: 16),
+                  _formatToggle(
+                    context: context,
                     enabled: hasSelection,
                     selected: isFormatKeyActive(
                       editorState,

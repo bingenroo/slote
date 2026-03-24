@@ -96,20 +96,26 @@ Use **narrow** signals for interactive toolbars; **one debounced pipe** for expe
 |--------------|-----------------|
 | **Inline toolbar (BIUS, colors, …)** | `selectionNotifier`, `toggledStyleNotifier`, plus **derived state** from node at caret (e.g. `delta.sliceAttributes`). Add `transactionStream` only if you observe staleness. |
 | **Persistence / preview / TOC** | **`transactionStream`** (debounced ~200 ms) → emit JSON, refresh outline. |
-| **Undo / redo buttons (editor)** | **`EditorState` undo manager** (or package API) for can-undo/can-redo — not the generic `undo_redo` package (see below). |
+| **Undo / redo buttons (editor)** | **`sloteEditorCanUndo` / `sloteEditorCanRedo`** + **`sloteEditorUndo` / `sloteEditorRedo`** on **`EditorState.undoManager`**, and **`RichTextEditorController.undoRedoListenable`** (notifies when the can-undo/can-redo pair changes; microtask-deferred so it matches AppFlowy’s post-`apply` history). Not the generic `undo_redo` package (see below). |
 
 ---
 
 ## Undo/redo: `undo_redo` vs AppFlowy
 
-### Today
+### In `package:rich_text` (today)
+
+- **AppFlowy-only API**: [`appflowy_undo_support.dart`](../lib/src/appflowy/appflowy_undo_support.dart) exports **`sloteEditorCanUndo`**, **`sloteEditorCanRedo`**, **`sloteEditorUndo`**, **`sloteEditorRedo`** — thin wrappers over **`EditorState.undoManager`** (same stack as AppFlowy’s standard undo/redo shortcuts).
+- **`RichTextEditorController`**: optional **`maxHistoryItemSize`** / **`minHistoryItemDuration`** forwarded to **`EditorState`**; **`undoRedoListenable`** (a Flutter `Listenable`) rebuilds toolbar enablement when undo/redo availability changes.
+- **Example**: undo/redo icons on [`format_toolbar.dart`](../example/lib/editor/format_toolbar.dart) merged with selection/toggled-style listenables in [`rich_text_editor_screen.dart`](../example/lib/editor/rich_text_editor_screen.dart).
+
+### Today (rest of repo)
 
 - **`components/undo_redo`**: Generic stack + **`TextUndoRedoController` / `UnifiedUndoRedoController`** used by the **main app** for **plain `TextFormField`-style** body text (`create_note*.dart`).
 - **AppFlowy `EditorState`**: Own **transaction history**; undo/redo replays edits made through the editor. **All rich-text actions** (BIUS, blocks, links, …) should go through **transactions** so **one** history stack covers them.
 
 ### Recommendation
 
-1. **Do not duplicate** document undo inside `undo_redo` when the note body is AppFlowy-driven. Wire **Undo/Redo** toolbar actions to **`EditorState`** (same stack as typing).
+1. **Do not duplicate** document undo inside `undo_redo` when the note body is AppFlowy-driven. Wire **Undo/Redo** toolbar actions to **`EditorState`** / the **`sloteEditor*`** helpers above (same stack as typing).
 2. **After** the note body uses AppFlowy end-to-end, **remove** `UnifiedUndoRedoController` (and `undo_redo` imports) from note screens for that field.
 3. **Deprecate `components/undo_redo`** when nothing in the repo imports it:
    - Either **delete** the package and drop the path dependency from root `pubspec.yaml`, **or**

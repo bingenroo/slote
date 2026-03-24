@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:slote/src/model/note.dart';
+import 'package:slote/src/services/slote_rich_text_storage.dart';
 import 'package:slote/src/views/create_note.dart';
 import 'package:shared/shared.dart';
 import 'package:theme/theme.dart';
@@ -20,6 +21,8 @@ class NoteListItem extends StatelessWidget {
   final VoidCallback? onTap;
   final bool selectionMode;
   final bool selected;
+
+  String get _preview => plainTextPreviewFromDocumentJsonString(note.body);
 
   String _formatDate(DateTime date) {
     final now = DateTime.now();
@@ -154,7 +157,7 @@ class NoteListItem extends StatelessWidget {
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              note.body,
+                              _preview,
                               style: GoogleFonts.poppins(
                                 fontSize: AppThemeConfig.smallFontSize,
                                 color:
