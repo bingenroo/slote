@@ -126,5 +126,118 @@ void main() {
       await sloteApplyLinkHref(es, sel, 'https://example.com');
       expect(jsonEncode(es.document.toJson()), contains('https://example.com'));
     });
+
+    test('sloteToggleSuperscript sets then clears slote_superscript', () async {
+      final es = EditorState.blank(withInitialText: false);
+      final t = es.transaction;
+      t.insertNode([0], paragraphNode(text: 'hello'));
+      await es.apply(t);
+      es.selection =
+          Selection.single(path: [0], startOffset: 0, endOffset: 5).normalized;
+
+      await sloteToggleSuperscript(es);
+      expect(
+        jsonEncode(es.document.toJson()),
+        contains(kSloteSuperscriptAttribute),
+      );
+
+      es.selection =
+          Selection.single(path: [0], startOffset: 0, endOffset: 5).normalized;
+      await sloteToggleSuperscript(es);
+      expect(
+        jsonEncode(es.document.toJson()),
+        isNot(contains(kSloteSuperscriptAttribute)),
+      );
+    });
+
+    test('sloteToggleSubscript sets then clears slote_subscript', () async {
+      final es = EditorState.blank(withInitialText: false);
+      final t = es.transaction;
+      t.insertNode([0], paragraphNode(text: 'hello'));
+      await es.apply(t);
+      es.selection =
+          Selection.single(path: [0], startOffset: 0, endOffset: 5).normalized;
+
+      await sloteToggleSubscript(es);
+      expect(
+        jsonEncode(es.document.toJson()),
+        contains(kSloteSubscriptAttribute),
+      );
+
+      es.selection =
+          Selection.single(path: [0], startOffset: 0, endOffset: 5).normalized;
+      await sloteToggleSubscript(es);
+      expect(
+        jsonEncode(es.document.toJson()),
+        isNot(contains(kSloteSubscriptAttribute)),
+      );
+    });
+
+    test('sloteToggleSuperscript clears subscript when switching', () async {
+      final es = EditorState.blank(withInitialText: false);
+      final t = es.transaction;
+      t.insertNode([0], paragraphNode(text: 'hello'));
+      await es.apply(t);
+
+      es.selection =
+          Selection.single(path: [0], startOffset: 0, endOffset: 5).normalized;
+      await sloteToggleSubscript(es);
+      expect(jsonEncode(es.document.toJson()), contains(kSloteSubscriptAttribute));
+
+      es.selection =
+          Selection.single(path: [0], startOffset: 0, endOffset: 5).normalized;
+      await sloteToggleSuperscript(es);
+
+      final encoded = jsonEncode(es.document.toJson());
+      expect(encoded, contains(kSloteSuperscriptAttribute));
+      expect(encoded, isNot(contains(kSloteSubscriptAttribute)));
+    });
+  });
+
+  group('slote_markdown_codec (round-trip)', () {
+    test('superscript encodes to <sup ...> and decodes back', () async {
+      final es = EditorState.blank(withInitialText: false);
+      final t = es.transaction;
+      t.insertNode([0], paragraphNode(text: 'x2'));
+      await es.apply(t);
+
+      es.selection =
+          Selection.single(path: [0], startOffset: 1, endOffset: 2).normalized;
+      await sloteToggleSuperscript(es);
+
+      final md = sloteDocumentToMarkdown(es.document);
+      expect(md, contains('<sup'));
+      expect(md, contains(kSloteSuperscriptAttribute));
+
+      final doc2 = sloteMarkdownToDocument(md);
+      final md2 = sloteDocumentToMarkdown(doc2);
+      expect(md2, contains('<sup'));
+      expect(md2, contains(kSloteSuperscriptAttribute));
+    });
+
+    test('font size/family encodes to <span ...> and decodes back', () async {
+      final es = EditorState.blank(withInitialText: false);
+      final t = es.transaction;
+      t.insertNode([0], paragraphNode(text: 'hi'));
+      await es.apply(t);
+
+      es.selection =
+          Selection.single(path: [0], startOffset: 0, endOffset: 2).normalized;
+      await sloteApplyFontSize(es, 18);
+      es.selection =
+          Selection.single(path: [0], startOffset: 0, endOffset: 2).normalized;
+      await sloteApplyFontFamily(es, 'serif');
+
+      final md = sloteDocumentToMarkdown(es.document);
+      expect(md, contains('<span'));
+      expect(md, contains(AppFlowyRichTextKeys.fontSize));
+      expect(md, contains(AppFlowyRichTextKeys.fontFamily));
+
+      final doc2 = sloteMarkdownToDocument(md);
+      final md2 = sloteDocumentToMarkdown(doc2);
+      expect(md2, contains('<span'));
+      expect(md2, contains(AppFlowyRichTextKeys.fontSize));
+      expect(md2, contains(AppFlowyRichTextKeys.fontFamily));
+    });
   });
 }

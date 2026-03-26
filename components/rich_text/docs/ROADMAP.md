@@ -44,11 +44,11 @@ Phases build on each other; run the example app and tests after each major phase
 
 | Feature | Notes |
 |---------|--------|
-| **Superscript / subscript** | Custom delta attributes + rendering; align with AppFlowy attribute keys / slice rules. |
+| **Superscript / subscript** | **Implemented (Phase 1)** in `package:rich_text`: custom delta attributes + rendering via `sloteTextSpanDecoratorForAttribute`, plus selection helpers (`sloteToggleSuperscript` / `sloteToggleSubscript`). Markdown export/import supported via `sloteDocumentToMarkdown` / `sloteMarkdownToDocument` using HTML tags (`<sup>` / `<sub>`). |
 | **Links** | Inline `href` (or package equivalent); dialog or paste handler. **Current behavior:** quick tap opens the URL in the system default browser; long-press opens the link format drawer. |
-| **Font size, font family** | Partial attributes + `EditorStyle` / custom spans as needed. |
+| **Font size, font family** | **Implemented (Phase 1)**: selection helpers apply AppFlowy inline attributes `font_size` / `font_family` (`sloteApplyFontSize` / `sloteApplyFontFamily`). Markdown export/import supported via `<span font_size=\"...\" font_family='\"...\"'>...` wrapper from `sloteDocumentToMarkdown`. |
 | **Text color, highlight** | Use / extend built-in color attributes where available. **Near-term focus — picker UX:** match **Google Docs–style mobile** behavior: a **bottom sheet** (slide-up formatting panel from the bottom; often described informally as a mobile “formatting drawer”) with swatches/options—not separate modal dialogues for raw hex input; desktop can use compact menus or the same sheet for parity. **Touchpoint:** [`example/lib/editor/format_toolbar.dart`](../example/lib/editor/format_toolbar.dart). |
-| **Alignment** | Typically **per-block** (paragraph) attributes + layout. |
+| **Alignment** | **Deferred** (out of scope for Phase 1): per-block (paragraph) attributes + layout. |
 | **Clear formatting** | Single command stripping partial styles on selection; respects `EditorState` history. |
 
 ### Wave C — Structural blocks

@@ -11,6 +11,7 @@ import 'dart:async';
 import 'package:appflowy_editor/appflowy_editor.dart';
 import 'package:flutter/material.dart';
 
+import 'slote_inline_attributes.dart';
 import 'slote_delta_format.dart';
 import 'slote_format_drawers.dart';
 
@@ -55,8 +56,7 @@ Future<void> sloteToggleHighlight(EditorState editorState) async {
   final nodes = editorState.getNodesInSelection(selection);
   final isHighlighted = nodes.allSatisfyInSelection(selection, (delta) {
     return delta.everyAttributes(
-      (attributes) =>
-          attributes[AppFlowyRichTextKeys.backgroundColor] != null,
+      (attributes) => attributes[AppFlowyRichTextKeys.backgroundColor] != null,
     );
   });
 
@@ -65,6 +65,123 @@ Future<void> sloteToggleHighlight(EditorState editorState) async {
     selection,
     isHighlighted ? null : kSloteDefaultHighlightColor.toHex(),
   );
+}
+
+bool _sloteSelectionAllHaveAttributeTrue(
+  EditorState editorState,
+  Selection selection,
+  String attributeKey,
+) {
+  final nodes = editorState.getNodesInSelection(selection);
+  return nodes.allSatisfyInSelection(selection, (delta) {
+    return delta.everyAttributes(
+      (attributes) => attributes[attributeKey] == true,
+    );
+  });
+}
+
+/// Toggle superscript on a **non-collapsed** selection.
+///
+/// - If the whole selection is already superscript, clears it.
+/// - Otherwise sets superscript and clears subscript.
+Future<void> sloteToggleSuperscript(EditorState editorState) async {
+  final selection = editorState.selection;
+  if (selection == null || selection.isCollapsed) return;
+
+  final isAllSup = _sloteSelectionAllHaveAttributeTrue(
+    editorState,
+    selection,
+    kSloteSuperscriptAttribute,
+  );
+
+  await editorState.formatDelta(selection, {
+    kSloteSuperscriptAttribute: isAllSup ? null : true,
+    kSloteSubscriptAttribute: null,
+  });
+
+  // Collapse to the end so subsequent typing slices the upcoming attributes
+  // (and thus continues in superscript/subscript without needing toggledStyle).
+  final end = selection.end;
+  editorState.selection =
+      Selection.single(
+        path: end.path,
+        startOffset: end.offset,
+        endOffset: end.offset,
+      ).normalized;
+}
+
+/// Toggle subscript on a **non-collapsed** selection.
+///
+/// - If the whole selection is already subscript, clears it.
+/// - Otherwise sets subscript and clears superscript.
+Future<void> sloteToggleSubscript(EditorState editorState) async {
+  final selection = editorState.selection;
+  if (selection == null || selection.isCollapsed) return;
+
+  final isAllSub = _sloteSelectionAllHaveAttributeTrue(
+    editorState,
+    selection,
+    kSloteSubscriptAttribute,
+  );
+
+  await editorState.formatDelta(selection, {
+    kSloteSubscriptAttribute: isAllSub ? null : true,
+    kSloteSuperscriptAttribute: null,
+  });
+
+  final end = selection.end;
+  editorState.selection =
+      Selection.single(
+        path: end.path,
+        startOffset: end.offset,
+        endOffset: end.offset,
+      ).normalized;
+}
+
+/// Applies or clears font size (`font_size`) on a **non-collapsed** selection.
+///
+/// Use `null` to clear font size back to the editor default.
+Future<void> sloteApplyFontSize(
+  EditorState editorState,
+  double? fontSize,
+) async {
+  final selection = editorState.selection;
+  if (selection == null || selection.isCollapsed) return;
+
+  await editorState.formatDelta(selection, {
+    AppFlowyRichTextKeys.fontSize: fontSize,
+  });
+
+  final end = selection.end;
+  editorState.selection =
+      Selection.single(
+        path: end.path,
+        startOffset: end.offset,
+        endOffset: end.offset,
+      ).normalized;
+}
+
+/// Applies or clears font family (`font_family`) on a **non-collapsed** selection.
+///
+/// Use `null` to clear font family back to the editor default.
+Future<void> sloteApplyFontFamily(
+  EditorState editorState,
+  String? fontFamily,
+) async {
+  final selection = editorState.selection;
+  if (selection == null || selection.isCollapsed) return;
+
+  await editorState.formatDelta(selection, {
+    AppFlowyRichTextKeys.fontFamily: fontFamily,
+  });
+
+  final end = selection.end;
+  editorState.selection =
+      Selection.single(
+        path: end.path,
+        startOffset: end.offset,
+        endOffset: end.offset,
+      ).normalized;
 }
 
 /// Toggles [kSloteSpikeTextColor] on a **non-collapsed** selection.
@@ -80,11 +197,7 @@ Future<void> sloteToggleTextColor(EditorState editorState) async {
     );
   });
 
-  await sloteApplyTextColor(
-    editorState,
-    selection,
-    allSpike ? null : hex,
-  );
+  await sloteApplyTextColor(editorState, selection, allSpike ? null : hex);
 }
 
 Map<String, dynamic> _sloteClearInlineAttributes() {
@@ -94,6 +207,8 @@ Map<String, dynamic> _sloteClearInlineAttributes() {
     AppFlowyRichTextKeys.code: null,
     AppFlowyRichTextKeys.fontFamily: null,
     AppFlowyRichTextKeys.fontSize: null,
+    kSloteSuperscriptAttribute: null,
+    kSloteSubscriptAttribute: null,
   };
   return m;
 }
@@ -165,35 +280,32 @@ CommandShortcutEvent _shortcutWithSharedHandler(
   String attributeKey,
 ) {
   return base.copyWith(
-    handler: (editorState) =>
-        applyBiusFromShortcut(editorState, attributeKey),
+    handler: (editorState) => applyBiusFromShortcut(editorState, attributeKey),
   );
 }
 
 Map<String, CommandShortcutEvent> _sloteStandardReplacements() => {
-      'toggle bold': _shortcutWithSharedHandler(
-        toggleBoldCommand,
-        AppFlowyRichTextKeys.bold,
-      ),
-      'toggle italic': _shortcutWithSharedHandler(
-        toggleItalicCommand,
-        AppFlowyRichTextKeys.italic,
-      ),
-      'toggle underline': _shortcutWithSharedHandler(
-        toggleUnderlineCommand,
-        AppFlowyRichTextKeys.underline,
-      ),
-      'toggle strikethrough': _shortcutWithSharedHandler(
-        toggleStrikethroughCommand,
-        AppFlowyRichTextKeys.strikethrough,
-      ),
-      'toggle highlight': toggleHighlightCommand.copyWith(
-        handler: _sloteToggleHighlightShortcut,
-      ),
-      'link menu': showLinkMenuCommand.copyWith(
-        handler: _sloteLinkMenuShortcut,
-      ),
-    };
+  'toggle bold': _shortcutWithSharedHandler(
+    toggleBoldCommand,
+    AppFlowyRichTextKeys.bold,
+  ),
+  'toggle italic': _shortcutWithSharedHandler(
+    toggleItalicCommand,
+    AppFlowyRichTextKeys.italic,
+  ),
+  'toggle underline': _shortcutWithSharedHandler(
+    toggleUnderlineCommand,
+    AppFlowyRichTextKeys.underline,
+  ),
+  'toggle strikethrough': _shortcutWithSharedHandler(
+    toggleStrikethroughCommand,
+    AppFlowyRichTextKeys.strikethrough,
+  ),
+  'toggle highlight': toggleHighlightCommand.copyWith(
+    handler: _sloteToggleHighlightShortcut,
+  ),
+  'link menu': showLinkMenuCommand.copyWith(handler: _sloteLinkMenuShortcut),
+};
 
 final CommandShortcutEvent _sloteToggleTextColorCommand = CommandShortcutEvent(
   key: sloteToggleTextColorShortcutKey,

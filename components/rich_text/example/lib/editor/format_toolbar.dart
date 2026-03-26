@@ -149,6 +149,30 @@ class FormatToolbar extends StatelessWidget {
                     onPressed: () =>
                         unawaited(sloteClearInlineFormatting(editorState)),
                   ),
+                  _FontSizeMenu(
+                    editorState: editorState,
+                    enabled: rangeSelection,
+                  ),
+                  _FontFamilyMenu(
+                    editorState: editorState,
+                    enabled: rangeSelection,
+                  ),
+                  _formatToggle(
+                    context: context,
+                    enabled: rangeSelection,
+                    selected: isSloteSuperscriptActiveInSelection(editorState),
+                    icon: Icons.superscript,
+                    tooltip: 'Superscript',
+                    onPressed: () => unawaited(sloteToggleSuperscript(editorState)),
+                  ),
+                  _formatToggle(
+                    context: context,
+                    enabled: rangeSelection,
+                    selected: isSloteSubscriptActiveInSelection(editorState),
+                    icon: Icons.subscript,
+                    tooltip: 'Subscript',
+                    onPressed: () => unawaited(sloteToggleSubscript(editorState)),
+                  ),
                 ],
               ),
             ),
@@ -202,6 +226,74 @@ class FormatToolbar extends StatelessWidget {
   }
 }
 
+class _FontSizeMenu extends StatelessWidget {
+  const _FontSizeMenu({required this.editorState, required this.enabled});
+
+  final EditorState editorState;
+  final bool enabled;
+
+  static const List<double> _sizes = [12, 14, 16, 18, 24, 32];
+
+  @override
+  Widget build(BuildContext context) {
+    return PopupMenuButton<double?>(
+      enabled: enabled,
+      tooltip: 'Font size',
+      icon: const Icon(Icons.format_size),
+      onSelected: (v) => unawaited(sloteApplyFontSize(editorState, v)),
+      itemBuilder: (context) => [
+        const PopupMenuItem<double?>(
+          value: null,
+          child: Text('Default size'),
+        ),
+        const PopupMenuDivider(),
+        ..._sizes.map(
+          (s) => PopupMenuItem<double?>(
+            value: s,
+            child: Text('${s.toInt()}'),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _FontFamilyMenu extends StatelessWidget {
+  const _FontFamilyMenu({required this.editorState, required this.enabled});
+
+  final EditorState editorState;
+  final bool enabled;
+
+  static const List<String> _families = [
+    'sans-serif',
+    'serif',
+    'monospace',
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return PopupMenuButton<String?>(
+      enabled: enabled,
+      tooltip: 'Font family',
+      icon: const Icon(Icons.font_download),
+      onSelected: (v) => unawaited(sloteApplyFontFamily(editorState, v)),
+      itemBuilder: (context) => [
+        const PopupMenuItem<String?>(
+          value: null,
+          child: Text('Default font'),
+        ),
+        const PopupMenuDivider(),
+        ..._families.map(
+          (f) => PopupMenuItem<String?>(
+            value: f,
+            child: Text(f),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 /// Whether [key] (an [AppFlowyRichTextKeys] partial style) reads as active.
 bool isFormatKeyActive(EditorState editorState, String key) {
   final selection = editorState.selection;
@@ -241,6 +333,34 @@ bool isLinkActiveInSelection(EditorState editorState) {
         delta.isNotEmpty &&
         delta.everyAttributes(
           (attr) => attr[AppFlowyRichTextKeys.href] != null,
+        ),
+  );
+}
+
+bool isSloteSuperscriptActiveInSelection(EditorState editorState) {
+  final selection = editorState.selection;
+  if (selection == null || selection.isCollapsed) return false;
+  final nodes = editorState.getNodesInSelection(selection);
+  return nodes.allSatisfyInSelection(
+    selection,
+    (delta) =>
+        delta.isNotEmpty &&
+        delta.everyAttributes(
+          (attr) => attr[kSloteSuperscriptAttribute] == true,
+        ),
+  );
+}
+
+bool isSloteSubscriptActiveInSelection(EditorState editorState) {
+  final selection = editorState.selection;
+  if (selection == null || selection.isCollapsed) return false;
+  final nodes = editorState.getNodesInSelection(selection);
+  return nodes.allSatisfyInSelection(
+    selection,
+    (delta) =>
+        delta.isNotEmpty &&
+        delta.everyAttributes(
+          (attr) => attr[kSloteSubscriptAttribute] == true,
         ),
   );
 }

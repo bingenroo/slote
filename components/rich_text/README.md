@@ -6,7 +6,7 @@ Slote’s **rich text editing** package. The product direction is **AppFlowy Edi
 
 | Layer | Status |
 |--------|--------|
-| **`lib/`** | **`RichTextEditorController`**, inline helpers (`applyBiusToggle`, Wave B `slote*` APIs), and `standardCommandShortcutsWithSloteInlineHandlers()` (see `lib/rich_text.dart`). |
+| **`lib/`** | **`RichTextEditorController`**, inline helpers (`applyBiusToggle`, Wave B `slote*` APIs), markdown helpers (`sloteDocumentToMarkdown` / `sloteMarkdownToDocument`), and `standardCommandShortcutsWithSloteInlineHandlers()` (see `lib/rich_text.dart`). |
 | **`example/`** | **Active development** — uses the package APIs: debounced document JSON preview, BIUS toolbar, AppFlowy editor with shared BIUS command shortcuts. |
 | **Legacy Quill stack** | **Not in this tree** — design and behavior are preserved in [IMPLEMENTATION.md](IMPLEMENTATION.md) for reference only (historical Quill + markdown pipeline). |
 

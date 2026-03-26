@@ -5,6 +5,7 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import 'slote_inline_attributes.dart';
 import 'slote_format_drawers.dart';
 
 /// Slote link behavior: **quick tap** opens the URL via [editorLaunchUrl] without
@@ -26,8 +27,38 @@ TextSpan sloteTextSpanDecoratorForAttribute(
     return before;
   }
   final href = attributes[AppFlowyRichTextKeys.href] as String?;
+  final isSuperscript = attributes[kSloteSuperscriptAttribute] == true;
+  final isSubscript = attributes[kSloteSubscriptAttribute] == true;
+
+  final needsTypographyOverride = isSuperscript || isSubscript;
+  final baseStyle = before.style;
+  final typographyStyle = (() {
+    if (!needsTypographyOverride || baseStyle == null) return baseStyle;
+    return baseStyle.copyWith(
+      // Keep attempting OpenType super/sub when supported by the font.
+      fontFeatures: [
+        ...?baseStyle.fontFeatures,
+        if (isSuperscript) const FontFeature.superscripts(),
+        if (isSubscript) const FontFeature.subscripts(),
+      ],
+    );
+  })();
+
   if (href == null) {
-    return before;
+    if (!needsTypographyOverride) return before;
+    final dy = isSuperscript ? -5.0 : 4.0;
+    return TextSpan(
+      children: [
+        WidgetSpan(
+          alignment: PlaceholderAlignment.baseline,
+          baseline: TextBaseline.alphabetic,
+          child: Transform.translate(
+            offset: Offset(0, dy),
+            child: Text(text.text, style: typographyStyle),
+          ),
+        ),
+      ],
+    );
   }
 
   final editorState = context.read<EditorState>();
@@ -54,7 +85,7 @@ TextSpan sloteTextSpanDecoratorForAttribute(
     };
 
   return TextSpan(
-    style: before.style,
+    style: typographyStyle,
     text: text.text,
     recognizer: recognizer,
     mouseCursor: SystemMouseCursors.click,
