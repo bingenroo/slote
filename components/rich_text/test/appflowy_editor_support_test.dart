@@ -188,6 +188,90 @@ void main() {
       expect(es.toggledStyle[kSloteSuperscriptAttribute], isFalse);
     });
 
+    test(
+      'insert with slote superscript toggledStyle applies attribute (IME contract)',
+      () async {
+        final es = EditorState.blank(withInitialText: false);
+        final setup = es.transaction;
+        setup.insertNode([0], paragraphNode(text: 'a'));
+        await es.apply(setup);
+        es.selection =
+            Selection.single(path: [0], startOffset: 1, endOffset: 1).normalized;
+
+        await sloteToggleSuperscript(es);
+        expect(AppFlowyRichTextKeys.supportToggled, contains(kSloteSuperscriptAttribute));
+
+        final node = es.getNodeAtPath([0]);
+        expect(node, isNotNull);
+        final tx = es.transaction;
+        tx.insertText(
+          node!,
+          1,
+          'x',
+          toggledAttributes: es.toggledStyle,
+        );
+        await es.apply(tx);
+
+        expect(es.getNodeAtPath([0])!.delta!.toPlainText(), 'ax');
+        final encoded = jsonEncode(es.document.toJson());
+        expect(encoded, contains(kSloteSuperscriptAttribute));
+      },
+    );
+
+    test(
+      'RichTextEditorController restores subscript toggledStyle for continued typing',
+      () async {
+        ensureSloteAppFlowyRichTextKeysRegistered();
+        final controller = RichTextEditorController(
+          document: Document.blank(withInitialText: false),
+        );
+        final es = controller.editorState;
+        final setup = es.transaction;
+        setup.insertNode([0], paragraphNode(text: 'a'));
+        await es.apply(setup);
+
+        es.selection =
+            Selection.single(path: [0], startOffset: 1, endOffset: 1).normalized;
+
+        await sloteToggleSubscript(es);
+        expect(es.toggledStyle[kSloteSubscriptAttribute], isTrue);
+
+        var node = es.getNodeAtPath([0]);
+        var tx = es.transaction;
+        tx.insertText(
+          node!,
+          1,
+          'b',
+          toggledAttributes: es.toggledStyle,
+        );
+        await es.apply(tx);
+
+        expect(
+          es.toggledStyle[kSloteSubscriptAttribute],
+          isTrue,
+          reason: 'sync after selection clear must not flip script pending style',
+        );
+
+        node = es.getNodeAtPath([0]);
+        tx = es.transaction;
+        tx.insertText(
+          node!,
+          2,
+          'c',
+          toggledAttributes: es.toggledStyle,
+        );
+        await es.apply(tx);
+
+        final delta = es.getNodeAtPath([0])!.delta!;
+        expect(delta.toPlainText(), 'abc');
+        expect(delta.sliceAttributes(2)?[kSloteSubscriptAttribute], isTrue);
+        expect(delta.sliceAttributes(3)?[kSloteSubscriptAttribute], isTrue);
+        expect(jsonEncode(es.document.toJson()), contains(kSloteSubscriptAttribute));
+
+        controller.dispose();
+      },
+    );
+
     test('sloteToggleSuperscript sets then clears slote_superscript', () async {
       final es = EditorState.blank(withInitialText: false);
       final t = es.transaction;

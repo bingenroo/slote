@@ -28,6 +28,7 @@ class RichTextEditorController {
          minHistoryItemDuration: minHistoryItemDuration,
          maxHistoryItemSize: maxHistoryItemSize,
        ) {
+    ensureSloteAppFlowyRichTextKeysRegistered();
     editorState.selectionNotifier.addListener(_onSelectionChangedForSupSub);
     _subscription = editorState.transactionStream.listen(_onTransaction);
   }
@@ -105,22 +106,25 @@ class RichTextEditorController {
 
     if (desiredSup == currSup && desiredSub == currSub) return;
 
+    // Do not use [EditorState.toggleAttribute] for a collapsed caret here.
+    // After each keystroke, [EditorState.selection] clears [toggledStyle]; this
+    // sync restores script keys from [Delta.sliceAttributes]. Stock
+    // `toggleAttribute` for a collapsed selection *without* the key in
+    // [toggledStyle] inspects the previous character and sets the pending key to
+    // the *opposite* of that slice (toggle off when the run already has the
+    // attribute). That leaves `slote_subscript: false` in [toggledStyle], and
+    // [Transaction.insertText] merges with `addAll(toggledAttributes)`, which
+    // strips subscript/superscript on the next typed character.
     _caretStyleSyncInFlight = true;
     try {
-      if (desiredSup) {
-        if (currSub) editorState.toggleAttribute(kSloteSubscriptAttribute);
-        if (!currSup) {
-          editorState.toggleAttribute(kSloteSuperscriptAttribute);
-        }
-      } else if (desiredSub) {
-        if (currSup) editorState.toggleAttribute(kSloteSuperscriptAttribute);
-        if (!currSub) {
-          editorState.toggleAttribute(kSloteSubscriptAttribute);
-        }
-      } else {
-        if (currSup) editorState.toggleAttribute(kSloteSuperscriptAttribute);
-        if (currSub) editorState.toggleAttribute(kSloteSubscriptAttribute);
-      }
+      editorState.updateToggledStyle(
+        kSloteSuperscriptAttribute,
+        desiredSup,
+      );
+      editorState.updateToggledStyle(
+        kSloteSubscriptAttribute,
+        desiredSub,
+      );
     } finally {
       _caretStyleSyncInFlight = false;
     }

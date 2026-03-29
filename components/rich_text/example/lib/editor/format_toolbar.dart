@@ -50,7 +50,7 @@ class FormatToolbar extends StatelessWidget {
                     tooltip: 'Redo',
                     onPressed: () => sloteEditorRedo(editorState),
                   ),
-                  const VerticalDivider(width: 16),
+                  _groupDivider(scheme),
                   _formatToggle(
                     context: context,
                     enabled: hasSelection,
@@ -60,8 +60,11 @@ class FormatToolbar extends StatelessWidget {
                     ),
                     icon: Icons.format_bold,
                     tooltip: 'Bold',
-                    onPressed: () =>
-                        applyBiusToggle(editorState, AppFlowyRichTextKeys.bold),
+                    onPressed:
+                        () => applyBiusToggle(
+                          editorState,
+                          AppFlowyRichTextKeys.bold,
+                        ),
                   ),
                   _formatToggle(
                     context: context,
@@ -72,10 +75,11 @@ class FormatToolbar extends StatelessWidget {
                     ),
                     icon: Icons.format_italic,
                     tooltip: 'Italic',
-                    onPressed: () => applyBiusToggle(
-                      editorState,
-                      AppFlowyRichTextKeys.italic,
-                    ),
+                    onPressed:
+                        () => applyBiusToggle(
+                          editorState,
+                          AppFlowyRichTextKeys.italic,
+                        ),
                   ),
                   _formatToggle(
                     context: context,
@@ -86,10 +90,11 @@ class FormatToolbar extends StatelessWidget {
                     ),
                     icon: Icons.format_underlined,
                     tooltip: 'Underline',
-                    onPressed: () => applyBiusToggle(
-                      editorState,
-                      AppFlowyRichTextKeys.underline,
-                    ),
+                    onPressed:
+                        () => applyBiusToggle(
+                          editorState,
+                          AppFlowyRichTextKeys.underline,
+                        ),
                   ),
                   _formatToggle(
                     context: context,
@@ -100,17 +105,18 @@ class FormatToolbar extends StatelessWidget {
                     ),
                     icon: Icons.strikethrough_s,
                     tooltip: 'Strikethrough',
-                    onPressed: () => applyBiusToggle(
-                      editorState,
-                      AppFlowyRichTextKeys.strikethrough,
-                    ),
+                    onPressed:
+                        () => applyBiusToggle(
+                          editorState,
+                          AppFlowyRichTextKeys.strikethrough,
+                        ),
                   ),
-                  const VerticalDivider(width: 16),
+                  _groupDivider(scheme),
                   SloteHeadingStyleToolbarMenu(
                     editorState: editorState,
                     enabled: sloteCanUseBlockHeadingControls(editorState),
                   ),
-                  const VerticalDivider(width: 16),
+                  _groupDivider(scheme),
                   // Link needs a range; other inline actions work at caret via
                   // toggledStyle / formatDelta.
                   _formatToggle(
@@ -119,8 +125,11 @@ class FormatToolbar extends StatelessWidget {
                     selected: sloteIsLinkActiveInSelection(editorState),
                     icon: Icons.link,
                     tooltip: 'Link',
-                    onPressed: () =>
-                        sloteShowLinkDialog(editorState, hostContext: context),
+                    onPressed:
+                        () => sloteShowLinkDialog(
+                          editorState,
+                          hostContext: context,
+                        ),
                   ),
                   _formatToggle(
                     context: context,
@@ -128,22 +137,23 @@ class FormatToolbar extends StatelessWidget {
                     selected: sloteIsHighlightActiveForToolbar(editorState),
                     icon: Icons.highlight,
                     tooltip: 'Highlight',
-                    onPressed: () => showSloteColorFormatDrawer(
-                      editorState,
-                      hostContext: context,
-                    ),
+                    onPressed:
+                        () => showSloteColorFormatDrawer(
+                          editorState,
+                          hostContext: context,
+                        ),
                   ),
                   _formatToggle(
                     context: context,
                     enabled: hasSelection,
-                    selected:
-                        sloteIsTextColorActiveForToolbar(editorState),
+                    selected: sloteIsTextColorActiveForToolbar(editorState),
                     icon: Icons.format_color_text,
                     tooltip: 'Text color',
-                    onPressed: () => showSloteColorFormatDrawer(
-                      editorState,
-                      hostContext: context,
-                    ),
+                    onPressed:
+                        () => showSloteColorFormatDrawer(
+                          editorState,
+                          hostContext: context,
+                        ),
                   ),
                   _formatToggle(
                     context: context,
@@ -151,8 +161,9 @@ class FormatToolbar extends StatelessWidget {
                     selected: false,
                     icon: Icons.format_clear,
                     tooltip: 'Clear formatting',
-                    onPressed: () =>
-                        unawaited(sloteClearInlineFormatting(editorState)),
+                    onPressed:
+                        () =>
+                            unawaited(sloteClearInlineFormatting(editorState)),
                   ),
                   _FontSizeMenu(
                     editorState: editorState,
@@ -171,7 +182,8 @@ class FormatToolbar extends StatelessWidget {
                     ),
                     icon: Icons.superscript,
                     tooltip: 'Superscript',
-                    onPressed: () => unawaited(sloteToggleSuperscript(editorState)),
+                    onPressed:
+                        () => unawaited(sloteToggleSuperscript(editorState)),
                   ),
                   _formatToggle(
                     context: context,
@@ -182,7 +194,8 @@ class FormatToolbar extends StatelessWidget {
                     ),
                     icon: Icons.subscript,
                     tooltip: 'Subscript',
-                    onPressed: () => unawaited(sloteToggleSubscript(editorState)),
+                    onPressed:
+                        () => unawaited(sloteToggleSubscript(editorState)),
                   ),
                 ],
               ),
@@ -190,6 +203,28 @@ class FormatToolbar extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+
+  /// Separator between toolbar groups. [VerticalDivider] is often invisible
+  /// here: low contrast on [ColorScheme.surfaceContainerLow] and weak height
+  /// constraints in a horizontal [SingleChildScrollView] + [Row].
+  Widget _groupDivider(ColorScheme scheme) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+      child: SizedBox(
+        height: 40,
+        child: Center(
+          child: Container(
+            width: 1,
+            height: 24,
+            decoration: BoxDecoration(
+              color: scheme.onSurface.withValues(alpha: 0.32),
+              borderRadius: BorderRadius.circular(0.5),
+            ),
+          ),
+        ),
+      ),
     );
   }
 
@@ -254,27 +289,28 @@ class _FontSizeMenu extends StatelessWidget {
       onOpened: () => keepEditorFocusNotifier.increase(),
       onCanceled: () => keepEditorFocusNotifier.decrease(),
       onSelected: (v) {
-        unawaited((() async {
-          try {
-            await sloteApplyFontSize(editorState, v);
-          } finally {
-            keepEditorFocusNotifier.decrease();
-          }
-        })());
+        unawaited(
+          (() async {
+            try {
+              await sloteApplyFontSize(editorState, v);
+            } finally {
+              keepEditorFocusNotifier.decrease();
+            }
+          })(),
+        );
       },
-      itemBuilder: (context) => [
-        const PopupMenuItem<double?>(
-          value: null,
-          child: Text('Default size'),
-        ),
-        const PopupMenuDivider(),
-        ..._sizes.map(
-          (s) => PopupMenuItem<double?>(
-            value: s,
-            child: Text('${s.toInt()}'),
-          ),
-        ),
-      ],
+      itemBuilder:
+          (context) => [
+            const PopupMenuItem<double?>(
+              value: null,
+              child: Text('Default size'),
+            ),
+            const PopupMenuDivider(),
+            ..._sizes.map(
+              (s) =>
+                  PopupMenuItem<double?>(value: s, child: Text('${s.toInt()}')),
+            ),
+          ],
     );
   }
 }
@@ -285,11 +321,7 @@ class _FontFamilyMenu extends StatelessWidget {
   final EditorState editorState;
   final bool enabled;
 
-  static const List<String> _families = [
-    'sans-serif',
-    'serif',
-    'monospace',
-  ];
+  static const List<String> _families = ['sans-serif', 'serif', 'monospace'];
 
   @override
   Widget build(BuildContext context) {
@@ -300,27 +332,27 @@ class _FontFamilyMenu extends StatelessWidget {
       onOpened: () => keepEditorFocusNotifier.increase(),
       onCanceled: () => keepEditorFocusNotifier.decrease(),
       onSelected: (v) {
-        unawaited((() async {
-          try {
-            await sloteApplyFontFamily(editorState, v);
-          } finally {
-            keepEditorFocusNotifier.decrease();
-          }
-        })());
+        unawaited(
+          (() async {
+            try {
+              await sloteApplyFontFamily(editorState, v);
+            } finally {
+              keepEditorFocusNotifier.decrease();
+            }
+          })(),
+        );
       },
-      itemBuilder: (context) => [
-        const PopupMenuItem<String?>(
-          value: null,
-          child: Text('Default font'),
-        ),
-        const PopupMenuDivider(),
-        ..._families.map(
-          (f) => PopupMenuItem<String?>(
-            value: f,
-            child: Text(f),
-          ),
-        ),
-      ],
+      itemBuilder:
+          (context) => [
+            const PopupMenuItem<String?>(
+              value: null,
+              child: Text('Default font'),
+            ),
+            const PopupMenuDivider(),
+            ..._families.map(
+              (f) => PopupMenuItem<String?>(value: f, child: Text(f)),
+            ),
+          ],
     );
   }
 }

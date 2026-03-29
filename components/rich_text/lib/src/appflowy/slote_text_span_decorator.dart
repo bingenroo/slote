@@ -8,6 +8,43 @@ import 'slote_inline_attributes.dart';
 import 'slote_format_drawers.dart';
 import 'slote_sup_sub_metrics.dart';
 
+const _kSloteScriptTextHeight = TextHeightBehavior(
+  applyHeightToFirstAscent: false,
+  applyHeightToLastDescent: false,
+);
+
+/// Script-sized [Text] with layout padding for inline [WidgetSpan]s.
+///
+/// Superscript uses [PlaceholderAlignment.aboveBaseline] (bottom of this widget
+/// on the paragraph alphabetic baseline). [edgePaddingPx] is **bottom** padding
+/// so glyphs sit higher; subscript uses [PlaceholderAlignment.belowBaseline] and
+/// **top** padding to hang below the baseline.
+Widget _sloteScriptSpanChild({
+  required String text,
+  required TextStyle? style,
+  required bool isSuperscript,
+  /// Logical px; superscript: bottom inset, subscript: top inset.
+  required double edgePaddingPx,
+}) {
+  final textWidget = Text(
+    text,
+    style: style,
+    textHeightBehavior: _kSloteScriptTextHeight,
+  );
+  if (edgePaddingPx <= 0) {
+    return textWidget;
+  }
+  return isSuperscript
+      ? Padding(
+          padding: EdgeInsets.only(bottom: edgePaddingPx),
+          child: textWidget,
+        )
+      : Padding(
+          padding: EdgeInsets.only(top: edgePaddingPx),
+          child: textWidget,
+        );
+}
+
 /// Slote link behavior: **quick tap** opens the URL via [editorLaunchUrl] without
 /// first selecting the span; **long press** (~500ms) opens the link format drawer.
 ///
@@ -49,42 +86,43 @@ TextSpan sloteTextSpanDecoratorForAttribute(
 
   final typographyStyle =
       (() {
-        if (!needsTypographyOverride || baseStyle == null) return baseStyle;
+        if (!needsTypographyOverride) return baseStyle;
         final m = supSubMetrics!;
-        return baseStyle.copyWith(
-          // Keep attempting OpenType super/sub when supported by the font.
-          fontFeatures: [
-            ...?baseStyle.fontFeatures,
-            if (isSuperscript) const FontFeature.superscripts(),
-            if (isSubscript) const FontFeature.subscripts(),
-          ],
+        final defaultStyle = DefaultTextStyle.of(context).style;
+        final effectiveBase = baseStyle ?? defaultStyle;
+        // Omit OpenType superscripts/subscripts: they resize/shift glyphs and
+        // fight our explicit em-based positioning (reference apps use full-size
+        // letters shifted on the line, not smaller OT alternates).
+        return effectiveBase.copyWith(
           fontSize: baseFontSize * m.fontScale,
+          color: baseStyle?.color ?? defaultStyle.color,
         );
       })();
 
   final dy = supSubMetrics?.translateY ?? 0.0;
-
-  Widget supSubGlyph(String t, TextStyle? s) {
-    return Text(
-      t,
-      style: s,
-      textHeightBehavior: const TextHeightBehavior(
-        applyHeightToFirstAscent: false,
-        applyHeightToLastDescent: false,
-      ),
-    );
-  }
+  // [PlaceholderAlignment.baseline] pins the script’s alphabetic baseline to the
+  // body baseline, so em-based “raise” has almost no effect. Use above/below
+  // baseline for sup/sub; padding applies extra shift in logical layout pixels.
+  final scriptEdgePad =
+      needsTypographyOverride ? (isSuperscript ? -dy : dy) : 0.0;
+  final PlaceholderAlignment scriptPlaceholderAlignment = !needsTypographyOverride
+      ? PlaceholderAlignment.baseline
+      : (isSuperscript
+            ? PlaceholderAlignment.aboveBaseline
+            : PlaceholderAlignment.belowBaseline);
 
   if (href == null) {
     if (!needsTypographyOverride) return before;
     return TextSpan(
       children: [
         WidgetSpan(
-          alignment: PlaceholderAlignment.baseline,
+          alignment: scriptPlaceholderAlignment,
           baseline: TextBaseline.alphabetic,
-          child: Transform.translate(
-            offset: Offset(0, dy),
-            child: supSubGlyph(text.text, typographyStyle),
+          child: _sloteScriptSpanChild(
+            text: text.text,
+            style: typographyStyle,
+            isSuperscript: isSuperscript,
+            edgePaddingPx: scriptEdgePad,
           ),
         ),
       ],
@@ -94,40 +132,53 @@ TextSpan sloteTextSpanDecoratorForAttribute(
   final editorState = context.read<EditorState>();
   Timer? longPressTimer;
 
-  // Use GestureDetector inside a WidgetSpan so we can baseline-shift
-  // superscripts/subscripts even for linked spans.
+  Widget linkGestureChild(Widget child) {
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        behavior: HitTestBehavior.translucent,
+        onTapDown: (_) {
+          longPressTimer = Timer(const Duration(milliseconds: 500), () {
+            longPressTimer = null;
+            if (!context.mounted) return;
+            showSloteLinkFormatDrawer(editorState, hostContext: context);
+          });
+        },
+        onTapUp: (_) {
+          if (longPressTimer != null && longPressTimer!.isActive) {
+            longPressTimer!.cancel();
+            longPressTimer = null;
+            unawaited(editorLaunchUrl(href));
+          }
+        },
+        onTapCancel: () {
+          longPressTimer?.cancel();
+          longPressTimer = null;
+        },
+        child: child,
+      ),
+    );
+  }
+
+  // Use GestureDetector inside a WidgetSpan for links (with or without script).
   return TextSpan(
     children: [
       WidgetSpan(
-        alignment: PlaceholderAlignment.baseline,
+        alignment: scriptPlaceholderAlignment,
         baseline: TextBaseline.alphabetic,
-        child: MouseRegion(
-          cursor: SystemMouseCursors.click,
-          child: GestureDetector(
-            behavior: HitTestBehavior.translucent,
-            onTapDown: (_) {
-              longPressTimer = Timer(const Duration(milliseconds: 500), () {
-                longPressTimer = null;
-                if (!context.mounted) return;
-                showSloteLinkFormatDrawer(editorState, hostContext: context);
-              });
-            },
-            onTapUp: (_) {
-              if (longPressTimer != null && longPressTimer!.isActive) {
-                longPressTimer!.cancel();
-                longPressTimer = null;
-                unawaited(editorLaunchUrl(href));
-              }
-            },
-            onTapCancel: () {
-              longPressTimer?.cancel();
-              longPressTimer = null;
-            },
-            child: Transform.translate(
-              offset: Offset(0, dy),
-              child: supSubGlyph(text.text, typographyStyle),
-            ),
-          ),
+        child: linkGestureChild(
+          needsTypographyOverride
+              ? _sloteScriptSpanChild(
+                  text: text.text,
+                  style: typographyStyle,
+                  isSuperscript: isSuperscript,
+                  edgePaddingPx: scriptEdgePad,
+                )
+              : Text(
+                  text.text,
+                  style: typographyStyle,
+                  textHeightBehavior: _kSloteScriptTextHeight,
+                ),
         ),
       ),
     ],

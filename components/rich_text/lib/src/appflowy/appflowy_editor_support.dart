@@ -154,6 +154,7 @@ Selection _sloteClampSelectionToNodeText(
 /// - If the whole selection is already superscript, clears it.
 /// - Otherwise sets superscript and clears subscript.
 Future<void> sloteToggleSuperscript(EditorState editorState) async {
+  ensureSloteAppFlowyRichTextKeysRegistered();
   final rawSelection = editorState.selection;
   if (rawSelection == null) return;
 
@@ -198,6 +199,7 @@ Future<void> sloteToggleSuperscript(EditorState editorState) async {
 /// - If the whole selection is already subscript, clears it.
 /// - Otherwise sets subscript and clears superscript.
 Future<void> sloteToggleSubscript(EditorState editorState) async {
+  ensureSloteAppFlowyRichTextKeysRegistered();
   final rawSelection = editorState.selection;
   if (rawSelection == null) return;
 
