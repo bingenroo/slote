@@ -26,6 +26,7 @@ void main() {
       expect(find.byTooltip('Highlight'), findsOneWidget);
       expect(find.byTooltip('Text color'), findsOneWidget);
       expect(find.byTooltip('Clear formatting'), findsOneWidget);
+      expect(find.byTooltip('Heading style'), findsOneWidget);
     });
 
     testWidgets('tearing down app after pump does not throw',

@@ -98,6 +98,7 @@ void showSloteLinkFormatDrawer(
     selection,
   );
 
+  keepEditorFocusNotifier.increase();
   showModalBottomSheet<void>(
     context: ctx,
     isScrollControlled: true,
@@ -109,7 +110,7 @@ void showSloteLinkFormatDrawer(
         initialHref: existing,
       );
     },
-  );
+  ).whenComplete(keepEditorFocusNotifier.decrease);
 }
 
 class _SloteLinkSheetBody extends StatefulWidget {
@@ -207,11 +208,12 @@ void showSloteColorFormatDrawer(
   BuildContext? hostContext,
 }) {
   final selection = editorState.selection;
-  if (selection == null || selection.isCollapsed) return;
+  if (selection == null) return;
 
   final ctx = sloteResolveEditorSheetContext(editorState, hostContext);
   if (ctx == null) return;
 
+  keepEditorFocusNotifier.increase();
   showModalBottomSheet<void>(
     context: ctx,
     isScrollControlled: true,
@@ -225,7 +227,7 @@ void showSloteColorFormatDrawer(
         ),
       );
     },
-  );
+  ).whenComplete(keepEditorFocusNotifier.decrease);
 }
 
 class _SloteColorSheetContent extends StatelessWidget {

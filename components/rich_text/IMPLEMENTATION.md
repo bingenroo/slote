@@ -129,12 +129,18 @@ and converted to markdown fenced blocks:
 
 ## Wave B (AppFlowy): link activation + format drawers (colors + link)
 
+### Superscript / subscript typography
+
+- Size and baseline shift are **em-relative** to the parent run (after [`TextScaler`](https://api.flutter.dev/flutter/widgets/TextScaler-class.html)); see [`slote_sup_sub_metrics.dart`](lib/src/appflowy/slote_sup_sub_metrics.dart). The span decorator still uses `WidgetSpan` + `Transform.translate` because Flutter `RichText` has no dedicated sup/sub baseline API ([flutter/flutter#10906](https://github.com/flutter/flutter/issues/10906)); cross-script robustness is in the same spirit as [flutter-quill#1909](https://github.com/singerdmx/flutter-quill/pull/1909).
+- **Manual verification (UI pass):** large body sizes / headings, hyperlink + superscript, RTL mixed with Latin, system text size ~130%. If specific fonts look too small with OpenType `sups`/`subs` plus emulation, a future **emulate-only** toggle may be warranted.
+- **Known editing/UX gaps** (caret-only toggle, extending sup/sub runs, caret stepping inside runs, no nesting): see [docs/ROADMAP.md](docs/ROADMAP.md#sup-sub-known-limitations).
+
 ### Link tap behavior
 
 - Quick tap on a run carrying `href` launches the URL via `editorLaunchUrl(href)`.
-  - Custom span decorator: [slote_text_span_decorator.dart#L16-L61](lib/src/appflowy/slote_text_span_decorator.dart#L16-L61)
+  - Custom span decorator: [slote_text_span_decorator.dart](lib/src/appflowy/slote_text_span_decorator.dart)
 - Long press (~500ms) opens the link edit drawer (bottom sheet).
-  - Implemented in the same decorator: [slote_text_span_decorator.dart#L36-L54](lib/src/appflowy/slote_text_span_decorator.dart#L36-L54)
+  - Implemented in the same decorator: [slote_text_span_decorator.dart](lib/src/appflowy/slote_text_span_decorator.dart)
 - The example wires `editorLaunchUrl` using `url_launcher`:
   - [example/lib/main.dart#L8-L24](example/lib/main.dart#L8-L24)
 

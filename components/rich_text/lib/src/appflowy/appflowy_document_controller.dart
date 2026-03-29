@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:appflowy_editor/appflowy_editor.dart';
 import 'package:flutter/foundation.dart';
 
+import 'slote_inline_attributes.dart';
 import 'appflowy_undo_support.dart';
 
 class _UndoRedoListenable extends ChangeNotifier {
@@ -21,12 +22,13 @@ class RichTextEditorController {
     this.debounce = const Duration(milliseconds: 200),
     int? maxHistoryItemSize,
     Duration minHistoryItemDuration = const Duration(milliseconds: 50),
-  })  : _undoRedoListenable = _UndoRedoListenable(),
-        editorState = EditorState(
-          document: document,
-          minHistoryItemDuration: minHistoryItemDuration,
-          maxHistoryItemSize: maxHistoryItemSize,
-        ) {
+  }) : _undoRedoListenable = _UndoRedoListenable(),
+       editorState = EditorState(
+         document: document,
+         minHistoryItemDuration: minHistoryItemDuration,
+         maxHistoryItemSize: maxHistoryItemSize,
+       ) {
+    editorState.selectionNotifier.addListener(_onSelectionChangedForSupSub);
     _subscription = editorState.transactionStream.listen(_onTransaction);
   }
 
@@ -66,6 +68,63 @@ class RichTextEditorController {
 
   bool _lastCanUndo = false;
   bool _lastCanRedo = false;
+
+  bool _caretStyleSyncInFlight = false;
+
+  void _onSelectionChangedForSupSub() {
+    _syncCaretSupSubTypingStyle();
+  }
+
+  void _syncCaretSupSubTypingStyle() {
+    if (_caretStyleSyncInFlight) return;
+    final selection = editorState.selection;
+    if (selection == null || !selection.isCollapsed) return;
+
+    final node = editorState.getNodeAtPath(selection.start.path);
+    final delta = node?.delta;
+    final toggled = editorState.toggledStyle;
+    final currSup = toggled[kSloteSuperscriptAttribute] == true;
+    final currSub = toggled[kSloteSubscriptAttribute] == true;
+
+    bool desiredSup = false;
+    bool desiredSub = false;
+    try {
+      if (delta != null && !delta.isEmpty) {
+        final atCaret = delta.sliceAttributes(selection.start.offset);
+        desiredSup = atCaret?[kSloteSuperscriptAttribute] == true;
+        desiredSub = atCaret?[kSloteSubscriptAttribute] == true;
+      }
+    } catch (_) {
+      // If AppFlowy reports an offset outside delta bounds, treat as baseline.
+      desiredSup = false;
+      desiredSub = false;
+    }
+
+    // Sup and sub are mutually exclusive; prefer superscript if corrupted.
+    if (desiredSup) desiredSub = false;
+
+    if (desiredSup == currSup && desiredSub == currSub) return;
+
+    _caretStyleSyncInFlight = true;
+    try {
+      if (desiredSup) {
+        if (currSub) editorState.toggleAttribute(kSloteSubscriptAttribute);
+        if (!currSup) {
+          editorState.toggleAttribute(kSloteSuperscriptAttribute);
+        }
+      } else if (desiredSub) {
+        if (currSup) editorState.toggleAttribute(kSloteSuperscriptAttribute);
+        if (!currSub) {
+          editorState.toggleAttribute(kSloteSubscriptAttribute);
+        }
+      } else {
+        if (currSup) editorState.toggleAttribute(kSloteSuperscriptAttribute);
+        if (currSub) editorState.toggleAttribute(kSloteSubscriptAttribute);
+      }
+    } finally {
+      _caretStyleSyncInFlight = false;
+    }
+  }
 
   void _onTransaction(EditorTransactionValue event) {
     final (time, _, options) = event;
@@ -108,6 +167,7 @@ class RichTextEditorController {
     _debounceTimer?.cancel();
     _subscription?.cancel();
     _subscription = null;
+    editorState.selectionNotifier.removeListener(_onSelectionChangedForSupSub);
     editorState.dispose();
     _undoRedoListenable.dispose();
   }

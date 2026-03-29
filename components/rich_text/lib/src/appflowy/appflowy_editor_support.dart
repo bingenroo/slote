@@ -47,11 +47,36 @@ KeyEventResult applyBiusFromShortcut(
 
 // --- Wave B: highlight, text color, clear, link -----------------------------
 
-/// Toggles highlight on a **non-collapsed** selection (works on mobile; unlike
-/// stock `toggleHighlightCommand`).
+/// Toggles highlight on the current selection.
+///
+/// Range: same as before (all highlighted → clear, else apply default tint).
+/// Collapsed: toggles pending highlight for the next insert via
+/// [EditorState.toggledStyle].
 Future<void> sloteToggleHighlight(EditorState editorState) async {
   final selection = editorState.selection;
-  if (selection == null || selection.isCollapsed) return;
+  if (selection == null) return;
+
+  final bg = AppFlowyRichTextKeys.backgroundColor;
+  final defaultHex = kSloteDefaultHighlightColor.toHex();
+
+  if (selection.isCollapsed) {
+    final toggled = editorState.toggledStyle;
+    final bool currentlyOn;
+    if (toggled.containsKey(bg)) {
+      currentlyOn = toggled[bg] != null;
+    } else {
+      final node = editorState.getNodeAtPath(selection.start.path);
+      final delta = node?.delta;
+      if (delta == null || delta.isEmpty) {
+        currentlyOn = false;
+      } else {
+        final atCaret = delta.sliceAttributes(selection.start.offset);
+        currentlyOn = atCaret?[bg] != null;
+      }
+    }
+    editorState.updateToggledStyle(bg, currentlyOn ? null : defaultHex);
+    return;
+  }
 
   final nodes = editorState.getNodesInSelection(selection);
   final isHighlighted = nodes.allSatisfyInSelection(selection, (delta) {
@@ -80,13 +105,71 @@ bool _sloteSelectionAllHaveAttributeTrue(
   });
 }
 
+int _sloteDeltaTextLength(Delta delta) {
+  var len = 0;
+  final iterator = delta.iterator;
+  while (iterator.moveNext()) {
+    final op = iterator.current;
+    if (op is! TextInsert) continue;
+    len += op.text.length;
+  }
+  return len;
+}
+
+/// Clamps selection offsets so `formatDelta` doesn't apply attributes to
+/// non-existent trailing positions (e.g. selecting past the last character).
+///
+/// Only clamps when `start.path == end.path` (single-node selection).
+Selection _sloteClampSelectionToNodeText(
+  EditorState editorState,
+  Selection selection,
+) {
+  if (selection.isCollapsed) return selection;
+  if (selection.start.path.length != selection.end.path.length) return selection;
+  for (var i = 0; i < selection.start.path.length; i++) {
+    if (selection.start.path[i] != selection.end.path[i]) return selection;
+  }
+
+  final node = editorState.getNodeAtPath(selection.start.path);
+  final delta = node?.delta;
+  if (delta == null) return selection;
+
+  final textLen = _sloteDeltaTextLength(delta);
+  if (textLen <= 0) return selection;
+
+  final safeStart = selection.start.offset.clamp(0, textLen);
+  final safeEnd = selection.end.offset.clamp(0, textLen);
+
+  // If clamping collapses the range, return a collapsed selection so callers
+  // can early-exit.
+  return Selection.single(
+    path: selection.start.path,
+    startOffset: safeStart,
+    endOffset: safeEnd,
+  ).normalized;
+}
+
 /// Toggle superscript on a **non-collapsed** selection.
 ///
 /// - If the whole selection is already superscript, clears it.
 /// - Otherwise sets superscript and clears subscript.
 Future<void> sloteToggleSuperscript(EditorState editorState) async {
-  final selection = editorState.selection;
-  if (selection == null || selection.isCollapsed) return;
+  final rawSelection = editorState.selection;
+  if (rawSelection == null) return;
+
+  if (rawSelection.isCollapsed) {
+    await editorState.toggleAttribute(kSloteSuperscriptAttribute);
+    if (editorState.toggledStyle[kSloteSuperscriptAttribute] == true) {
+      editorState.updateToggledStyle(kSloteSubscriptAttribute, false);
+    }
+    return;
+  }
+
+  final selection = _sloteClampSelectionToNodeText(
+    editorState,
+    rawSelection.normalized,
+  );
+  if (selection.isCollapsed) return;
 
   final isAllSup = _sloteSelectionAllHaveAttributeTrue(
     editorState,
@@ -115,8 +198,22 @@ Future<void> sloteToggleSuperscript(EditorState editorState) async {
 /// - If the whole selection is already subscript, clears it.
 /// - Otherwise sets subscript and clears superscript.
 Future<void> sloteToggleSubscript(EditorState editorState) async {
-  final selection = editorState.selection;
-  if (selection == null || selection.isCollapsed) return;
+  final rawSelection = editorState.selection;
+  if (rawSelection == null) return;
+
+  if (rawSelection.isCollapsed) {
+    await editorState.toggleAttribute(kSloteSubscriptAttribute);
+    if (editorState.toggledStyle[kSloteSubscriptAttribute] == true) {
+      editorState.updateToggledStyle(kSloteSuperscriptAttribute, false);
+    }
+    return;
+  }
+
+  final selection = _sloteClampSelectionToNodeText(
+    editorState,
+    rawSelection.normalized,
+  );
+  if (selection.isCollapsed) return;
 
   final isAllSub = _sloteSelectionAllHaveAttributeTrue(
     editorState,
@@ -146,6 +243,8 @@ Future<void> sloteApplyFontSize(
   double? fontSize,
 ) async {
   final selection = editorState.selection;
+  // `font_size` is not in AppFlowy `supportToggled`; collapsed would assert in
+  // debug on insert. Range-only until upstream adds it.
   if (selection == null || selection.isCollapsed) return;
 
   await editorState.formatDelta(selection, {
@@ -169,7 +268,15 @@ Future<void> sloteApplyFontFamily(
   String? fontFamily,
 ) async {
   final selection = editorState.selection;
-  if (selection == null || selection.isCollapsed) return;
+  if (selection == null) return;
+
+  if (selection.isCollapsed) {
+    editorState.updateToggledStyle(
+      AppFlowyRichTextKeys.fontFamily,
+      fontFamily,
+    );
+    return;
+  }
 
   await editorState.formatDelta(selection, {
     AppFlowyRichTextKeys.fontFamily: fontFamily,
@@ -228,7 +335,7 @@ void sloteShowLinkDialog(EditorState editorState, {BuildContext? hostContext}) {
 }
 
 KeyEventResult _sloteToggleHighlightShortcut(EditorState editorState) {
-  if (editorState.selection == null || editorState.selection!.isCollapsed) {
+  if (editorState.selection == null) {
     return KeyEventResult.ignored;
   }
   showSloteColorFormatDrawer(editorState);
@@ -236,7 +343,7 @@ KeyEventResult _sloteToggleHighlightShortcut(EditorState editorState) {
 }
 
 KeyEventResult _sloteToggleTextColorShortcut(EditorState editorState) {
-  if (editorState.selection == null || editorState.selection!.isCollapsed) {
+  if (editorState.selection == null) {
     return KeyEventResult.ignored;
   }
   showSloteColorFormatDrawer(editorState);

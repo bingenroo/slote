@@ -44,12 +44,25 @@ Phases build on each other; run the example app and tests after each major phase
 
 | Feature | Notes |
 |---------|--------|
-| **Superscript / subscript** | **Implemented (Phase 1)** in `package:rich_text`: custom delta attributes + rendering via `sloteTextSpanDecoratorForAttribute`, plus selection helpers (`sloteToggleSuperscript` / `sloteToggleSubscript`). Markdown export/import supported via `sloteDocumentToMarkdown` / `sloteMarkdownToDocument` using HTML tags (`<sup>` / `<sub>`). |
+| **Superscript / subscript** | **Implemented (Phase 1)** in `package:rich_text`: custom delta attributes + rendering via `sloteTextSpanDecoratorForAttribute`, plus selection helpers (`sloteToggleSuperscript` / `sloteToggleSubscript`). Markdown export/import supported via `sloteDocumentToMarkdown` / `sloteMarkdownToDocument` using HTML tags (`<sup>` / `<sub>`). **Open UX/editing gaps** are tracked below (deferred). |
 | **Links** | Inline `href` (or package equivalent); dialog or paste handler. **Current behavior:** quick tap opens the URL in the system default browser; long-press opens the link format drawer. |
 | **Font size, font family** | **Implemented (Phase 1)**: selection helpers apply AppFlowy inline attributes `font_size` / `font_family` (`sloteApplyFontSize` / `sloteApplyFontFamily`). Markdown export/import supported via `<span font_size=\"...\" font_family='\"...\"'>...` wrapper from `sloteDocumentToMarkdown`. |
 | **Text color, highlight** | Use / extend built-in color attributes where available. **Near-term focus — picker UX:** match **Google Docs–style mobile** behavior: a **bottom sheet** (slide-up formatting panel from the bottom; often described informally as a mobile “formatting drawer”) with swatches/options—not separate modal dialogues for raw hex input; desktop can use compact menus or the same sheet for parity. **Touchpoint:** [`example/lib/editor/format_toolbar.dart`](../example/lib/editor/format_toolbar.dart). |
 | **Alignment** | **Deferred** (out of scope for Phase 1): per-block (paragraph) attributes + layout. |
 | **Clear formatting** | Single command stripping partial styles on selection; respects `EditorState` history. |
+
+<a id="sup-sub-known-limitations"></a>
+
+#### Superscript / subscript — known limitations (deferred)
+
+These issues show up when formatting **one or more selected characters** (toolbar / toggles). They are **documented for later work**; no fix is implied by this list.
+
+1. **No “typing mode” from a caret** — Superscript/subscript cannot be turned on with only a **collapsed caret** (no selection). The user must select text first. **Expected:** toggle sup/sub, then **continue typing** at that level (like Docs/Word).
+2. **Cannot extend sup/sub after a single-character span** — After making a **single character** superscript or subscript, **additional typing** does not stay at that level; new characters only appear at **normal** level, typically **before** the sup/sub run. **Expected:** the caret at the end of a sup/sub run should allow typing **more** sup/sub text.
+3. **Caret skips sup/sub runs when navigating** — With a range formatted as sup/sub, **per-character caret movement** does not step **inside** the formatted run; the caret tends to **jump past** it to adjacent same-level text. **Expected:** arrow keys and taps should allow **editing inside** sup/sub spans character by character.
+4. **No nested superscript or subscript** — Nested sup/sup, sub/sub, or sup/sub combinations are **not** supported in the model or UI.
+
+**Code touchpoints (for future fixes):** `sloteToggleSuperscript` / `sloteToggleSubscript` and selection guards in [`appflowy_editor_support.dart`](../lib/src/appflowy/appflowy_editor_support.dart); caret / `toggledStyle` sync in [`appflowy_document_controller.dart`](../lib/src/appflowy/appflowy_document_controller.dart); rendering in [`slote_text_span_decorator.dart`](../lib/src/appflowy/slote_text_span_decorator.dart) (`WidgetSpan` may affect layout/caret behavior vs plain `TextSpan`).
 
 ### Wave C — Structural blocks
 

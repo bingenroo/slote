@@ -4,7 +4,7 @@ import 'package:appflowy_editor/appflowy_editor.dart';
 import 'package:flutter/material.dart';
 import 'package:rich_text/rich_text.dart';
 
-/// Fixed formatting bar: BIUS toggles, link, highlight, text color, clear.
+/// Fixed formatting bar: BIUS, heading/body, link, colors, clear, fonts, sup/sub.
 class FormatToolbar extends StatelessWidget {
   const FormatToolbar({
     super.key,
@@ -54,7 +54,7 @@ class FormatToolbar extends StatelessWidget {
                   _formatToggle(
                     context: context,
                     enabled: hasSelection,
-                    selected: isFormatKeyActive(
+                    selected: sloteIsFormatKeyActive(
                       editorState,
                       AppFlowyRichTextKeys.bold,
                     ),
@@ -66,7 +66,7 @@ class FormatToolbar extends StatelessWidget {
                   _formatToggle(
                     context: context,
                     enabled: hasSelection,
-                    selected: isFormatKeyActive(
+                    selected: sloteIsFormatKeyActive(
                       editorState,
                       AppFlowyRichTextKeys.italic,
                     ),
@@ -80,7 +80,7 @@ class FormatToolbar extends StatelessWidget {
                   _formatToggle(
                     context: context,
                     enabled: hasSelection,
-                    selected: isFormatKeyActive(
+                    selected: sloteIsFormatKeyActive(
                       editorState,
                       AppFlowyRichTextKeys.underline,
                     ),
@@ -94,7 +94,7 @@ class FormatToolbar extends StatelessWidget {
                   _formatToggle(
                     context: context,
                     enabled: hasSelection,
-                    selected: isFormatKeyActive(
+                    selected: sloteIsFormatKeyActive(
                       editorState,
                       AppFlowyRichTextKeys.strikethrough,
                     ),
@@ -106,12 +106,17 @@ class FormatToolbar extends StatelessWidget {
                     ),
                   ),
                   const VerticalDivider(width: 16),
-                  // Link, highlight, and text color use format drawers + formatDelta
-                  // from `package:rich_text` (range selection only).
+                  SloteHeadingStyleToolbarMenu(
+                    editorState: editorState,
+                    enabled: sloteCanUseBlockHeadingControls(editorState),
+                  ),
+                  const VerticalDivider(width: 16),
+                  // Link needs a range; other inline actions work at caret via
+                  // toggledStyle / formatDelta.
                   _formatToggle(
                     context: context,
                     enabled: rangeSelection,
-                    selected: isLinkActiveInSelection(editorState),
+                    selected: sloteIsLinkActiveInSelection(editorState),
                     icon: Icons.link,
                     tooltip: 'Link',
                     onPressed: () =>
@@ -119,8 +124,8 @@ class FormatToolbar extends StatelessWidget {
                   ),
                   _formatToggle(
                     context: context,
-                    enabled: rangeSelection,
-                    selected: isHighlightActiveInSelection(editorState),
+                    enabled: hasSelection,
+                    selected: sloteIsHighlightActiveForToolbar(editorState),
                     icon: Icons.highlight,
                     tooltip: 'Highlight',
                     onPressed: () => showSloteColorFormatDrawer(
@@ -130,9 +135,9 @@ class FormatToolbar extends StatelessWidget {
                   ),
                   _formatToggle(
                     context: context,
-                    enabled: rangeSelection,
+                    enabled: hasSelection,
                     selected:
-                        isUniformTextColorActiveInSelection(editorState),
+                        sloteIsTextColorActiveForToolbar(editorState),
                     icon: Icons.format_color_text,
                     tooltip: 'Text color',
                     onPressed: () => showSloteColorFormatDrawer(
@@ -155,20 +160,26 @@ class FormatToolbar extends StatelessWidget {
                   ),
                   _FontFamilyMenu(
                     editorState: editorState,
-                    enabled: rangeSelection,
+                    enabled: hasSelection,
                   ),
                   _formatToggle(
                     context: context,
-                    enabled: rangeSelection,
-                    selected: isSloteSuperscriptActiveInSelection(editorState),
+                    enabled: hasSelection,
+                    selected: sloteIsFormatKeyActive(
+                      editorState,
+                      kSloteSuperscriptAttribute,
+                    ),
                     icon: Icons.superscript,
                     tooltip: 'Superscript',
                     onPressed: () => unawaited(sloteToggleSuperscript(editorState)),
                   ),
                   _formatToggle(
                     context: context,
-                    enabled: rangeSelection,
-                    selected: isSloteSubscriptActiveInSelection(editorState),
+                    enabled: hasSelection,
+                    selected: sloteIsFormatKeyActive(
+                      editorState,
+                      kSloteSubscriptAttribute,
+                    ),
                     icon: Icons.subscript,
                     tooltip: 'Subscript',
                     onPressed: () => unawaited(sloteToggleSubscript(editorState)),
@@ -240,7 +251,17 @@ class _FontSizeMenu extends StatelessWidget {
       enabled: enabled,
       tooltip: 'Font size',
       icon: const Icon(Icons.format_size),
-      onSelected: (v) => unawaited(sloteApplyFontSize(editorState, v)),
+      onOpened: () => keepEditorFocusNotifier.increase(),
+      onCanceled: () => keepEditorFocusNotifier.decrease(),
+      onSelected: (v) {
+        unawaited((() async {
+          try {
+            await sloteApplyFontSize(editorState, v);
+          } finally {
+            keepEditorFocusNotifier.decrease();
+          }
+        })());
+      },
       itemBuilder: (context) => [
         const PopupMenuItem<double?>(
           value: null,
@@ -276,7 +297,17 @@ class _FontFamilyMenu extends StatelessWidget {
       enabled: enabled,
       tooltip: 'Font family',
       icon: const Icon(Icons.font_download),
-      onSelected: (v) => unawaited(sloteApplyFontFamily(editorState, v)),
+      onOpened: () => keepEditorFocusNotifier.increase(),
+      onCanceled: () => keepEditorFocusNotifier.decrease(),
+      onSelected: (v) {
+        unawaited((() async {
+          try {
+            await sloteApplyFontFamily(editorState, v);
+          } finally {
+            keepEditorFocusNotifier.decrease();
+          }
+        })());
+      },
       itemBuilder: (context) => [
         const PopupMenuItem<String?>(
           value: null,
@@ -292,105 +323,4 @@ class _FontFamilyMenu extends StatelessWidget {
       ],
     );
   }
-}
-
-/// Whether [key] (an [AppFlowyRichTextKeys] partial style) reads as active.
-bool isFormatKeyActive(EditorState editorState, String key) {
-  final selection = editorState.selection;
-  if (selection == null) return false;
-
-  if (selection.isCollapsed) {
-    final toggled = editorState.toggledStyle;
-    if (toggled.containsKey(key)) {
-      return toggled[key] == true;
-    }
-    final node = editorState.getNodeAtPath(selection.start.path);
-    final delta = node?.delta;
-    if (delta == null || delta.isEmpty) {
-      return false;
-    }
-    final atCaret = delta.sliceAttributes(selection.start.offset);
-    return atCaret?[key] == true;
-  }
-
-  final nodes = editorState.getNodesInSelection(selection);
-  return nodes.allSatisfyInSelection(
-    selection,
-    (delta) =>
-        delta.isNotEmpty &&
-        delta.everyAttributes((attr) => attr[key] == true),
-  );
-}
-
-/// Non-collapsed selection only; all runs carry `href`.
-bool isLinkActiveInSelection(EditorState editorState) {
-  final selection = editorState.selection;
-  if (selection == null || selection.isCollapsed) return false;
-  final nodes = editorState.getNodesInSelection(selection);
-  return nodes.allSatisfyInSelection(
-    selection,
-    (delta) =>
-        delta.isNotEmpty &&
-        delta.everyAttributes(
-          (attr) => attr[AppFlowyRichTextKeys.href] != null,
-        ),
-  );
-}
-
-bool isSloteSuperscriptActiveInSelection(EditorState editorState) {
-  final selection = editorState.selection;
-  if (selection == null || selection.isCollapsed) return false;
-  final nodes = editorState.getNodesInSelection(selection);
-  return nodes.allSatisfyInSelection(
-    selection,
-    (delta) =>
-        delta.isNotEmpty &&
-        delta.everyAttributes(
-          (attr) => attr[kSloteSuperscriptAttribute] == true,
-        ),
-  );
-}
-
-bool isSloteSubscriptActiveInSelection(EditorState editorState) {
-  final selection = editorState.selection;
-  if (selection == null || selection.isCollapsed) return false;
-  final nodes = editorState.getNodesInSelection(selection);
-  return nodes.allSatisfyInSelection(
-    selection,
-    (delta) =>
-        delta.isNotEmpty &&
-        delta.everyAttributes(
-          (attr) => attr[kSloteSubscriptAttribute] == true,
-        ),
-  );
-}
-
-/// Non-collapsed selection only; all runs have a highlight color.
-bool isHighlightActiveInSelection(EditorState editorState) {
-  final selection = editorState.selection;
-  if (selection == null || selection.isCollapsed) return false;
-  final nodes = editorState.getNodesInSelection(selection);
-  return nodes.allSatisfyInSelection(
-    selection,
-    (delta) =>
-        delta.isNotEmpty &&
-        delta.everyAttributes(
-          (attr) => attr[AppFlowyRichTextKeys.backgroundColor] != null,
-        ),
-  );
-}
-
-/// Non-collapsed selection only; every run has the same non-null text color.
-bool isUniformTextColorActiveInSelection(EditorState editorState) {
-  final selection = editorState.selection;
-  if (selection == null || selection.isCollapsed) return false;
-  final nodes = editorState.getNodesInSelection(selection);
-  return nodes.allSatisfyInSelection(
-    selection,
-    (delta) =>
-        delta.isNotEmpty &&
-        delta.everyAttributes(
-          (attr) => attr[AppFlowyRichTextKeys.textColor] != null,
-        ),
-  );
 }

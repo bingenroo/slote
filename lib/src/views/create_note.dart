@@ -226,7 +226,7 @@ class _BottomRichTextToolbar extends StatelessWidget {
                   _formatToggle(
                     context: context,
                     enabled: hasSelection,
-                    selected: _isFormatKeyActive(
+                    selected: sloteIsFormatKeyActive(
                       editorState,
                       AppFlowyRichTextKeys.bold,
                     ),
@@ -241,7 +241,7 @@ class _BottomRichTextToolbar extends StatelessWidget {
                   _formatToggle(
                     context: context,
                     enabled: hasSelection,
-                    selected: _isFormatKeyActive(
+                    selected: sloteIsFormatKeyActive(
                       editorState,
                       AppFlowyRichTextKeys.italic,
                     ),
@@ -256,7 +256,7 @@ class _BottomRichTextToolbar extends StatelessWidget {
                   _formatToggle(
                     context: context,
                     enabled: hasSelection,
-                    selected: _isFormatKeyActive(
+                    selected: sloteIsFormatKeyActive(
                       editorState,
                       AppFlowyRichTextKeys.underline,
                     ),
@@ -271,7 +271,7 @@ class _BottomRichTextToolbar extends StatelessWidget {
                   _formatToggle(
                     context: context,
                     enabled: hasSelection,
-                    selected: _isFormatKeyActive(
+                    selected: sloteIsFormatKeyActive(
                       editorState,
                       AppFlowyRichTextKeys.strikethrough,
                     ),
@@ -299,10 +299,30 @@ class _BottomRichTextToolbar extends StatelessWidget {
                       ),
                     ),
                   ),
+                  SloteHeadingStyleToolbarMenu(
+                    editorState: editorState,
+                    enabled: sloteCanUseBlockHeadingControls(editorState),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    child: SizedBox(
+                      height: 40,
+                      child: Center(
+                        child: Container(
+                          width: 1,
+                          height: 24,
+                          decoration: BoxDecoration(
+                            color: scheme.outlineVariant,
+                            borderRadius: BorderRadius.circular(0.5),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
                   _formatToggle(
                     context: context,
                     enabled: rangeSelection,
-                    selected: _isLinkActiveInSelection(editorState),
+                    selected: sloteIsLinkActiveInSelection(editorState),
                     icon: Icons.link,
                     tooltip: 'Link',
                     onPressed:
@@ -313,8 +333,8 @@ class _BottomRichTextToolbar extends StatelessWidget {
                   ),
                   _formatToggle(
                     context: context,
-                    enabled: rangeSelection,
-                    selected: _isHighlightActiveInSelection(editorState),
+                    enabled: hasSelection,
+                    selected: sloteIsHighlightActiveForToolbar(editorState),
                     icon: Icons.highlight,
                     tooltip: 'Highlight',
                     onPressed:
@@ -325,8 +345,8 @@ class _BottomRichTextToolbar extends StatelessWidget {
                   ),
                   _formatToggle(
                     context: context,
-                    enabled: rangeSelection,
-                    selected: _isUniformTextColorActiveInSelection(editorState),
+                    enabled: hasSelection,
+                    selected: sloteIsTextColorActiveForToolbar(editorState),
                     icon: Icons.format_color_text,
                     tooltip: 'Text color',
                     onPressed:
@@ -394,71 +414,4 @@ class _BottomRichTextToolbar extends StatelessWidget {
       icon: Icon(icon),
     );
   }
-}
-
-bool _isFormatKeyActive(EditorState editorState, String key) {
-  final selection = editorState.selection;
-  if (selection == null) return false;
-
-  if (selection.isCollapsed) {
-    final toggled = editorState.toggledStyle;
-    if (toggled.containsKey(key)) {
-      return toggled[key] == true;
-    }
-    final node = editorState.getNodeAtPath(selection.start.path);
-    final delta = node?.delta;
-    if (delta == null || delta.isEmpty) return false;
-    final atCaret = delta.sliceAttributes(selection.start.offset);
-    return atCaret?[key] == true;
-  }
-
-  final nodes = editorState.getNodesInSelection(selection);
-  return nodes.allSatisfyInSelection(
-    selection,
-    (delta) =>
-        delta.isNotEmpty &&
-        delta.everyAttributes((attributes) => attributes[key] == true),
-  );
-}
-
-bool _isLinkActiveInSelection(EditorState editorState) {
-  final selection = editorState.selection;
-  if (selection == null || selection.isCollapsed) return false;
-  final nodes = editorState.getNodesInSelection(selection);
-  return nodes.allSatisfyInSelection(
-    selection,
-    (delta) =>
-        delta.isNotEmpty &&
-        delta.everyAttributes(
-          (attr) => attr[AppFlowyRichTextKeys.href] != null,
-        ),
-  );
-}
-
-bool _isHighlightActiveInSelection(EditorState editorState) {
-  final selection = editorState.selection;
-  if (selection == null || selection.isCollapsed) return false;
-  final nodes = editorState.getNodesInSelection(selection);
-  return nodes.allSatisfyInSelection(
-    selection,
-    (delta) =>
-        delta.isNotEmpty &&
-        delta.everyAttributes(
-          (attr) => attr[AppFlowyRichTextKeys.backgroundColor] != null,
-        ),
-  );
-}
-
-bool _isUniformTextColorActiveInSelection(EditorState editorState) {
-  final selection = editorState.selection;
-  if (selection == null || selection.isCollapsed) return false;
-  final nodes = editorState.getNodesInSelection(selection);
-  return nodes.allSatisfyInSelection(
-    selection,
-    (delta) =>
-        delta.isNotEmpty &&
-        delta.everyAttributes(
-          (attr) => attr[AppFlowyRichTextKeys.textColor] != null,
-        ),
-  );
 }
