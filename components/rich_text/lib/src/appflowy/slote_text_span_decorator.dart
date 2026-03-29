@@ -15,10 +15,14 @@ const _kSloteScriptTextHeight = TextHeightBehavior(
 
 /// Script-sized [Text] with layout padding for inline [WidgetSpan]s.
 ///
-/// Superscript uses [PlaceholderAlignment.aboveBaseline] (bottom of this widget
-/// on the paragraph alphabetic baseline). [edgePaddingPx] is **bottom** padding
-/// so glyphs sit higher; subscript uses [PlaceholderAlignment.belowBaseline] and
-/// **top** padding to hang below the baseline.
+/// Plain sup/sub uses **one [WidgetSpan] per UTF-16 code unit** (same count as
+/// [TextInsert.length]) so selection offsets match layout. A single [TextStyle]
+/// cannot apply [TextStyle.baselineShift] on current stable Flutter.
+/// Link+script uses a
+/// single [WidgetSpan] for the whole run (same alignment and padding rules).
+///
+/// Superscript: [PlaceholderAlignment.aboveBaseline] + bottom [edgePaddingPx].
+/// Subscript: [PlaceholderAlignment.belowBaseline] + top [edgePaddingPx].
 Widget _sloteScriptSpanChild({
   required String text,
   required TextStyle? style,
@@ -100,9 +104,8 @@ TextSpan sloteTextSpanDecoratorForAttribute(
       })();
 
   final dy = supSubMetrics?.translateY ?? 0.0;
-  // [PlaceholderAlignment.baseline] pins the script’s alphabetic baseline to the
-  // body baseline, so em-based “raise” has almost no effect. Use above/below
-  // baseline for sup/sub; padding applies extra shift in logical layout pixels.
+  // [PlaceholderAlignment.baseline] ignores em-based shift; above/below
+  // baseline + padding track [SloteSupSubMetrics.translateY].
   final scriptEdgePad =
       needsTypographyOverride ? (isSuperscript ? -dy : dy) : 0.0;
   final PlaceholderAlignment scriptPlaceholderAlignment = !needsTypographyOverride
@@ -113,18 +116,20 @@ TextSpan sloteTextSpanDecoratorForAttribute(
 
   if (href == null) {
     if (!needsTypographyOverride) return before;
+    final t = text.text;
     return TextSpan(
       children: [
-        WidgetSpan(
-          alignment: scriptPlaceholderAlignment,
-          baseline: TextBaseline.alphabetic,
-          child: _sloteScriptSpanChild(
-            text: text.text,
-            style: typographyStyle,
-            isSuperscript: isSuperscript,
-            edgePaddingPx: scriptEdgePad,
+        for (var i = 0; i < t.length; i++)
+          WidgetSpan(
+            alignment: scriptPlaceholderAlignment,
+            baseline: TextBaseline.alphabetic,
+            child: _sloteScriptSpanChild(
+              text: t.substring(i, i + 1),
+              style: typographyStyle,
+              isSuperscript: isSuperscript,
+              edgePaddingPx: scriptEdgePad,
+            ),
           ),
-        ),
       ],
     );
   }
@@ -160,7 +165,8 @@ TextSpan sloteTextSpanDecoratorForAttribute(
     );
   }
 
-  // Use GestureDetector inside a WidgetSpan for links (with or without script).
+  // GestureDetector inside [WidgetSpan]. Link+script uses one placeholder;
+  // caret may not address individual chars inside multi-char script.
   return TextSpan(
     children: [
       WidgetSpan(

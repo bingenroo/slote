@@ -12,6 +12,8 @@ class SloteSupSubMetrics {
   final double fontScale;
 
   /// Vertical layout shift (negative raises superscript, positive lowers subscript).
+  ///
+  /// Used with [WidgetSpan] + padding (link+script and per UTF-16 code unit plain script).
   final double translateY;
 
   /// Logical parent font size (from [TextStyle.fontSize] or fallback).
