@@ -15,6 +15,24 @@ double? sloteEndOfParagraphCaretHeight({
   required Node node,
   required TextStyleConfiguration textStyleConfiguration,
 }) {
+  final m = sloteEndOfParagraphCaretMetrics(
+    context: context,
+    editorState: editorState,
+    node: node,
+    textStyleConfiguration: textStyleConfiguration,
+  );
+  return m?.height;
+}
+
+/// Caret metrics at paragraph end from [EditorState.toggledStyle].
+///
+/// Pass to [EditorStyle.endOfParagraphCaretMetrics].
+EndOfParagraphCaretMetrics? sloteEndOfParagraphCaretMetrics({
+  required BuildContext context,
+  required EditorState editorState,
+  required Node node,
+  required TextStyleConfiguration textStyleConfiguration,
+}) {
   if (node.delta == null) return null;
 
   final cfg = textStyleConfiguration;
@@ -28,12 +46,14 @@ double? sloteEndOfParagraphCaretHeight({
   final isSuperscript = rawSup && !rawSub;
   final isSubscript = rawSub && !rawSup;
 
+  double dy = 0.0;
   var probeStyle = bodyStyle;
   if (isSuperscript || isSubscript) {
     final m = isSuperscript
         ? SloteSupSubMetrics.superscript(context, baseFontSize: baseFontSize)
         : SloteSupSubMetrics.subscript(context, baseFontSize: baseFontSize);
     probeStyle = bodyStyle.copyWith(fontSize: baseFontSize * m.fontScale);
+    dy = m.translateY;
   }
 
   final painter = TextPainter(
@@ -42,5 +62,12 @@ double? sloteEndOfParagraphCaretHeight({
     textScaler: TextScaler.linear(editorState.editorStyle.textScaleFactor),
   )..layout(maxWidth: double.infinity);
 
-  return painter.height;
+  // Match the script WidgetSpan child padding so the caret doesn't appear cut.
+  final edgePaddingPx =
+      (isSuperscript || isSubscript) ? (isSuperscript ? -dy : dy) : 0.0;
+
+  return EndOfParagraphCaretMetrics(
+    height: painter.height + edgePaddingPx,
+    dy: dy,
+  );
 }

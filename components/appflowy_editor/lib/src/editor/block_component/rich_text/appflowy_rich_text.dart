@@ -108,6 +108,11 @@ class _AppFlowyRichTextState extends State<AppFlowyRichText>
   final textKey = GlobalKey();
   final placeholderTextKey = GlobalKey();
 
+  // Debug-only caret logging (throttled to avoid spam).
+  int? _lastLoggedCaretOffset;
+  double? _lastLoggedCaretHeight;
+  bool? _lastLoggedCaretIsAtEnd;
+
   RenderParagraph? get _renderParagraph =>
       textKey.currentContext?.findRenderObject() as RenderParagraph?;
 
@@ -198,15 +203,15 @@ class _AppFlowyRichTextState extends State<AppFlowyRichText>
     }
 
     final delta = widget.node.delta;
-    if (position.offset < 0 ||
-        (delta != null && position.offset > delta.length)) {
+    final plainTextLength = delta?.toPlainText().length ?? 0;
+    if (position.offset < 0 || position.offset > plainTextLength) {
       return null;
     }
 
     final textPosition = TextPosition(offset: position.offset);
     final isAtEnd = delta != null &&
         position.path.equals(widget.node.path) &&
-        position.offset == delta.length;
+        position.offset == plainTextLength;
 
     double? placeholderCursorHeight =
         _placeholderRenderParagraph?.getFullHeightForCaret(textPosition);
@@ -231,10 +236,36 @@ class _AppFlowyRichTextState extends State<AppFlowyRichText>
         _renderParagraph?.getOffsetForCaret(textPosition, Rect.zero) ??
             Offset.zero;
 
+    // If we are at the text boundary, keep track of the previous caret height.
+    // We'll use it to prevent the boundary caret from becoming taller than the
+    // last in-text caret (common when line metrics are expanded by spans).
+    final double? previousCaretHeight =
+        (delta != null && delta.isNotEmpty && position.offset == plainTextLength)
+            ? _renderParagraph?.getFullHeightForCaret(
+                TextPosition(offset: max(0, plainTextLength - 1)),
+              )
+            : null;
+
     var usedEndOfParagraphResolver = false;
+    final eotMetricsResolver =
+        widget.editorState.editorStyle.endOfParagraphCaretMetrics;
+    if (isAtEnd && eotMetricsResolver != null) {
+      final resolved = eotMetricsResolver(
+        context: context,
+        editorState: widget.editorState,
+        node: widget.node,
+        textStyleConfiguration: textStyleConfiguration,
+      );
+      if (resolved != null) {
+        cursorHeight = resolved.height;
+        cursorOffset = cursorOffset.translate(0, resolved.dy);
+        usedEndOfParagraphResolver = true;
+      }
+    }
+
     final eotResolver =
         widget.editorState.editorStyle.endOfParagraphCaretHeight;
-    if (isAtEnd && eotResolver != null) {
+    if (!usedEndOfParagraphResolver && isAtEnd && eotResolver != null) {
       final resolved = eotResolver(
         context: context,
         editorState: widget.editorState,
@@ -249,12 +280,17 @@ class _AppFlowyRichTextState extends State<AppFlowyRichText>
 
     // Merging placeholder height can undo a shrunk EOT caret on non-empty text.
     if (placeholderCursorHeight != null) {
-      final skipPlaceholderHeightMerge = usedEndOfParagraphResolver &&
-          delta != null &&
-          delta.isNotEmpty;
+      final skipPlaceholderHeightMerge =
+          usedEndOfParagraphResolver && delta != null && delta.isNotEmpty;
       if (!skipPlaceholderHeightMerge) {
         cursorHeight = max(cursorHeight ?? 0, placeholderCursorHeight);
       }
+    }
+
+    // Final guard: never allow the boundary caret to be taller than the last
+    // in-text caret height on that line.
+    if (previousCaretHeight != null && cursorHeight != null) {
+      cursorHeight = min(cursorHeight, previousCaretHeight);
     }
 
     if (delta?.isEmpty == true) {
@@ -274,6 +310,25 @@ class _AppFlowyRichTextState extends State<AppFlowyRichText>
       widget.cursorWidth,
       cursorHeight ?? 16.0,
     );
+
+    if (kDebugMode) {
+      final shouldLog = (_lastLoggedCaretOffset != position.offset) ||
+          (_lastLoggedCaretIsAtEnd != isAtEnd) ||
+          (_lastLoggedCaretHeight == null ||
+              (cursorHeight != null &&
+                  (_lastLoggedCaretHeight! - cursorHeight).abs() > 0.25));
+      if (shouldLog) {
+        _lastLoggedCaretOffset = position.offset;
+        _lastLoggedCaretIsAtEnd = isAtEnd;
+        _lastLoggedCaretHeight = cursorHeight;
+        debugPrint(
+          'DBG-CARET path=${position.path} offset=${position.offset} '
+          'isAtEnd=$isAtEnd usedEOT=$usedEndOfParagraphResolver '
+          'height=${(cursorHeight ?? -1).toStringAsFixed(2)} '
+          'rect=$rect',
+        );
+      }
+    }
     return rect;
   }
 

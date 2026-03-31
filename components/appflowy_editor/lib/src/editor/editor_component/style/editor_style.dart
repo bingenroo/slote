@@ -14,6 +14,26 @@ typedef EndOfParagraphCaretHeightResolver = double? Function({
   required TextStyleConfiguration textStyleConfiguration,
 });
 
+class EndOfParagraphCaretMetrics {
+  const EndOfParagraphCaretMetrics({
+    required this.height,
+    this.dy = 0.0,
+  });
+
+  final double height;
+
+  /// Additional vertical adjustment applied to the caret rect's top (y).
+  /// Negative moves the caret up; positive moves it down.
+  final double dy;
+}
+
+typedef EndOfParagraphCaretMetricsResolver = EndOfParagraphCaretMetrics? Function({
+  required BuildContext context,
+  required EditorState editorState,
+  required Node node,
+  required TextStyleConfiguration textStyleConfiguration,
+});
+
 /// The style of the editor.
 ///
 /// You can customize the style of the editor by passing the [EditorStyle] to
@@ -42,6 +62,7 @@ class EditorStyle {
     this.mobileDragHandleHeightExtend,
     this.autoDismissCollapsedHandleDuration = const Duration(seconds: 3),
     this.endOfParagraphCaretHeight,
+    this.endOfParagraphCaretMetrics,
   });
 
   // The padding of the editor.
@@ -122,6 +143,10 @@ class EditorStyle {
   /// If set, [AppFlowyRichText] may use this to size the caret at paragraph end.
   final EndOfParagraphCaretHeightResolver? endOfParagraphCaretHeight;
 
+  /// If set, [AppFlowyRichText] may use this to size/position the caret at
+  /// paragraph end.
+  final EndOfParagraphCaretMetricsResolver? endOfParagraphCaretMetrics;
+
   const EditorStyle.desktop({
     EdgeInsets? padding,
     Color? cursorColor,
@@ -134,6 +159,7 @@ class EditorStyle {
     this.textScaleFactor = 1.0,
     this.maxWidth,
     this.endOfParagraphCaretHeight,
+    this.endOfParagraphCaretMetrics,
   })  : padding = padding ?? const EdgeInsets.symmetric(horizontal: 100),
         cursorColor = cursorColor ?? const Color(0xFF00BCF0),
         selectionColor =
@@ -177,6 +203,7 @@ class EditorStyle {
     this.mobileDragHandleHeightExtend,
     this.autoDismissCollapsedHandleDuration = const Duration(seconds: 3),
     this.endOfParagraphCaretHeight,
+    this.endOfParagraphCaretMetrics,
   })  : padding = padding ?? const EdgeInsets.symmetric(horizontal: 20),
         cursorColor = cursorColor ?? const Color(0xFF00BCF0),
         dragHandleColor = dragHandleColor ?? const Color(0xFF00BCF0),
@@ -211,6 +238,7 @@ class EditorStyle {
     double? mobileDragHandleHeightExtend,
     Duration? autoDismissCollapsedHandleDuration,
     EndOfParagraphCaretHeightResolver? endOfParagraphCaretHeight,
+    EndOfParagraphCaretMetricsResolver? endOfParagraphCaretMetrics,
   }) {
     return EditorStyle(
       padding: padding ?? this.padding,
@@ -245,6 +273,8 @@ class EditorStyle {
           this.autoDismissCollapsedHandleDuration,
       endOfParagraphCaretHeight:
           endOfParagraphCaretHeight ?? this.endOfParagraphCaretHeight,
+      endOfParagraphCaretMetrics:
+          endOfParagraphCaretMetrics ?? this.endOfParagraphCaretMetrics,
     );
   }
 }

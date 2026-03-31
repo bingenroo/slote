@@ -226,6 +226,7 @@ class _CreateNoteViewState extends State<CreateNoteView> {
         .copyWith(
           textSpanDecorator: sloteTextSpanDecoratorForAttribute,
           endOfParagraphCaretHeight: sloteEndOfParagraphCaretHeight,
+          endOfParagraphCaretMetrics: sloteEndOfParagraphCaretMetrics,
         );
     final editorState = _richTextController.editorState;
 

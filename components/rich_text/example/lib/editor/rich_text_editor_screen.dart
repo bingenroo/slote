@@ -94,6 +94,7 @@ class _RichTextEditorScreenState extends State<RichTextEditorScreen> {
             .copyWith(
       textSpanDecorator: sloteTextSpanDecoratorForAttribute,
       endOfParagraphCaretHeight: sloteEndOfParagraphCaretHeight,
+      endOfParagraphCaretMetrics: sloteEndOfParagraphCaretMetrics,
     );
     return Scaffold(
       appBar: AppBar(
