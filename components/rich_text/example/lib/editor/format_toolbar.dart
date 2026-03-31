@@ -51,6 +51,11 @@ class FormatToolbar extends StatelessWidget {
                     onPressed: () => sloteEditorRedo(editorState),
                   ),
                   _groupDivider(scheme),
+                  _blockAlignmentGroup(
+                    context: context,
+                    enabled: hasSelection,
+                  ),
+                  _groupDivider(scheme),
                   _formatToggle(
                     context: context,
                     enabled: hasSelection,
@@ -203,6 +208,58 @@ class FormatToolbar extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+
+  Widget _blockAlignmentGroup({
+    required BuildContext context,
+    required bool enabled,
+  }) {
+    final active = sloteBlockAlignmentInSelection(editorState);
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _formatToggle(
+          context: context,
+          enabled: enabled,
+          selected: active == SloteBlockAlignment.left,
+          icon: Icons.format_align_left,
+          tooltip: 'Align left',
+          onPressed: () => unawaited(
+            sloteApplyBlockAlignment(editorState, SloteBlockAlignment.left),
+          ),
+        ),
+        _formatToggle(
+          context: context,
+          enabled: enabled,
+          selected: active == SloteBlockAlignment.center,
+          icon: Icons.format_align_center,
+          tooltip: 'Align center',
+          onPressed: () => unawaited(
+            sloteApplyBlockAlignment(editorState, SloteBlockAlignment.center),
+          ),
+        ),
+        _formatToggle(
+          context: context,
+          enabled: enabled,
+          selected: active == SloteBlockAlignment.right,
+          icon: Icons.format_align_right,
+          tooltip: 'Align right',
+          onPressed: () => unawaited(
+            sloteApplyBlockAlignment(editorState, SloteBlockAlignment.right),
+          ),
+        ),
+        _formatToggle(
+          context: context,
+          enabled: enabled,
+          selected: active == SloteBlockAlignment.justify,
+          icon: Icons.format_align_justify,
+          tooltip: 'Justify',
+          onPressed: () => unawaited(
+            sloteApplyBlockAlignment(editorState, SloteBlockAlignment.justify),
+          ),
+        ),
+      ],
     );
   }
 

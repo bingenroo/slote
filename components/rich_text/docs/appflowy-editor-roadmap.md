@@ -81,6 +81,19 @@ The numbered list below is the **original** narrow scope; the **full** backlog (
 
 ---
 
+## Slote fork: caret height at EOT & sup/sub layout
+
+The app uses a **vendored** [`components/appflowy_editor`](../../appflowy_editor) (see [ROADMAP.md](ROADMAP.md) → COMPLIANCE). These hooks exist only in the fork:
+
+| Behavior | What we did | Where |
+|----------|-------------|--------|
+| **Tall caret at end of paragraph** | With mixed superscript/subscript on a line, the EOT caret no longer inherits the line’s full strut height from placeholder merging. **`EditorStyle`** exposes `endOfParagraphCaretHeight` (`EndOfParagraphCaretHeightResolver?`). At EOT, `AppFlowyRichText.getCursorRectInPosition` calls it; if it returns a height, placeholder `max` merge for that rect is skipped when the paragraph is non-empty. | Fork: `editor_style.dart`, `appflowy_rich_text.dart`. Slote: [`lib/src/appflowy/slote_end_of_paragraph_caret_height.dart`](../lib/src/appflowy/slote_end_of_paragraph_caret_height.dart) — uses `EditorState.toggledStyle` + `TextPainter` + `SloteSupSubMetrics` so the caret height matches **what the user would type next** (e.g. after toggling sup/sub). Wire with `EditorStyle.copyWith(endOfParagraphCaretHeight: sloteEndOfParagraphCaretHeight)` in the app/example. |
+| **Caret inside multi-char sup/sub** | One `TextSpan` of script became one `WidgetSpan` → one placeholder vs many offsets; the caret could skip the run. **Mitigation:** plain sup/sub runs are expanded to **one `WidgetSpan` per UTF-16 code unit** (not a single baseline `TextStyle` — stable Flutter lacked `baselineShift` in `copyWith` when this shipped). | [`slote_text_span_decorator.dart`](../lib/src/appflowy/slote_text_span_decorator.dart) |
+
+**Example app:** `components/rich_text/example` must override `appflowy_editor` to the **same** path as root/`rich_text` or new `EditorStyle` fields will not resolve at analyze time.
+
+---
+
 ## Repo touchpoints (when implementing)
 
 | Area | Path |

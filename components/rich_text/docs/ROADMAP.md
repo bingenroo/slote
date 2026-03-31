@@ -4,6 +4,8 @@ This document is the **canonical plan** for Slote’s rich-text subsystem: edito
 
 **Implementation detail (AppFlowy):** [appflowy-editor-roadmap.md](appflowy-editor-roadmap.md) tracks AppFlowy-specific milestones (JSON spike, BIUS, controller, shortcuts).
 
+**Vendored editor + licensing:** Slote uses a local fork at [`components/appflowy_editor`](../../appflowy_editor) (see root / package `dependency_overrides`). Dual-license **AGPL-3.0 | MPL-2.0** and what that means for sharing source is summarized in [`components/appflowy_editor/COMPLIANCE.md`](../../appflowy_editor/COMPLIANCE.md).
+
 ---
 
 ## Direction
@@ -48,7 +50,7 @@ Phases build on each other; run the example app and tests after each major phase
 | **Links** | Inline `href` (or package equivalent); dialog or paste handler. **Current behavior:** quick tap opens the URL in the system default browser; long-press opens the link format drawer. |
 | **Font size, font family** | **Implemented (Phase 1)**: selection helpers apply AppFlowy inline attributes `font_size` / `font_family` (`sloteApplyFontSize` / `sloteApplyFontFamily`). Markdown export/import supported via `<span font_size=\"...\" font_family='\"...\"'>...` wrapper from `sloteDocumentToMarkdown`. |
 | **Text color, highlight** | Use / extend built-in color attributes where available. **Near-term focus — picker UX:** match **Google Docs–style mobile** behavior: a **bottom sheet** (slide-up formatting panel from the bottom; often described informally as a mobile “formatting drawer”) with swatches/options—not separate modal dialogues for raw hex input; desktop can use compact menus or the same sheet for parity. **Touchpoint:** [`example/lib/editor/format_toolbar.dart`](../example/lib/editor/format_toolbar.dart). |
-| **Alignment** | **Deferred** (out of scope for Phase 1): per-block (paragraph) attributes + layout. |
+| **Alignment** | **Implemented (Phase 1, example toolbar)**: block-level `align` via `blockComponentAlign` with `left` / `center` / `right` / `justify` (`justify` uses `TextAlign.justify` on text blocks in vendored `appflowy_editor`). Slote example toolbar exposes all four. Main app wiring is deferred. |
 | **Clear formatting** | Single command stripping partial styles on selection; respects `EditorState` history. |
 
 <a id="sup-sub-known-limitations"></a>

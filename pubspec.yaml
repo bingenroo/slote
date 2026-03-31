@@ -84,6 +84,11 @@ dev_dependencies:
   # build_runner:
   flutter_launcher_icons: ^0.14.4
 
+# Slote uses a vendored fork under components/appflowy_editor (caret metrics, etc.).
+dependency_overrides:
+  appflowy_editor:
+    path: components/appflowy_editor
+
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
 

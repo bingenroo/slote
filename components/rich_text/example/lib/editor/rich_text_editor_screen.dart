@@ -93,6 +93,7 @@ class _RichTextEditorScreenState extends State<RichTextEditorScreen> {
         (useDesktopChrome ? EditorStyle.desktop() : EditorStyle.mobile())
             .copyWith(
       textSpanDecorator: sloteTextSpanDecoratorForAttribute,
+      endOfParagraphCaretHeight: sloteEndOfParagraphCaretHeight,
     );
     return Scaffold(
       appBar: AppBar(

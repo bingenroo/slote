@@ -204,6 +204,10 @@ class _AppFlowyRichTextState extends State<AppFlowyRichText>
     }
 
     final textPosition = TextPosition(offset: position.offset);
+    final isAtEnd = delta != null &&
+        position.path.equals(widget.node.path) &&
+        position.offset == delta.length;
+
     double? placeholderCursorHeight =
         _placeholderRenderParagraph?.getFullHeightForCaret(textPosition);
     Offset? placeholderCursorOffset =
@@ -227,8 +231,30 @@ class _AppFlowyRichTextState extends State<AppFlowyRichText>
         _renderParagraph?.getOffsetForCaret(textPosition, Rect.zero) ??
             Offset.zero;
 
+    var usedEndOfParagraphResolver = false;
+    final eotResolver =
+        widget.editorState.editorStyle.endOfParagraphCaretHeight;
+    if (isAtEnd && eotResolver != null) {
+      final resolved = eotResolver(
+        context: context,
+        editorState: widget.editorState,
+        node: widget.node,
+        textStyleConfiguration: textStyleConfiguration,
+      );
+      if (resolved != null) {
+        cursorHeight = resolved;
+        usedEndOfParagraphResolver = true;
+      }
+    }
+
+    // Merging placeholder height can undo a shrunk EOT caret on non-empty text.
     if (placeholderCursorHeight != null) {
-      cursorHeight = max(cursorHeight ?? 0, placeholderCursorHeight);
+      final skipPlaceholderHeightMerge = usedEndOfParagraphResolver &&
+          delta != null &&
+          delta.isNotEmpty;
+      if (!skipPlaceholderHeightMerge) {
+        cursorHeight = max(cursorHeight ?? 0, placeholderCursorHeight);
+      }
     }
 
     if (delta?.isEmpty == true) {

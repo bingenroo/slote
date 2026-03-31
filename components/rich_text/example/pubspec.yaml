@@ -22,5 +22,10 @@ dev_dependencies:
     sdk: flutter
   flutter_lints: ^6.0.0
 
+# Must match root rich_text / Slote: vendored fork with [EditorStyle.endOfParagraphCaretHeight].
+dependency_overrides:
+  appflowy_editor:
+    path: ../../appflowy_editor
+
 flutter:
   uses-material-design: true

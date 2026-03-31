@@ -1,6 +1,19 @@
 import 'package:appflowy_editor/appflowy_editor.dart';
 import 'package:flutter/material.dart';
 
+/// Optional caret height when the collapsed caret is at [Node.delta] end
+/// ([Selection.startIndex] == [Delta.length]), to avoid Flutter using full-line
+/// metrics (e.g. lines with inline widgets or mixed baselines).
+///
+/// Return a non-null height to replace [RenderParagraph.getFullHeightForCaret];
+/// return null to keep default behavior.
+typedef EndOfParagraphCaretHeightResolver = double? Function({
+  required BuildContext context,
+  required EditorState editorState,
+  required Node node,
+  required TextStyleConfiguration textStyleConfiguration,
+});
+
 /// The style of the editor.
 ///
 /// You can customize the style of the editor by passing the [EditorStyle] to
@@ -28,6 +41,7 @@ class EditorStyle {
     this.mobileDragHandleLeftExtend,
     this.mobileDragHandleHeightExtend,
     this.autoDismissCollapsedHandleDuration = const Duration(seconds: 3),
+    this.endOfParagraphCaretHeight,
   });
 
   // The padding of the editor.
@@ -105,6 +119,9 @@ class EditorStyle {
 
   final double textScaleFactor;
 
+  /// If set, [AppFlowyRichText] may use this to size the caret at paragraph end.
+  final EndOfParagraphCaretHeightResolver? endOfParagraphCaretHeight;
+
   const EditorStyle.desktop({
     EdgeInsets? padding,
     Color? cursorColor,
@@ -116,6 +133,7 @@ class EditorStyle {
     this.cursorWidth = 2.0,
     this.textScaleFactor = 1.0,
     this.maxWidth,
+    this.endOfParagraphCaretHeight,
   })  : padding = padding ?? const EdgeInsets.symmetric(horizontal: 100),
         cursorColor = cursorColor ?? const Color(0xFF00BCF0),
         selectionColor =
@@ -158,6 +176,7 @@ class EditorStyle {
     this.mobileDragHandleLeftExtend,
     this.mobileDragHandleHeightExtend,
     this.autoDismissCollapsedHandleDuration = const Duration(seconds: 3),
+    this.endOfParagraphCaretHeight,
   })  : padding = padding ?? const EdgeInsets.symmetric(horizontal: 20),
         cursorColor = cursorColor ?? const Color(0xFF00BCF0),
         dragHandleColor = dragHandleColor ?? const Color(0xFF00BCF0),
@@ -191,6 +210,7 @@ class EditorStyle {
     double? mobileDragHandleLeftExtend,
     double? mobileDragHandleHeightExtend,
     Duration? autoDismissCollapsedHandleDuration,
+    EndOfParagraphCaretHeightResolver? endOfParagraphCaretHeight,
   }) {
     return EditorStyle(
       padding: padding ?? this.padding,
@@ -223,6 +243,8 @@ class EditorStyle {
           mobileDragHandleHeightExtend ?? this.mobileDragHandleHeightExtend,
       autoDismissCollapsedHandleDuration: autoDismissCollapsedHandleDuration ??
           this.autoDismissCollapsedHandleDuration,
+      endOfParagraphCaretHeight:
+          endOfParagraphCaretHeight ?? this.endOfParagraphCaretHeight,
     );
   }
 }
