@@ -225,6 +225,7 @@ class _CreateNoteViewState extends State<CreateNoteView> {
             : EditorStyle.mobile())
         .copyWith(
           textSpanDecorator: sloteTextSpanDecoratorForAttribute,
+          caretMetrics: sloteCaretMetrics,
           endOfParagraphCaretHeight: sloteEndOfParagraphCaretHeight,
           endOfParagraphCaretMetrics: sloteEndOfParagraphCaretMetrics,
         );
@@ -284,6 +285,7 @@ class _CreateNoteViewState extends State<CreateNoteView> {
         child: _BottomRichTextToolbar(
           editorState: editorState,
           listenable: _formatBarListenable,
+          layout: SloteToolbarLayout.verticalScroll,
         ),
       ),
     );
@@ -388,10 +390,15 @@ class _BottomRichTextToolbar extends StatelessWidget {
   const _BottomRichTextToolbar({
     required this.editorState,
     required this.listenable,
+    this.layout = SloteToolbarLayout.horizontalScroll,
   });
 
   final EditorState editorState;
   final Listenable listenable;
+  final SloteToolbarLayout layout;
+
+  // Keep vertical mode as a single visible bar; users swipe up/down within it.
+  static const double _kVerticalToolbarHeight = 44;
 
   @override
   Widget build(BuildContext context) {
@@ -402,189 +409,353 @@ class _BottomRichTextToolbar extends StatelessWidget {
         final sel = editorState.selection;
         final hasSelection = sel != null;
         final rangeSelection = sel != null && !sel.isCollapsed;
+        final caretSelection = sel != null && sel.isCollapsed;
+
+        final groups = <List<Widget>>[
+          [
+            _formatToggle(
+              context: context,
+              enabled: sloteEditorCanUndo(editorState),
+              selected: false,
+              icon: Icons.undo,
+              tooltip: 'Undo',
+              onPressed: () => sloteEditorUndo(editorState),
+            ),
+            _formatToggle(
+              context: context,
+              enabled: sloteEditorCanRedo(editorState),
+              selected: false,
+              icon: Icons.redo,
+              tooltip: 'Redo',
+              onPressed: () => sloteEditorRedo(editorState),
+            ),
+          ],
+          [
+            _blockAlignmentGroup(
+              context: context,
+              enabled: hasSelection,
+            ),
+            SloteHeadingStyleToolbarMenu(
+              editorState: editorState,
+              enabled: sloteCanUseBlockHeadingControls(editorState),
+            ),
+          ],
+          [
+            _formatToggle(
+              context: context,
+              enabled: caretSelection,
+              selected: false,
+              icon: Icons.format_list_bulleted,
+              tooltip: 'Bulleted list',
+              onPressed: () => insertBulletedListAfterSelection(editorState),
+            ),
+            _formatToggle(
+              context: context,
+              enabled: caretSelection,
+              selected: false,
+              icon: Icons.format_list_numbered,
+              tooltip: 'Numbered list',
+              onPressed: () => insertNumberedListAfterSelection(editorState),
+            ),
+            _formatToggle(
+              context: context,
+              enabled: caretSelection,
+              selected: false,
+              icon: Icons.check_box,
+              tooltip: 'Checkbox',
+              onPressed: () => insertCheckboxAfterSelection(editorState),
+            ),
+            _formatToggle(
+              context: context,
+              enabled: caretSelection,
+              selected: false,
+              icon: Icons.format_quote,
+              tooltip: 'Quote',
+              onPressed: () => insertQuoteAfterSelection(editorState),
+            ),
+            _formatToggle(
+              context: context,
+              enabled: caretSelection,
+              selected: false,
+              icon: Icons.horizontal_rule,
+              tooltip: 'Divider',
+              onPressed: () => insertNodeAfterSelection(
+                editorState,
+                dividerNode(),
+              ),
+            ),
+            _formatToggle(
+              context: context,
+              enabled: caretSelection,
+              selected: false,
+              icon: Icons.code,
+              tooltip: 'Code block',
+              onPressed: () => insertCodeBlockAfterSelection(editorState),
+            ),
+            _formatToggle(
+              context: context,
+              enabled: caretSelection,
+              selected: false,
+              icon: Icons.lightbulb_outline,
+              tooltip: 'Callout',
+              onPressed: () => insertCalloutAfterSelection(editorState),
+            ),
+            _formatToggle(
+              context: context,
+              enabled: caretSelection,
+              selected: false,
+              icon: Icons.table_chart,
+              tooltip: 'Table (2×2)',
+              onPressed: () => insertTableAfterSelection(editorState),
+            ),
+            _formatToggle(
+              context: context,
+              enabled: caretSelection,
+              selected: false,
+              icon: Icons.image,
+              tooltip: 'Image (URL)',
+              onPressed: () async {
+                final url = await showDialog<String?>(
+                  context: context,
+                  builder: (context) {
+                    final controller = TextEditingController();
+                    return AlertDialog(
+                      title: const Text('Insert image URL'),
+                      content: TextField(
+                        controller: controller,
+                        autofocus: true,
+                        decoration: const InputDecoration(
+                          hintText: 'https://… or file://… or slote://…',
+                        ),
+                      ),
+                      actions: [
+                        TextButton(
+                          onPressed: () =>
+                              Navigator.pop(context, controller.text),
+                          child: const Text('Insert'),
+                        ),
+                        TextButton(
+                          onPressed: () => Navigator.pop(context, null),
+                          child: const Text('Cancel'),
+                        ),
+                      ],
+                    );
+                  },
+                );
+                final trimmed = url?.trim();
+                if (trimmed == null || trimmed.isEmpty) return;
+                insertImageAfterSelection(editorState, url: trimmed);
+              },
+            ),
+          ],
+          [
+            _formatToggle(
+              context: context,
+              enabled: hasSelection,
+              selected: sloteIsFormatKeyActive(
+                editorState,
+                AppFlowyRichTextKeys.bold,
+              ),
+              icon: Icons.format_bold,
+              tooltip: 'Bold',
+              onPressed:
+                  () => applyBiusToggle(
+                    editorState,
+                    AppFlowyRichTextKeys.bold,
+                  ),
+            ),
+            _formatToggle(
+              context: context,
+              enabled: hasSelection,
+              selected: sloteIsFormatKeyActive(
+                editorState,
+                AppFlowyRichTextKeys.italic,
+              ),
+              icon: Icons.format_italic,
+              tooltip: 'Italic',
+              onPressed:
+                  () => applyBiusToggle(
+                    editorState,
+                    AppFlowyRichTextKeys.italic,
+                  ),
+            ),
+            _formatToggle(
+              context: context,
+              enabled: hasSelection,
+              selected: sloteIsFormatKeyActive(
+                editorState,
+                AppFlowyRichTextKeys.underline,
+              ),
+              icon: Icons.format_underlined,
+              tooltip: 'Underline',
+              onPressed:
+                  () => applyBiusToggle(
+                    editorState,
+                    AppFlowyRichTextKeys.underline,
+                  ),
+            ),
+            _formatToggle(
+              context: context,
+              enabled: hasSelection,
+              selected: sloteIsFormatKeyActive(
+                editorState,
+                AppFlowyRichTextKeys.strikethrough,
+              ),
+              icon: Icons.strikethrough_s,
+              tooltip: 'Strikethrough',
+              onPressed:
+                  () => applyBiusToggle(
+                    editorState,
+                    AppFlowyRichTextKeys.strikethrough,
+                  ),
+            ),
+          ],
+          [
+            _formatToggle(
+              context: context,
+              enabled: rangeSelection,
+              selected: sloteIsLinkActiveInSelection(editorState),
+              icon: Icons.link,
+              tooltip: 'Link',
+              onPressed:
+                  () => sloteShowLinkDialog(
+                    editorState,
+                    hostContext: context,
+                  ),
+            ),
+            _formatToggle(
+              context: context,
+              enabled: hasSelection,
+              selected: sloteIsHighlightActiveForToolbar(editorState),
+              icon: Icons.highlight,
+              tooltip: 'Highlight',
+              onPressed:
+                  () => showSloteColorFormatDrawer(
+                    editorState,
+                    hostContext: context,
+                  ),
+            ),
+            _formatToggle(
+              context: context,
+              enabled: hasSelection,
+              selected: sloteIsTextColorActiveForToolbar(editorState),
+              icon: Icons.format_color_text,
+              tooltip: 'Text color',
+              onPressed:
+                  () => showSloteColorFormatDrawer(
+                    editorState,
+                    hostContext: context,
+                  ),
+            ),
+            _formatToggle(
+              context: context,
+              enabled: rangeSelection,
+              selected: false,
+              icon: Icons.format_clear,
+              tooltip: 'Clear formatting',
+              onPressed:
+                  () => unawaited(sloteClearInlineFormatting(editorState)),
+            ),
+          ],
+          [
+            _FontSizeMenu(
+              editorState: editorState,
+              enabled: rangeSelection,
+            ),
+            _FontFamilyMenu(
+              editorState: editorState,
+              enabled: hasSelection,
+            ),
+            _formatToggle(
+              context: context,
+              enabled: rangeSelection,
+              selected: sloteIsFormatKeyActive(
+                editorState,
+                kSloteSuperscriptAttribute,
+              ),
+              icon: Icons.superscript,
+              tooltip: 'Superscript',
+              onPressed: () =>
+                  unawaited(sloteToggleSuperscript(editorState)),
+            ),
+            _formatToggle(
+              context: context,
+              enabled: rangeSelection,
+              selected: sloteIsFormatKeyActive(
+                editorState,
+                kSloteSubscriptAttribute,
+              ),
+              icon: Icons.subscript,
+              tooltip: 'Subscript',
+              onPressed: () =>
+                  unawaited(sloteToggleSubscript(editorState)),
+            ),
+          ],
+        ];
 
         return Material(
           color: scheme.surfaceContainerLow,
           child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 4),
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  _formatToggle(
-                    context: context,
-                    enabled: sloteEditorCanUndo(editorState),
-                    selected: false,
-                    icon: Icons.undo,
-                    tooltip: 'Undo',
-                    onPressed: () => sloteEditorUndo(editorState),
-                  ),
-                  _formatToggle(
-                    context: context,
-                    enabled: sloteEditorCanRedo(editorState),
-                    selected: false,
-                    icon: Icons.redo,
-                    tooltip: 'Redo',
-                    onPressed: () => sloteEditorRedo(editorState),
-                  ),
-                  _groupDivider(scheme),
-                  _blockAlignmentGroup(
-                    context: context,
-                    enabled: hasSelection,
-                  ),
-                  _groupDivider(scheme),
-                  _formatToggle(
-                    context: context,
-                    enabled: hasSelection,
-                    selected: sloteIsFormatKeyActive(
-                      editorState,
-                      AppFlowyRichTextKeys.bold,
-                    ),
-                    icon: Icons.format_bold,
-                    tooltip: 'Bold',
-                    onPressed:
-                        () => applyBiusToggle(
-                          editorState,
-                          AppFlowyRichTextKeys.bold,
-                        ),
-                  ),
-                  _formatToggle(
-                    context: context,
-                    enabled: hasSelection,
-                    selected: sloteIsFormatKeyActive(
-                      editorState,
-                      AppFlowyRichTextKeys.italic,
-                    ),
-                    icon: Icons.format_italic,
-                    tooltip: 'Italic',
-                    onPressed:
-                        () => applyBiusToggle(
-                          editorState,
-                          AppFlowyRichTextKeys.italic,
-                        ),
-                  ),
-                  _formatToggle(
-                    context: context,
-                    enabled: hasSelection,
-                    selected: sloteIsFormatKeyActive(
-                      editorState,
-                      AppFlowyRichTextKeys.underline,
-                    ),
-                    icon: Icons.format_underlined,
-                    tooltip: 'Underline',
-                    onPressed:
-                        () => applyBiusToggle(
-                          editorState,
-                          AppFlowyRichTextKeys.underline,
-                        ),
-                  ),
-                  _formatToggle(
-                    context: context,
-                    enabled: hasSelection,
-                    selected: sloteIsFormatKeyActive(
-                      editorState,
-                      AppFlowyRichTextKeys.strikethrough,
-                    ),
-                    icon: Icons.strikethrough_s,
-                    tooltip: 'Strikethrough',
-                    onPressed:
-                        () => applyBiusToggle(
-                          editorState,
-                          AppFlowyRichTextKeys.strikethrough,
-                        ),
-                  ),
-                  _groupDivider(scheme),
-                  SloteHeadingStyleToolbarMenu(
-                    editorState: editorState,
-                    enabled: sloteCanUseBlockHeadingControls(editorState),
-                  ),
-                  _groupDivider(scheme),
-                  _formatToggle(
-                    context: context,
-                    enabled: rangeSelection,
-                    selected: sloteIsLinkActiveInSelection(editorState),
-                    icon: Icons.link,
-                    tooltip: 'Link',
-                    onPressed:
-                        () => sloteShowLinkDialog(
-                          editorState,
-                          hostContext: context,
-                        ),
-                  ),
-                  _formatToggle(
-                    context: context,
-                    enabled: hasSelection,
-                    selected: sloteIsHighlightActiveForToolbar(editorState),
-                    icon: Icons.highlight,
-                    tooltip: 'Highlight',
-                    onPressed:
-                        () => showSloteColorFormatDrawer(
-                          editorState,
-                          hostContext: context,
-                        ),
-                  ),
-                  _formatToggle(
-                    context: context,
-                    enabled: hasSelection,
-                    selected: sloteIsTextColorActiveForToolbar(editorState),
-                    icon: Icons.format_color_text,
-                    tooltip: 'Text color',
-                    onPressed:
-                        () => showSloteColorFormatDrawer(
-                          editorState,
-                          hostContext: context,
-                        ),
-                  ),
-                  _formatToggle(
-                    context: context,
-                    enabled: rangeSelection,
-                    selected: false,
-                    icon: Icons.format_clear,
-                    tooltip: 'Clear formatting',
-                    onPressed:
-                        () =>
-                            unawaited(sloteClearInlineFormatting(editorState)),
-                  ),
-                  _FontSizeMenu(
-                    editorState: editorState,
-                    enabled: rangeSelection,
-                  ),
-                  _FontFamilyMenu(
-                    editorState: editorState,
-                    enabled: hasSelection,
-                  ),
-                  _formatToggle(
-                    context: context,
-                    enabled: rangeSelection,
-                    selected: sloteIsFormatKeyActive(
-                      editorState,
-                      kSloteSuperscriptAttribute,
-                    ),
-                    icon: Icons.superscript,
-                    tooltip: 'Superscript',
-                    onPressed: () =>
-                        unawaited(sloteToggleSuperscript(editorState)),
-                  ),
-                  _formatToggle(
-                    context: context,
-                    enabled: rangeSelection,
-                    selected: sloteIsFormatKeyActive(
-                      editorState,
-                      kSloteSubscriptAttribute,
-                    ),
-                    icon: Icons.subscript,
-                    tooltip: 'Subscript',
-                    onPressed: () =>
-                        unawaited(sloteToggleSubscript(editorState)),
-                  ),
-                ],
-              ),
+            padding: EdgeInsets.symmetric(
+              vertical: layout == SloteToolbarLayout.verticalScroll ? 2 : 4,
             ),
+            child:
+                layout == SloteToolbarLayout.verticalScroll
+                    ? _buildVertical(groups, scheme)
+                    : _buildHorizontal(groups, scheme),
           ),
         );
       },
+    );
+  }
+
+  Widget _buildHorizontal(List<List<Widget>> groups, ColorScheme scheme) {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          for (var i = 0; i < groups.length; i++) ...[
+            ...groups[i],
+            if (i != groups.length - 1) _groupDivider(scheme),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildVertical(List<List<Widget>> groups, ColorScheme scheme) {
+    // One group per "page": snaps to nearest row (like iOS alarm wheel) with
+    // inertial fling + optional edge bounce.
+    return SizedBox(
+      height: _kVerticalToolbarHeight,
+      child: ClipRect(
+        child: PageView.builder(
+          scrollDirection: Axis.vertical,
+          itemCount: groups.length,
+          physics: const SloteToolbarVerticalPagePhysics(
+            parent: BouncingScrollPhysics(
+              parent: SloteScaledDragScrollPhysics(),
+            ),
+          ),
+          padEnds: false,
+          itemBuilder: (context, index) {
+            return Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              child: Center(
+                child: Wrap(
+                  alignment: WrapAlignment.center,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  spacing: 2,
+                  runSpacing: 2,
+                  children: groups[index],
+                ),
+              ),
+            );
+          },
+        ),
+      ),
     );
   }
 

@@ -35,6 +35,54 @@ void insertNumberedListAfterSelection(EditorState editorState) {
   );
 }
 
+void insertCodeBlockAfterSelection(EditorState editorState) {
+  insertNodeAfterSelection(
+    editorState,
+    codeBlockNode(),
+  );
+}
+
+void insertCalloutAfterSelection(EditorState editorState) {
+  insertNodeAfterSelection(
+    editorState,
+    calloutNode(),
+  );
+}
+
+void insertTableAfterSelection(
+  EditorState editorState, {
+  int rows = 2,
+  int cols = 2,
+}) {
+  assert(rows > 0 && cols > 0);
+  final table = TableNode.fromList(
+    List.generate(
+      cols,
+      (_) => List.generate(rows, (_) => ''),
+      growable: false,
+    ),
+  ).node;
+  insertNodeAfterSelection(editorState, table);
+}
+
+void insertImageAfterSelection(
+  EditorState editorState, {
+  required String url,
+  String align = 'center',
+  double? height,
+  double? width,
+}) {
+  insertNodeAfterSelection(
+    editorState,
+    imageNode(
+      url: url,
+      align: align,
+      height: height,
+      width: width,
+    ),
+  );
+}
+
 bool insertNodeAfterSelection(
   EditorState editorState,
   Node node,

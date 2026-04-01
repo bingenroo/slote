@@ -23,6 +23,10 @@ export 'base_component_keys.dart';
 // bulleted list
 export 'bulleted_list_block_component/bulleted_list_block_component.dart';
 export 'bulleted_list_block_component/bulleted_list_character_shortcut.dart';
+// callout
+export 'callout_block_component/callout_block_component.dart';
+// code block
+export 'code_block_component/code_block_component.dart';
 // divider
 export 'divider_block_component/divider_block_component.dart';
 export 'divider_block_component/divider_character_shortcut.dart';

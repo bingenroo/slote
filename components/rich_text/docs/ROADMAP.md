@@ -10,22 +10,22 @@ This document is the **canonical plan** for Slote’s rich-text subsystem: edito
 
 ## Direction
 
-| Topic | Decision |
-|--------|-----------|
-| **Source of truth** | **AppFlowy Document JSON** for pixel-accurate round-trip in the app. Use Markdown (or Delta) only for **import/export or migration**, not as the live model. |
-| **Editor** | [`appflowy_editor`](https://pub.dev/packages/appflowy_editor) — compose UI (toolbars, shortcuts) against `EditorState` APIs. |
-| **Package layout** | **`lib/`** now exports AppFlowy helpers (`RichTextEditorController`, BIUS entry points, shortcut wiring). The **example** app composes the full editor UI and depends on `package:rich_text`. |
-| **Legacy** | Pre–AppFlowy Quill implementation is **archived in writing only**: [IMPLEMENTATION.md](../IMPLEMENTATION.md) (no longer the active stack). |
+| Topic               | Decision                                                                                                                                                                                      |
+| ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Source of truth** | **AppFlowy Document JSON** for pixel-accurate round-trip in the app. Use Markdown (or Delta) only for **import/export or migration**, not as the live model.                                  |
+| **Editor**          | [`appflowy_editor`](https://pub.dev/packages/appflowy_editor) — compose UI (toolbars, shortcuts) against `EditorState` APIs.                                                                  |
+| **Package layout**  | **`lib/`** now exports AppFlowy helpers (`RichTextEditorController`, BIUS entry points, shortcut wiring). The **example** app composes the full editor UI and depends on `package:rich_text`. |
+| **Legacy**          | Pre–AppFlowy Quill implementation is **archived in writing only**: [IMPLEMENTATION.md](../IMPLEMENTATION.md) (no longer the active stack).                                                    |
 
 ---
 
 ## Current status (rolling)
 
-| Item | State |
-|------|--------|
-| **Active spike** | [`example/lib/main.dart`](../example/lib/main.dart) — `EditorState` from JSON, `AppFlowyEditor`, fixed **BIUS** toolbar (`toggleAttribute` + caret-aware active state). |
-| **Phase (AppFlowy checklist)** | **Phases 3–4 complete** in `package:rich_text` + example: `RichTextEditorController`, debounced JSON, shared BIUS entry points + command shortcuts. |
-| **Main Slote app** | Note body still uses plain text / Quill at root; **integration** of this editor is a separate milestone (see PRD). |
+| Item                           | State                                                                                                                                                                   |
+| ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Active spike**               | [`example/lib/main.dart`](../example/lib/main.dart) — `EditorState` from JSON, `AppFlowyEditor`, fixed **BIUS** toolbar (`toggleAttribute` + caret-aware active state). |
+| **Phase (AppFlowy checklist)** | **Phases 3–4 complete** in `package:rich_text` + example: `RichTextEditorController`, debounced JSON, shared BIUS entry points + command shortcuts.                     |
+| **Main Slote app**             | Note body still uses plain text / Quill at root; **integration** of this editor is a separate milestone (see PRD).                                                      |
 
 ---
 
@@ -35,23 +35,23 @@ Phases build on each other; run the example app and tests after each major phase
 
 ### Wave A — Foundation (AppFlowy Phases 1–4)
 
-| Step | Scope |
-|------|--------|
-| **A1 — Document JSON confidence** | Load/save `Document.fromJson` / `toJson`, observe deltas per keystroke, validate undo with built-in history. *(Aligns with AppFlowy Phase 1.)* |
-| **A2 — Inline BIUS** | Toolbar + parity shortcuts for Bold, Italic, Underline, Strikethrough. *(AppFlowy Phase 2–4.)* |
-| **A3 — Controller + persistence hook** | One owner of `EditorState`; debounced emission of canonical JSON for DB/API/logging; subscription cleanup. *(AppFlowy Phase 3.)* |
-| **A4 — Keyboard parity** | BIUS (and later shared) commands: toolbar and shortcuts call the **same** `EditorState` entry points. *(AppFlowy Phase 4.)* |
+| Step                                   | Scope                                                                                                                                          |
+| -------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| **A1 — Document JSON confidence**      | Load/save `Document.fromJson` / `toJson`, observe deltas per keystroke, validate undo with built-in history. _(Aligns with AppFlowy Phase 1.)_ |
+| **A2 — Inline BIUS**                   | Toolbar + parity shortcuts for Bold, Italic, Underline, Strikethrough. _(AppFlowy Phase 2–4.)_                                                 |
+| **A3 — Controller + persistence hook** | One owner of `EditorState`; debounced emission of canonical JSON for DB/API/logging; subscription cleanup. _(AppFlowy Phase 3.)_               |
+| **A4 — Keyboard parity**               | BIUS (and later shared) commands: toolbar and shortcuts call the **same** `EditorState` entry points. _(AppFlowy Phase 4.)_                    |
 
 ### Wave B — Extended inline & typography
 
-| Feature | Notes |
-|---------|--------|
-| **Superscript / subscript** | **Implemented (Phase 1)** in `package:rich_text`: custom delta attributes + rendering via `sloteTextSpanDecoratorForAttribute`, plus selection helpers (`sloteToggleSuperscript` / `sloteToggleSubscript`). Markdown export/import supported via `sloteDocumentToMarkdown` / `sloteMarkdownToDocument` using HTML tags (`<sup>` / `<sub>`). **Open UX/editing gaps** are tracked below (deferred). |
-| **Links** | Inline `href` (or package equivalent); dialog or paste handler. **Current behavior:** quick tap opens the URL in the system default browser; long-press opens the link format drawer. |
-| **Font size, font family** | **Implemented (Phase 1)**: selection helpers apply AppFlowy inline attributes `font_size` / `font_family` (`sloteApplyFontSize` / `sloteApplyFontFamily`). Markdown export/import supported via `<span font_size=\"...\" font_family='\"...\"'>...` wrapper from `sloteDocumentToMarkdown`. |
-| **Text color, highlight** | Use / extend built-in color attributes where available. **Near-term focus — picker UX:** match **Google Docs–style mobile** behavior: a **bottom sheet** (slide-up formatting panel from the bottom; often described informally as a mobile “formatting drawer”) with swatches/options—not separate modal dialogues for raw hex input; desktop can use compact menus or the same sheet for parity. **Touchpoint:** [`example/lib/editor/format_toolbar.dart`](../example/lib/editor/format_toolbar.dart). |
-| **Alignment** | **Implemented (Phase 1, example toolbar)**: block-level `align` via `blockComponentAlign` with `left` / `center` / `right` / `justify` (`justify` uses `TextAlign.justify` on text blocks in vendored `appflowy_editor`). Slote example toolbar exposes all four. Main app wiring is deferred. |
-| **Clear formatting** | Single command stripping partial styles on selection; respects `EditorState` history. |
+| Feature                     | Notes                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Superscript / subscript** | **Implemented (Phase 1)** in `package:rich_text`: custom delta attributes + rendering via `sloteTextSpanDecoratorForAttribute`, plus selection helpers (`sloteToggleSuperscript` / `sloteToggleSubscript`). Markdown export/import supported via `sloteDocumentToMarkdown` / `sloteMarkdownToDocument` using HTML tags (`<sup>` / `<sub>`). **Open UX/editing gaps** are tracked below (deferred).                                                                                                        |
+| **Links**                   | Inline `href` (or package equivalent); dialog or paste handler. **Current behavior:** quick tap opens the URL in the system default browser; long-press opens the link format drawer.                                                                                                                                                                                                                                                                                                                     |
+| **Font size, font family**  | **Implemented (Phase 1)**: selection helpers apply AppFlowy inline attributes `font_size` / `font_family` (`sloteApplyFontSize` / `sloteApplyFontFamily`). Markdown export/import supported via `<span font_size=\"...\" font_family='\"...\"'>...` wrapper from `sloteDocumentToMarkdown`.                                                                                                                                                                                                               |
+| **Text color, highlight**   | Use / extend built-in color attributes where available. **Near-term focus — picker UX:** match **Google Docs–style mobile** behavior: a **bottom sheet** (slide-up formatting panel from the bottom; often described informally as a mobile “formatting drawer”) with swatches/options—not separate modal dialogues for raw hex input; desktop can use compact menus or the same sheet for parity. **Touchpoint:** [`example/lib/editor/format_toolbar.dart`](../example/lib/editor/format_toolbar.dart). |
+| **Alignment**               | **Implemented (Phase 1, example toolbar)**: block-level `align` via `blockComponentAlign` with `left` / `center` / `right` / `justify` (`justify` uses `TextAlign.justify` on text blocks in vendored `appflowy_editor`). Slote example toolbar exposes all four. Main app wiring is deferred.                                                                                                                                                                                                            |
+| **Clear formatting**        | Single command stripping partial styles on selection; respects `EditorState` history.                                                                                                                                                                                                                                                                                                                                                                                                                     |
 
 <a id="sup-sub-known-limitations"></a>
 
@@ -66,40 +66,76 @@ These issues show up when formatting **one or more selected characters** (toolba
 
 **Code touchpoints (for future fixes):** `sloteToggleSuperscript` / `sloteToggleSubscript` and selection guards in [`appflowy_editor_support.dart`](../lib/src/appflowy/appflowy_editor_support.dart); caret / `toggledStyle` sync in [`appflowy_document_controller.dart`](../lib/src/appflowy/appflowy_document_controller.dart); rendering in [`slote_text_span_decorator.dart`](../lib/src/appflowy/slote_text_span_decorator.dart) (`WidgetSpan` may affect layout/caret behavior vs plain `TextSpan`).
 
-### Wave C — Structural blocks
+### Wave C — Structural blocks (split)
 
-| Feature | Notes |
-|---------|--------|
-| **Headings H1–H6** | Block type / heading level. |
-| **Bullet, numbered, checkbox lists** | Built-in or extended block components. |
-| **Quote blocks** | Blockquote component. |
+We’ll implement Wave C in small, shippable slices. Order is chosen to maximize reuse (headings/lists unlock TOC + most note-taking docs) and minimize “hard storage” decisions (images/tables later).
+
+#### C1 — Headings (H1–H5)
+
+| Feature            | Notes                                                              |
+| ------------------ | ------------------------------------------------------------------ |
+| **Headings H1–H5** | Block type / heading level. (We only need up to **H5** right now.) |
+
+#### C2 — Lists
+
+| Feature            | Notes                                                                             |
+| ------------------ | --------------------------------------------------------------------------------- |
+| **Bullet lists**   | Basic bullets first (indent/outdent, new item, split/merge).                      |
+| **Numbered lists** | Numbering + nesting rules consistent with AppFlowy defaults.                      |
+| **Checkbox lists** | Toggleable checkbox item; ensure state persists in JSON + markdown export/import. |
+
+#### C3 — Simple blocks (low coupling)
+
+| Feature                       | Notes                       |
+| ----------------------------- | --------------------------- |
+| **Quote blocks**              | Blockquote component.       |
 | **Horizontal rule / divider** | Insert block or equivalent. |
+
+#### C4 — Code blocks (plain first)
+
+| Feature         | Notes                                                                             |
+| --------------- | --------------------------------------------------------------------------------- |
 | **Code blocks** | Fenced-style block; **start plain**, then optional syntax highlight (see Wave E). |
-| **Tables** | Custom or package block builders; higher complexity — schedule after lists/headings. |
-| **Callouts** | Custom block + styling. |
+
+#### C5 — Callouts
+
+| Feature      | Notes                                                                |
+| ------------ | -------------------------------------------------------------------- |
+| **Callouts** | Custom block + styling; keep schema minimal to avoid migration pain. |
+
+#### C6 — Tables (deferred within Wave C)
+
+| Feature    | Notes                                                            |
+| ---------- | ---------------------------------------------------------------- |
+| **Tables** | Higher complexity — schedule after headings/lists/quote/hr/code. |
+
+#### C7 — Images (deferred within Wave C)
+
+| Feature    | Notes                                                                   |
+| ---------- | ----------------------------------------------------------------------- |
 | **Images** | Embed block; storage policy at app boundary (paths, blobs, encryption). |
 
 ### Wave D — Advanced content
 
-| Feature | Notes |
-|---------|--------|
-| **Formula (LaTeX)** | Inline or block embed; renderer + editing UX. |
-| **Outline / TOC** | **Chrome**, not a single delta: walk document (on debounced `transactionStream` or equivalent), show headings hierarchy, jump on tap. |
+| Feature             | Notes                                                                                                                                 |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| **Formula (LaTeX)** | Inline or block embed; renderer + editing UX.                                                                                         |
+| **Outline / TOC**   | **Chrome**, not a single delta: walk document (on debounced `transactionStream` or equivalent), show headings hierarchy, jump on tap. |
 
 ### Wave E — Editor polish & theming
 
-| Item | Notes |
-|------|--------|
-| **Theming bridge** | `EditorStyle` / `BlockComponentConfiguration` ↔ Slote `theme` component. |
-| **Mobile vs desktop** | `EditorStyle.mobile()` vs desktop, floating toolbars, safe areas. |
-| **Performance** | Large docs: avoid rebuilding full chrome on every keystroke; debounce heavy readers (TOC, JSON export). |
+| Item                  | Notes                                                                                                   |
+| --------------------- | ------------------------------------------------------------------------------------------------------- |
+| **Theming bridge**    | `EditorStyle` / `BlockComponentConfiguration` ↔ Slote `theme` component.                                |
+| **Mobile vs desktop** | `EditorStyle.mobile()` vs desktop, floating toolbars, safe areas.                                       |
+| **Performance**       | Large docs: avoid rebuilding full chrome on every keystroke; debounce heavy readers (TOC, JSON export). |
 
 ### Wave F — Cross-cutting (from PRD / security)
 
-| Item | Notes |
-|------|--------|
+| Item           | Notes                                                                                                                      |
+| -------------- | -------------------------------------------------------------------------------------------------------------------------- |
 | **Encryption** | Lives **outside** rich_text core; operate on serialized JSON at app boundary ([roadmap note](appflowy-editor-roadmap.md)). |
-| **Draw / ink** | Stays in **`components/draw`**; overlay or attachment model at note level — not inside rich_text core. |
+| **Draw / ink** | Stays in **`components/draw`**; overlay or attachment model at note level — not inside rich_text core.                     |
 
 ---
 
@@ -107,11 +143,11 @@ These issues show up when formatting **one or more selected characters** (toolba
 
 Use **narrow** signals for interactive toolbars; **one debounced pipe** for expensive work.
 
-| UI / concern | Typical signals |
-|--------------|-----------------|
-| **Inline toolbar (BIUS, colors, …)** | `selectionNotifier`, `toggledStyleNotifier`, plus **derived state** from node at caret (e.g. `delta.sliceAttributes`). Add `transactionStream` only if you observe staleness. |
-| **Persistence / preview / TOC** | **`transactionStream`** (debounced ~200 ms) → emit JSON, refresh outline. |
-| **Undo / redo buttons (editor)** | **`sloteEditorCanUndo` / `sloteEditorCanRedo`** + **`sloteEditorUndo` / `sloteEditorRedo`** on **`EditorState.undoManager`**, and **`RichTextEditorController.undoRedoListenable`** (notifies when the can-undo/can-redo pair changes; microtask-deferred so it matches AppFlowy’s post-`apply` history). Not the generic `undo_redo` package (see below). |
+| UI / concern                         | Typical signals                                                                                                                                                                                                                                                                                                                                            |
+| ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Inline toolbar (BIUS, colors, …)** | `selectionNotifier`, `toggledStyleNotifier`, plus **derived state** from node at caret (e.g. `delta.sliceAttributes`). Add `transactionStream` only if you observe staleness.                                                                                                                                                                              |
+| **Persistence / preview / TOC**      | **`transactionStream`** (debounced ~200 ms) → emit JSON, refresh outline.                                                                                                                                                                                                                                                                                  |
+| **Undo / redo buttons (editor)**     | **`sloteEditorCanUndo` / `sloteEditorCanRedo`** + **`sloteEditorUndo` / `sloteEditorRedo`** on **`EditorState.undoManager`**, and **`RichTextEditorController.undoRedoListenable`** (notifies when the can-undo/can-redo pair changes; microtask-deferred so it matches AppFlowy’s post-`apply` history). Not the generic `undo_redo` package (see below). |
 
 ---
 
@@ -149,12 +185,12 @@ Use **narrow** signals for interactive toolbars; **one debounced pipe** for expe
 
 ## Repo touchpoints
 
-| Area | Path |
-|------|------|
-| Spike / daily dev | [`example/`](../example) |
-| Future public API | [`lib/rich_text.dart`](../lib/rich_text.dart) |
+| Area                     | Path                                                     |
+| ------------------------ | -------------------------------------------------------- |
+| Spike / daily dev        | [`example/`](../example)                                 |
+| Future public API        | [`lib/rich_text.dart`](../lib/rich_text.dart)            |
 | AppFlowy phase checklist | [appflowy-editor-roadmap.md](appflowy-editor-roadmap.md) |
-| Legacy Quill record | [IMPLEMENTATION.md](../IMPLEMENTATION.md) |
+| Legacy Quill record      | [IMPLEMENTATION.md](../IMPLEMENTATION.md)                |
 
 ---
 

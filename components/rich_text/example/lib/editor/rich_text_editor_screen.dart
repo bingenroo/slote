@@ -93,6 +93,7 @@ class _RichTextEditorScreenState extends State<RichTextEditorScreen> {
         (useDesktopChrome ? EditorStyle.desktop() : EditorStyle.mobile())
             .copyWith(
       textSpanDecorator: sloteTextSpanDecoratorForAttribute,
+      caretMetrics: sloteCaretMetrics,
       endOfParagraphCaretHeight: sloteEndOfParagraphCaretHeight,
       endOfParagraphCaretMetrics: sloteEndOfParagraphCaretMetrics,
     );
@@ -116,6 +117,7 @@ class _RichTextEditorScreenState extends State<RichTextEditorScreen> {
             child: FormatToolbar(
               editorState: es,
               listenable: _formatBarListenable,
+              layout: SloteToolbarLayout.verticalScroll,
             ),
           ),
         ],

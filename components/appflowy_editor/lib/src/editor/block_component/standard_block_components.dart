@@ -15,6 +15,21 @@ final Map<String, BlockComponentBuilder> standardBlockComponentBuilderMap = {
           : ' ',
     ),
   ),
+  CodeBlockKeys.type: ParagraphBlockComponentBuilder(
+    configuration: standardBlockComponentConfiguration.copyWith(
+      padding: (_) => const EdgeInsets.symmetric(vertical: 8.0),
+      placeholderText: (_) => 'Code',
+      textStyle: (node, {textSpan}) => const TextStyle(
+        fontFamily: 'monospace',
+      ),
+    ),
+  ),
+  CalloutBlockKeys.type: ParagraphBlockComponentBuilder(
+    configuration: standardBlockComponentConfiguration.copyWith(
+      padding: (_) => const EdgeInsets.symmetric(vertical: 8.0),
+      placeholderText: (_) => 'Callout',
+    ),
+  ),
   TodoListBlockKeys.type: TodoListBlockComponentBuilder(
     configuration: standardBlockComponentConfiguration.copyWith(
       placeholderText: (_) => AppFlowyEditorL10n.current.toDoPlaceholder,

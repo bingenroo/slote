@@ -17,6 +17,7 @@ Document markdownToDocument(
     markdownInlineSyntaxes: inlineSyntaxes,
     markdownParsers: [
       ...markdownParsers,
+      const MarkdownCodeBlockParserV2(),
       const MarkdownParagraphParserV2(),
       const MarkdownHeadingParserV2(),
       const MarkdownTodoListParserV2(),

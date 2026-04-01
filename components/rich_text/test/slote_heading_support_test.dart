@@ -37,6 +37,21 @@ void main() {
       expect(node?.type, ParagraphBlockKeys.type);
     });
 
+    test('collapsed caret: paragraph becomes H5', () async {
+      final es = EditorState.blank(withInitialText: false);
+      final t = es.transaction;
+      t.insertNode([0], paragraphNode(text: 'hello'));
+      await es.apply(t);
+      es.selection =
+          Selection.single(path: [0], startOffset: 0, endOffset: 0).normalized;
+
+      await sloteToggleHeadingLevel(es, 5);
+      final node = es.getNodeAtPath([0]);
+      expect(node?.type, HeadingBlockKeys.type);
+      expect(node?.attributes[HeadingBlockKeys.level], 5);
+      expect(sloteHeadingLevelAtSelectionStart(es), 5);
+    });
+
     test('sloteCanUseBlockHeadingControls true for paragraph with caret',
         () async {
       final es = EditorState.blank(withInitialText: false);

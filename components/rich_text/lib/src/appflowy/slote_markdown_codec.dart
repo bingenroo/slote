@@ -4,6 +4,7 @@ import 'dart:convert';
 
 import 'package:appflowy_editor/appflowy_editor.dart';
 
+import 'slote_callout_markdown.dart';
 import 'slote_inline_attributes.dart';
 
 /// Slote markdown import (string -> AppFlowy [Document]).
@@ -13,7 +14,21 @@ import 'slote_inline_attributes.dart';
 /// - We encode custom inline attributes using HTML tags + JSON-ish attribute values
 ///   so AppFlowy’s `DeltaMarkdownDecoder` can `jsonDecode` them.
 Document sloteMarkdownToDocument(String markdown) {
-  return markdownToDocument(markdown);
+  final normalized = markdown.replaceAllMapped(
+    RegExp(
+      r'<callout\b[^>]*kind="([^"]+)"[^>]*>([\s\S]*?)</callout>',
+      caseSensitive: false,
+    ),
+    (m) {
+      final kind = m.group(1) ?? 'info';
+      final inner = (m.group(2) ?? '').replaceAll(RegExp(r'<[^>]+>'), '');
+      final text = inner.trimRight();
+      return '[[slote_callout kind="$kind"]]$text';
+    },
+  );
+
+  final doc = markdownToDocument(normalized);
+  return _slotePostProcessCallouts(doc);
 }
 
 /// Slote markdown export (AppFlowy [Document] -> string).
@@ -26,9 +41,44 @@ String sloteDocumentToMarkdown(Document document) {
   return documentToMarkdown(
     document,
     customParsers: const [
+      SloteCalloutNodeParser(),
       _SloteTextNodeParser(),
     ],
   );
+}
+
+Document _slotePostProcessCallouts(Document doc) {
+  final out = Document.blank();
+  final nodes = <Node>[];
+
+  for (final node in doc.root.children) {
+    if (node.type != ParagraphBlockKeys.type) {
+      nodes.add(node);
+      continue;
+    }
+
+    final text = node.delta?.toPlainText() ?? '';
+    final match = RegExp(r'^\[\[slote_callout kind="([^"]+)"\]\](.*)$')
+        .firstMatch(text);
+    if (match == null) {
+      nodes.add(node);
+      continue;
+    }
+
+    final kind = match.group(1) ?? 'info';
+    final body = (match.group(2) ?? '').trimRight();
+    nodes.add(
+      calloutNode(
+        kind: kind,
+        delta: Delta()..insert(body),
+      ),
+    );
+  }
+
+  if (nodes.isNotEmpty) {
+    out.insert([0], nodes);
+  }
+  return out;
 }
 
 class _SloteTextNodeParser extends NodeParser {

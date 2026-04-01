@@ -34,6 +34,18 @@ typedef EndOfParagraphCaretMetricsResolver = EndOfParagraphCaretMetrics? Functio
   required TextStyleConfiguration textStyleConfiguration,
 });
 
+/// Optional caret metrics resolver for any caret position (not just paragraph end).
+///
+/// Return non-null to override [RenderParagraph.getFullHeightForCaret] and adjust
+/// the caret rect's vertical placement by [EndOfParagraphCaretMetrics.dy].
+typedef CaretMetricsResolver = EndOfParagraphCaretMetrics? Function({
+  required BuildContext context,
+  required EditorState editorState,
+  required Node node,
+  required Position position,
+  required TextStyleConfiguration textStyleConfiguration,
+});
+
 /// The style of the editor.
 ///
 /// You can customize the style of the editor by passing the [EditorStyle] to
@@ -61,6 +73,7 @@ class EditorStyle {
     this.mobileDragHandleLeftExtend,
     this.mobileDragHandleHeightExtend,
     this.autoDismissCollapsedHandleDuration = const Duration(seconds: 3),
+    this.caretMetrics,
     this.endOfParagraphCaretHeight,
     this.endOfParagraphCaretMetrics,
   });
@@ -140,6 +153,10 @@ class EditorStyle {
 
   final double textScaleFactor;
 
+  /// If set, [AppFlowyRichText] may use this to size/position the caret at any
+  /// caret position (e.g. to avoid full-line metrics around inline widgets).
+  final CaretMetricsResolver? caretMetrics;
+
   /// If set, [AppFlowyRichText] may use this to size the caret at paragraph end.
   final EndOfParagraphCaretHeightResolver? endOfParagraphCaretHeight;
 
@@ -158,6 +175,7 @@ class EditorStyle {
     this.cursorWidth = 2.0,
     this.textScaleFactor = 1.0,
     this.maxWidth,
+    this.caretMetrics,
     this.endOfParagraphCaretHeight,
     this.endOfParagraphCaretMetrics,
   })  : padding = padding ?? const EdgeInsets.symmetric(horizontal: 100),
@@ -202,6 +220,7 @@ class EditorStyle {
     this.mobileDragHandleLeftExtend,
     this.mobileDragHandleHeightExtend,
     this.autoDismissCollapsedHandleDuration = const Duration(seconds: 3),
+    this.caretMetrics,
     this.endOfParagraphCaretHeight,
     this.endOfParagraphCaretMetrics,
   })  : padding = padding ?? const EdgeInsets.symmetric(horizontal: 20),
@@ -237,6 +256,7 @@ class EditorStyle {
     double? mobileDragHandleLeftExtend,
     double? mobileDragHandleHeightExtend,
     Duration? autoDismissCollapsedHandleDuration,
+    CaretMetricsResolver? caretMetrics,
     EndOfParagraphCaretHeightResolver? endOfParagraphCaretHeight,
     EndOfParagraphCaretMetricsResolver? endOfParagraphCaretMetrics,
   }) {
@@ -271,6 +291,7 @@ class EditorStyle {
           mobileDragHandleHeightExtend ?? this.mobileDragHandleHeightExtend,
       autoDismissCollapsedHandleDuration: autoDismissCollapsedHandleDuration ??
           this.autoDismissCollapsedHandleDuration,
+      caretMetrics: caretMetrics ?? this.caretMetrics,
       endOfParagraphCaretHeight:
           endOfParagraphCaretHeight ?? this.endOfParagraphCaretHeight,
       endOfParagraphCaretMetrics:

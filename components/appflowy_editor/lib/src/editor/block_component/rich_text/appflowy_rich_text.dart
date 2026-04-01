@@ -236,9 +236,37 @@ class _AppFlowyRichTextState extends State<AppFlowyRichText>
         _renderParagraph?.getOffsetForCaret(textPosition, Rect.zero) ??
             Offset.zero;
 
+    var usedCaretMetricsResolver = false;
+    // Optional general caret metrics resolver (for any caret position).
+    // Keep end-of-paragraph resolvers as higher precedence.
+    if (!isAtEnd) {
+      final caretMetricsResolver = widget.editorState.editorStyle.caretMetrics;
+      if (caretMetricsResolver != null) {
+        final resolved = caretMetricsResolver(
+          context: context,
+          editorState: widget.editorState,
+          node: widget.node,
+          position: position,
+          textStyleConfiguration: textStyleConfiguration,
+        );
+        if (resolved != null) {
+          cursorHeight = resolved.height;
+          cursorOffset = cursorOffset.translate(0, resolved.dy);
+          usedCaretMetricsResolver = true;
+        }
+      }
+    }
+
     // If we are at the text boundary, keep track of the previous caret height.
     // We'll use it to prevent the boundary caret from becoming taller than the
     // last in-text caret (common when line metrics are expanded by spans).
+    final Offset? previousCaretOffset =
+        (delta != null && delta.isNotEmpty && position.offset == plainTextLength)
+            ? _renderParagraph?.getOffsetForCaret(
+                TextPosition(offset: max(0, plainTextLength - 1)),
+                Rect.zero,
+              )
+            : null;
     final double? previousCaretHeight =
         (delta != null && delta.isNotEmpty && position.offset == plainTextLength)
             ? _renderParagraph?.getFullHeightForCaret(
@@ -258,7 +286,15 @@ class _AppFlowyRichTextState extends State<AppFlowyRichText>
       );
       if (resolved != null) {
         cursorHeight = resolved.height;
-        cursorOffset = cursorOffset.translate(0, resolved.dy);
+        // At EOT, RenderParagraph may place the caret using full-line baseline
+        // even when the last run is a WidgetSpan with a different baseline.
+        // Anchor Y to the last in-text caret only when the two disagree.
+        if (previousCaretOffset != null &&
+            (cursorOffset.dy - previousCaretOffset.dy).abs() > 0.5) {
+          cursorOffset = Offset(cursorOffset.dx, previousCaretOffset.dy);
+        } else {
+          cursorOffset = cursorOffset.translate(0, resolved.dy);
+        }
         usedEndOfParagraphResolver = true;
       }
     }
@@ -278,10 +314,12 @@ class _AppFlowyRichTextState extends State<AppFlowyRichText>
       }
     }
 
-    // Merging placeholder height can undo a shrunk EOT caret on non-empty text.
+    // Merging placeholder height can undo a shrunk caret on non-empty text.
     if (placeholderCursorHeight != null) {
       final skipPlaceholderHeightMerge =
-          usedEndOfParagraphResolver && delta != null && delta.isNotEmpty;
+          (usedEndOfParagraphResolver || usedCaretMetricsResolver) &&
+              delta != null &&
+              delta.isNotEmpty;
       if (!skipPlaceholderHeightMerge) {
         cursorHeight = max(cursorHeight ?? 0, placeholderCursorHeight);
       }
@@ -324,6 +362,7 @@ class _AppFlowyRichTextState extends State<AppFlowyRichText>
         debugPrint(
           'DBG-CARET path=${position.path} offset=${position.offset} '
           'isAtEnd=$isAtEnd usedEOT=$usedEndOfParagraphResolver '
+          'usedCaretMetrics=$usedCaretMetricsResolver '
           'height=${(cursorHeight ?? -1).toStringAsFixed(2)} '
           'rect=$rect',
         );

@@ -3,7 +3,7 @@ import 'dart:async';
 import 'package:appflowy_editor/appflowy_editor.dart';
 import 'package:flutter/material.dart';
 
-/// Heading level (1–3) for the block at the selection start, or `null` if that
+/// Heading level (1–5) for the block at the selection start, or `null` if that
 /// block is not a heading.
 int? sloteHeadingLevelAtSelectionStart(EditorState editorState) {
   final selection = editorState.selection;
@@ -19,7 +19,7 @@ bool sloteCanUseBlockHeadingControls(EditorState editorState) {
   return onlyShowInSingleSelectionAndTextType(editorState);
 }
 
-/// Toggle [level] (1–3) on each affected block in the current selection.
+/// Toggle [level] (1–5) on each affected block in the current selection.
 ///
 /// Uses the same rules as AppFlowy’s heading toolbar: if a block is already a
 /// heading at [level], it becomes a paragraph; otherwise it becomes a heading at
@@ -83,9 +83,9 @@ Future<void> sloteApplyParagraphBody(EditorState editorState) async {
   );
 }
 
-enum _SloteHeadingMenuValue { body, h1, h2, h3 }
+enum _SloteHeadingMenuValue { body, h1, h2, h3, h4, h5 }
 
-/// Popup menu: Normal paragraph, H1, H2, H3. Uses [keepEditorFocusNotifier] so
+/// Popup menu: Normal paragraph, H1–H5. Uses [keepEditorFocusNotifier] so
 /// the editor regains focus after the menu closes (same pattern as font menus).
 class SloteHeadingStyleToolbarMenu extends StatelessWidget {
   const SloteHeadingStyleToolbarMenu({
@@ -121,6 +121,12 @@ class SloteHeadingStyleToolbarMenu extends StatelessWidget {
               case _SloteHeadingMenuValue.h3:
                 await sloteToggleHeadingLevel(editorState, 3);
                 break;
+              case _SloteHeadingMenuValue.h4:
+                await sloteToggleHeadingLevel(editorState, 4);
+                break;
+              case _SloteHeadingMenuValue.h5:
+                await sloteToggleHeadingLevel(editorState, 5);
+                break;
             }
           } finally {
             keepEditorFocusNotifier.decrease();
@@ -144,6 +150,14 @@ class SloteHeadingStyleToolbarMenu extends StatelessWidget {
         PopupMenuItem(
           value: _SloteHeadingMenuValue.h3,
           child: Text('Heading 3'),
+        ),
+        PopupMenuItem(
+          value: _SloteHeadingMenuValue.h4,
+          child: Text('Heading 4'),
+        ),
+        PopupMenuItem(
+          value: _SloteHeadingMenuValue.h5,
+          child: Text('Heading 5'),
         ),
       ],
     );
