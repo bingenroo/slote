@@ -82,6 +82,39 @@ void main() {
   );
 
   testWidgets(
+    'subscriptCaretTranslateYPendingBodyBaseline is larger than in-span translateY',
+    (tester) async {
+      late double pending;
+      late double inSpan;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Builder(
+            builder: (context) {
+              inSpan = SloteSupSubMetrics.subscript(
+                context,
+                baseFontSize: 14,
+              ).translateY;
+              pending =
+                  SloteSupSubMetrics.subscriptCaretTranslateYPendingBodyBaseline(
+                context,
+                baseFontSize: 14,
+              );
+              return const SizedBox.shrink();
+            },
+          ),
+        ),
+      );
+
+      expect(pending, greaterThan(inSpan));
+      expect(
+        pending - inSpan,
+        closeTo(14 * SloteSupSubMetrics.subscriptPendingCaretExtraEm, 1e-6),
+      );
+    },
+  );
+
+  testWidgets(
     'SloteSupSubMetrics applies MediaQuery textScaler to translate distance',
     (tester) async {
       late double dyDefault;

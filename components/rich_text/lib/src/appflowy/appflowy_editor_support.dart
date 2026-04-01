@@ -125,7 +125,8 @@ Selection _sloteClampSelectionToNodeText(
   Selection selection,
 ) {
   if (selection.isCollapsed) return selection;
-  if (selection.start.path.length != selection.end.path.length) return selection;
+  if (selection.start.path.length != selection.end.path.length)
+    return selection;
   for (var i = 0; i < selection.start.path.length; i++) {
     if (selection.start.path[i] != selection.end.path[i]) return selection;
   }
@@ -161,7 +162,7 @@ Future<void> sloteToggleSuperscript(EditorState editorState) async {
   if (rawSelection.isCollapsed) {
     await editorState.toggleAttribute(kSloteSuperscriptAttribute);
     if (editorState.toggledStyle[kSloteSuperscriptAttribute] == true) {
-      editorState.updateToggledStyle(kSloteSubscriptAttribute, false);
+      editorState.updateToggledStyle(kSloteSubscriptAttribute, null);
     }
     return;
   }
@@ -206,7 +207,7 @@ Future<void> sloteToggleSubscript(EditorState editorState) async {
   if (rawSelection.isCollapsed) {
     await editorState.toggleAttribute(kSloteSubscriptAttribute);
     if (editorState.toggledStyle[kSloteSubscriptAttribute] == true) {
-      editorState.updateToggledStyle(kSloteSuperscriptAttribute, false);
+      editorState.updateToggledStyle(kSloteSuperscriptAttribute, null);
     }
     return;
   }
@@ -273,10 +274,7 @@ Future<void> sloteApplyFontFamily(
   if (selection == null) return;
 
   if (selection.isCollapsed) {
-    editorState.updateToggledStyle(
-      AppFlowyRichTextKeys.fontFamily,
-      fontFamily,
-    );
+    editorState.updateToggledStyle(AppFlowyRichTextKeys.fontFamily, fontFamily);
     return;
   }
 

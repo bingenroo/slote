@@ -235,7 +235,11 @@ class EditorState {
   late final toggledStyleNotifier = ValueNotifier<Attributes>(toggledStyle);
 
   void updateToggledStyle(String key, dynamic value) {
-    _toggledStyle[key] = value;
+    if (value == null) {
+      _toggledStyle.remove(key);
+    } else {
+      _toggledStyle[key] = value;
+    }
     toggledStyleNotifier.value = {..._toggledStyle};
   }
 

@@ -64,8 +64,22 @@ EndOfParagraphCaretMetrics? sloteCaretMetrics({
     return true; // any other non-null value counts as enabled
   }
 
+  final selection = editorState.selection;
+  final toggled = editorState.toggledStyle;
+
+  final toggledSup = _enabled(toggled[kSloteSuperscriptAttribute]);
+  final toggledSub = _enabled(toggled[kSloteSubscriptAttribute]);
+
   var rawSup = _enabled(attrs[kSloteSuperscriptAttribute]);
   var rawSub = _enabled(attrs[kSloteSubscriptAttribute]);
+  final sliceHadSubscript = rawSub;
+
+  // If we're in "pending typing style" mode, that should drive caret metrics.
+  if (selection?.isCollapsed == true && (toggledSup || toggledSub)) {
+    rawSup = toggledSup;
+    rawSub = toggledSub;
+  }
+
   // Sup/sub should be mutually exclusive; if both are present, prefer sup
   // (matches span decorator behavior).
   if (rawSup && rawSub) rawSub = false;
@@ -112,9 +126,21 @@ EndOfParagraphCaretMetrics? sloteCaretMetrics({
   // position the WidgetSpan on the line, but it makes the caret too tall).
   final edgePaddingPx = isSuperscript ? 0.0 : m.translateY;
 
-  final caretDy = isSuperscript
-      ? m.translateY * SloteSupSubMetrics.superscriptCaretTranslateYFactor
-      : m.translateY;
+  final pendingSubOnBodyBaseline =
+      isSubscript &&
+      toggledSub &&
+      !sliceHadSubscript &&
+      selection?.isCollapsed == true;
+
+  final caretDy =
+      isSuperscript
+          ? m.translateY * SloteSupSubMetrics.superscriptCaretTranslateYFactor
+          : pendingSubOnBodyBaseline
+          ? SloteSupSubMetrics.subscriptCaretTranslateYPendingBodyBaseline(
+              context,
+              baseFontSize: baseFontSize,
+            )
+          : m.translateY;
 
   return EndOfParagraphCaretMetrics(
     height: painter.height + edgePaddingPx,

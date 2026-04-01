@@ -18,6 +18,7 @@ class EndOfParagraphCaretMetrics {
   const EndOfParagraphCaretMetrics({
     required this.height,
     this.dy = 0.0,
+    this.ignorePreviousCaretYAnchor = false,
   });
 
   final double height;
@@ -25,6 +26,13 @@ class EndOfParagraphCaretMetrics {
   /// Additional vertical adjustment applied to the caret rect's top (y).
   /// Negative moves the caret up; positive moves it down.
   final double dy;
+
+  /// When true, [AppFlowyRichText] applies [dy] even if the caret Y would
+  /// normally be snapped to the last in-text glyph (boundary baseline fix).
+  ///
+  /// Use when [EditorState.toggledStyle] requests superscript/subscript that
+  /// differs from the last run — snapping would keep the old script's Y.
+  final bool ignorePreviousCaretYAnchor;
 }
 
 typedef EndOfParagraphCaretMetricsResolver = EndOfParagraphCaretMetrics? Function({

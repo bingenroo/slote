@@ -90,8 +90,15 @@ class RichTextEditorController {
     bool desiredSup = false;
     bool desiredSub = false;
     try {
-      if (delta != null && !delta.isEmpty) {
-        final atCaret = delta.sliceAttributes(selection.start.offset);
+      if (delta != null && delta.isNotEmpty) {
+        // Delta.sliceAttributes(k): for k>=1 it returns attributes for plain char (k-1).
+        // For a collapsed caret, prefer the style of the *following* character.
+        final plainLen = delta.toPlainText().length;
+        final o = selection.start.offset.clamp(0, plainLen);
+        final sliceProbe =
+            o >= plainLen ? plainLen : (o + 1).clamp(0, plainLen);
+
+        final atCaret = delta.sliceAttributes(sliceProbe);
         desiredSup = atCaret?[kSloteSuperscriptAttribute] == true;
         desiredSub = atCaret?[kSloteSubscriptAttribute] == true;
       }
@@ -103,6 +110,13 @@ class RichTextEditorController {
 
     // Sup and sub are mutually exclusive; prefer superscript if corrupted.
     if (desiredSup) desiredSub = false;
+
+    if (kDebugMode) {
+      debugPrint(
+        'DBG-SUPSUB-SYNC offset=${selection.start.offset} '
+        'currSup=$currSup currSub=$currSub desiredSup=$desiredSup desiredSub=$desiredSub',
+      );
+    }
 
     if (desiredSup == currSup && desiredSub == currSub) return;
 

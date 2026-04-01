@@ -278,6 +278,7 @@ class _AppFlowyRichTextState extends State<AppFlowyRichText>
     final eotMetricsResolver =
         widget.editorState.editorStyle.endOfParagraphCaretMetrics;
     if (isAtEnd && eotMetricsResolver != null) {
+      final rpCaretYBeforeEot = cursorOffset.dy;
       final resolved = eotMetricsResolver(
         context: context,
         editorState: widget.editorState,
@@ -289,13 +290,35 @@ class _AppFlowyRichTextState extends State<AppFlowyRichText>
         // At EOT, RenderParagraph may place the caret using full-line baseline
         // even when the last run is a WidgetSpan with a different baseline.
         // Anchor Y to the last in-text caret only when the two disagree.
-        if (previousCaretOffset != null &&
-            (cursorOffset.dy - previousCaretOffset.dy).abs() > 0.5) {
+        //
+        // If the resolver sets [ignorePreviousCaretYAnchor] (pending script on
+        // the body baseline, or toggled style differs from the last run),
+        // apply [dy]; when the last run is already sub/sup, snap uses the
+        // previous glyph Y and [dy] is 0.
+        final bigDyDrift = previousCaretOffset != null &&
+            (cursorOffset.dy - previousCaretOffset.dy).abs() > 0.5;
+        final branchSnap =
+            !resolved.ignorePreviousCaretYAnchor && bigDyDrift;
+        if (branchSnap) {
           cursorOffset = Offset(cursorOffset.dx, previousCaretOffset.dy);
         } else {
           cursorOffset = cursorOffset.translate(0, resolved.dy);
         }
         usedEndOfParagraphResolver = true;
+        if (kDebugMode) {
+          debugPrint(
+            'DBG-EOT-MERGE path=${position.path} off=${position.offset} '
+            'plainLen=$plainTextLength '
+            'rpCaretY=${rpCaretYBeforeEot.toStringAsFixed(2)} '
+            'prevIdxY=${previousCaretOffset?.dy.toStringAsFixed(2) ?? "null"} '
+            'prevIdxH=${previousCaretHeight?.toStringAsFixed(2) ?? "null"} '
+            'bigDrift=$bigDyDrift ignorePrev=${resolved.ignorePreviousCaretYAnchor} '
+            'branch=${branchSnap ? "snapNoDy" : "translateDy"} '
+            'resolvedDy=${resolved.dy.toStringAsFixed(2)} '
+            'h=${resolved.height.toStringAsFixed(2)} '
+            'cursorY=${cursorOffset.dy.toStringAsFixed(2)}',
+          );
+        }
       }
     }
 
