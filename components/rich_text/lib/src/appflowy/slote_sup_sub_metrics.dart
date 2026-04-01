@@ -29,6 +29,14 @@ class SloteSupSubMetrics {
   /// Lower distance as a fraction of scaled parent em (~4px at 14pt).
   static const double subscriptLowerEm = 0.05;
 
+  /// Multiplier on [translateY] when nudging the **editing caret** inside
+  /// superscript runs (general caret resolver + end-of-paragraph metrics).
+  ///
+  /// [WidgetSpan] with [PlaceholderAlignment.aboveBaseline] already moves the
+  /// caret into the placeholder; applying the full layout [translateY] again
+  /// tends to float the caret above the script glyphs.
+  static const double superscriptCaretTranslateYFactor = 0.42;
+
   static SloteSupSubMetrics superscript(
     BuildContext context, {
     required double baseFontSize,

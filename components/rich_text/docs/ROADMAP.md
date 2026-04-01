@@ -25,6 +25,7 @@ This document is the **canonical plan** for Slote’s rich-text subsystem: edito
 | ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Active spike**               | [`example/lib/main.dart`](../example/lib/main.dart) — `EditorState` from JSON, `AppFlowyEditor`, fixed **BIUS** toolbar (`toggleAttribute` + caret-aware active state). |
 | **Phase (AppFlowy checklist)** | **Phases 3–4 complete** in `package:rich_text` + example: `RichTextEditorController`, debounced JSON, shared BIUS entry points + command shortcuts.                     |
+| **Wave C (structural blocks)** | **C1–C5 delivered** (headings, lists, quote, divider, code block, callout) — see [Wave C](#wave-c--structural-blocks-split) below. **C6–C7** (tables, images) still **not** product/editor milestones; markdown codec tests cover table/image round-trip separately. |
 | **Main Slote app**             | Note body still uses plain text / Quill at root; **integration** of this editor is a separate milestone (see PRD).                                                      |
 
 ---
@@ -68,52 +69,28 @@ These issues show up when formatting **one or more selected characters** (toolba
 
 ### Wave C — Structural blocks (split)
 
-We’ll implement Wave C in small, shippable slices. Order is chosen to maximize reuse (headings/lists unlock TOC + most note-taking docs) and minimize “hard storage” decisions (images/tables later).
+Wave C is implemented in small, shippable slices. Order maximizes reuse (headings/lists unlock TOC + most note-taking docs) and defers “hard storage” decisions (images/tables as dedicated milestones).
 
-#### C1 — Headings (H1–H5)
+#### Wave C — delivered (C1–C5)
 
-| Feature            | Notes                                                              |
-| ------------------ | ------------------------------------------------------------------ |
-| **Headings H1–H5** | Block type / heading level. (We only need up to **H5** right now.) |
+These slices are **in place** today: example toolbar wiring, AppFlowy block components, and (where noted) `package:rich_text` APIs or markdown codec coverage.
 
-#### C2 — Lists
+| Slice | Feature | Notes |
+| ----- | ------- | ----- |
+| **C1** | **Headings H1–H5** | Block heading levels up to **H5**. APIs and menu: [`slote_heading_support.dart`](../lib/src/appflowy/slote_heading_support.dart) (`sloteToggleHeadingLevel`, `SloteHeadingStyleToolbarMenu`); example: [`format_toolbar.dart`](../example/lib/editor/format_toolbar.dart). Tests: `slote_heading_support_test.dart`, `slote_markdown_heading_levels_test.dart`. |
+| **C2** | **Bullet, numbered, checkbox lists** | Toolbar actions use AppFlowy `insertBulletedListAfterSelection` / `insertNumberedListAfterSelection` / `insertCheckboxAfterSelection` (indent/outdent, new item, split/merge follow **AppFlowy defaults**). Tests: [`slote_list_insertion_test.dart`](../test/slote_list_insertion_test.dart). |
+| **C3** | **Quote + horizontal rule** | Quote: `insertQuoteAfterSelection`. Divider: `dividerNode()` + `insertNodeAfterSelection` (see [`slote_list_insertion_test.dart`](../test/slote_list_insertion_test.dart)). |
+| **C4** | **Code blocks (plain first)** | Fenced-style plain code block via `insertCodeBlockAfterSelection` in the example toolbar. Markdown round-trip: [`slote_markdown_codec.dart`](../lib/src/appflowy/slote_markdown_codec.dart); tests: `slote_markdown_code_block_test.dart`. Optional syntax highlight is **Wave E**. |
+| **C5** | **Callouts** | Custom callout block + insert from toolbar (`insertCalloutAfterSelection`). Markdown: [`slote_callout_markdown.dart`](../lib/src/appflowy/slote_callout_markdown.dart); tests: `slote_markdown_callout_test.dart`. |
 
-| Feature            | Notes                                                                             |
-| ------------------ | --------------------------------------------------------------------------------- |
-| **Bullet lists**   | Basic bullets first (indent/outdent, new item, split/merge).                      |
-| **Numbered lists** | Numbering + nesting rules consistent with AppFlowy defaults.                      |
-| **Checkbox lists** | Toggleable checkbox item; ensure state persists in JSON + markdown export/import. |
+#### Wave C — not yet (C6–C7)
 
-#### C3 — Simple blocks (low coupling)
+These remain **out of scope** for the current editor/product slice: no dedicated Slote toolbar or app-level storage story yet, even though **markdown import/export** for table and image nodes is covered by codec tests (`slote_markdown_table_test.dart`, `slote_markdown_image_test.dart`) for migration and interchange.
 
-| Feature                       | Notes                       |
-| ----------------------------- | --------------------------- |
-| **Quote blocks**              | Blockquote component.       |
-| **Horizontal rule / divider** | Insert block or equivalent. |
-
-#### C4 — Code blocks (plain first)
-
-| Feature         | Notes                                                                             |
-| --------------- | --------------------------------------------------------------------------------- |
-| **Code blocks** | Fenced-style block; **start plain**, then optional syntax highlight (see Wave E). |
-
-#### C5 — Callouts
-
-| Feature      | Notes                                                                |
-| ------------ | -------------------------------------------------------------------- |
-| **Callouts** | Custom block + styling; keep schema minimal to avoid migration pain. |
-
-#### C6 — Tables (deferred within Wave C)
-
-| Feature    | Notes                                                            |
-| ---------- | ---------------------------------------------------------------- |
-| **Tables** | Higher complexity — schedule after headings/lists/quote/hr/code. |
-
-#### C7 — Images (deferred within Wave C)
-
-| Feature    | Notes                                                                   |
-| ---------- | ----------------------------------------------------------------------- |
-| **Images** | Embed block; storage policy at app boundary (paths, blobs, encryption). |
+| Slice | Feature | Notes |
+| ----- | ------- | ----- |
+| **C6** | **Tables** | Full **editing UX** (insert from chrome, complex manipulation) and any Slote-specific table behavior — schedule after the delivered block set. Higher complexity than quote/hr/code. |
+| **C7** | **Images** | Embed block **in product**: storage policy at app boundary (paths, blobs, encryption), picker UX, and main-app wiring — not just codec round-trip. |
 
 ### Wave D — Advanced content
 

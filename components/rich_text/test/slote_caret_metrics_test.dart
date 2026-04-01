@@ -84,5 +84,75 @@ void main() {
     )..layout();
     expect(m.height, greaterThan(scriptPainter.height));
   });
+
+  testWidgets(
+    'sloteCaretMetrics uses character after caret (boundary before base, not sup)',
+    (tester) async {
+      late BuildContext ctx;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Builder(
+            builder: (context) {
+              ctx = context;
+              return const SizedBox.shrink();
+            },
+          ),
+        ),
+      );
+
+      // Plain indices: 0–1 base, 2–3 superscript, 4–5 base.
+      final es = EditorState(
+        document: Document.fromJson({
+          'document': {
+            'type': 'page',
+            'children': [
+              {
+                'type': 'paragraph',
+                'data': {
+                  'delta': [
+                    {'insert': 'ab'},
+                    {
+                      'insert': 'cd',
+                      'attributes': {kSloteSuperscriptAttribute: true},
+                    },
+                    {'insert': 'ef'},
+                  ],
+                },
+              },
+            ],
+          },
+        }),
+      );
+      es.editorStyle = const EditorStyle.mobile();
+
+      final node = es.getNodeAtPath([0]);
+      expect(node, isNotNull);
+
+      final cfg = TextStyleConfiguration(
+        text: TextStyle(fontSize: 16),
+      );
+
+      // Caret before "e" (offset 4): must not use superscript of "c"/"d".
+      final atBaseAfterSup = sloteCaretMetrics(
+        context: ctx,
+        editorState: es,
+        node: node!,
+        position: Position(path: [0], offset: 4),
+        textStyleConfiguration: cfg,
+      );
+      expect(atBaseAfterSup, isNull);
+
+      // Caret before "d" (offset 3): still within sup run.
+      final inSup = sloteCaretMetrics(
+        context: ctx,
+        editorState: es,
+        node: node,
+        position: Position(path: [0], offset: 3),
+        textStyleConfiguration: cfg,
+      );
+      expect(inSup, isNotNull);
+    },
+  );
 }
 

@@ -24,15 +24,18 @@ CharacterShortcutEventHandler _insertNewLineHandler = (editorState) async {
     return false;
   }
 
-  final selection = editorState.selection?.normalized;
+  var selection = editorState.selection?.normalized;
   if (selection == null) {
     return false;
   }
 
   // delete the selection
   await editorState.deleteSelection(selection);
-  // insert a new line
-  await editorState.insertNewLine(position: selection.start);
+  // Re-read selection: [selection.start] is stale after delete.
+  selection = editorState.selection?.normalized;
+  if (selection == null || !selection.isCollapsed) {
+    return false;
+  }
 
-  return true;
+  return editorState.insertNewLine(position: selection.start);
 };

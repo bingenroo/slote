@@ -33,13 +33,24 @@ EndOfParagraphCaretMetrics? sloteCaretMetrics({
   final plainTextLength = delta.toPlainText().length;
   final clampedOffset = position.offset.clamp(0, plainTextLength);
 
-  // Caret at offset N sits between characters; prefer the style of the character
-  // just before the caret so the caret matches the run you're in.
-  final int probeIndex = (clampedOffset <= 0) ? 0 : (clampedOffset - 1);
+  // [sliceAttributes] follows AppFlowy's default rules: for index k>=1 it returns
+  // attributes of plaintext character (k-1); for k==0, character 0.
+  //
+  // Flutter [TextPosition.offset] is the index of the code unit *after* the caret
+  // (caret sits before that character). With downstream affinity we want the style
+  // of that following character — i.e. plain index `clampedOffset`. That maps to
+  // slice index `clampedOffset + 1` (or 0 when offset is 0; both yield char 0).
+  //
+  // Using `offset - 1` here was off-by-one and made the caret pick the *previous*
+  // run at sup/base boundaries (caret before base text still used superscript).
+  final int sliceProbe =
+      clampedOffset >= plainTextLength
+          ? plainTextLength
+          : (clampedOffset + 1).clamp(0, plainTextLength);
 
   Attributes? attrs;
   try {
-    attrs = delta.sliceAttributes(probeIndex);
+    attrs = delta.sliceAttributes(sliceProbe);
   } catch (_) {
     attrs = null;
   }
@@ -64,7 +75,9 @@ EndOfParagraphCaretMetrics? sloteCaretMetrics({
   if (!isSuperscript && !isSubscript) {
     if (kDebugMode) {
       debugPrint(
-        'DBG-SLOTE-CARET-METRICS skip offset=$clampedOffset keys=${attrs.keys.toList()}',
+        'DBG-SLOTE-CARET-METRICS skip offset=$clampedOffset sliceProbe=$sliceProbe '
+        'plainLen=$plainTextLength keys=${attrs.keys.toList()} '
+        'rawSup=$rawSup rawSub=$rawSub',
       );
     }
     return null;
@@ -99,8 +112,12 @@ EndOfParagraphCaretMetrics? sloteCaretMetrics({
   // position the WidgetSpan on the line, but it makes the caret too tall).
   final edgePaddingPx = isSuperscript ? 0.0 : m.translateY;
 
+  final caretDy = isSuperscript
+      ? m.translateY * SloteSupSubMetrics.superscriptCaretTranslateYFactor
+      : m.translateY;
+
   return EndOfParagraphCaretMetrics(
     height: painter.height + edgePaddingPx,
-    dy: m.translateY,
+    dy: caretDy,
   );
 }

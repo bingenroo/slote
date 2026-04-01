@@ -33,7 +33,7 @@ Future<bool> insertNewLineInType(
         convertToParagraphCommand.execute(editorState);
   }
 
-  await editorState.insertNewLine(
+  return editorState.insertNewLine(
     nodeBuilder: (node) => node.copyWith(
       type: type,
       attributes: {
@@ -42,5 +42,4 @@ Future<bool> insertNewLineInType(
       },
     ),
   );
-  return true;
 }

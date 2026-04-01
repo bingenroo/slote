@@ -57,8 +57,11 @@ CharacterShortcutEvent insertNewLineAfterHeading = CharacterShortcutEvent(
     }
     final transaction = editorState.transaction;
     transaction.insertNode(selection.start.path, paragraphNode());
+    // Inserting at [i] shifts the former node at [i] to [i+1]. The new block
+    // occupies [i], so the caret must stay on `selection.start.path`, not
+    // `.next` (which would land at offset 0 of the heading).
     transaction.afterSelection = Selection.collapsed(
-      Position(path: selection.start.path.next, offset: 0),
+      Position(path: selection.start.path, offset: 0),
     );
     await editorState.apply(transaction);
     return true;

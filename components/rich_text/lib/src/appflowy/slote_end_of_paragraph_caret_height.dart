@@ -99,7 +99,10 @@ EndOfParagraphCaretMetrics? sloteEndOfParagraphCaretMetrics({
       fontSize: baseFontSize * m.fontScale,
       height: null,
     );
-    dy = m.translateY;
+    dy =
+        isSuperscript
+            ? m.translateY * SloteSupSubMetrics.superscriptCaretTranslateYFactor
+            : m.translateY;
     probeTextHeightBehavior = _kSloteScriptCaretTextHeight;
   }
 

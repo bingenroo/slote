@@ -10,7 +10,9 @@ extension TextTransforms on EditorState {
   ///
   /// Then it inserts a new paragraph node. After that, it sets the selection to be at the
   /// beginning of the new paragraph.
-  Future<void> insertNewLine({
+  ///
+  /// Returns whether a transaction was applied (false if the operation was a no-op).
+  Future<bool> insertNewLine({
     Position? position,
     Node Function(Node node)? nodeBuilder,
   }) async {
@@ -19,13 +21,13 @@ extension TextTransforms on EditorState {
 
     // If there is no position, or if the selection is not collapsed, do nothing.
     if (position == null || !(selection?.isCollapsed ?? false)) {
-      return;
+      return false;
     }
 
     final node = getNodeAtPath(position.path);
 
     if (node == null) {
-      return;
+      return false;
     }
 
     // Get the transaction and the path of the next node.
@@ -84,7 +86,8 @@ extension TextTransforms on EditorState {
     transaction.customSelectionType = SelectionType.inline;
 
     // Apply the transaction.
-    return apply(transaction);
+    await apply(transaction);
+    return true;
   }
 
   /// Inserts text at the given position.
