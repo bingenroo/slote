@@ -4,6 +4,7 @@ import 'package:appflowy_editor/appflowy_editor.dart';
 import 'package:appflowy_editor/src/editor/editor_component/service/ime/text_diff.dart';
 import 'package:appflowy_editor/src/editor/editor_component/service/ime/text_input_service.dart';
 import 'package:appflowy_editor/src/editor/util/platform_extension.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
 // string from flutter callback
@@ -18,7 +19,17 @@ class NonDeltaTextInputService extends TextInputService with TextInputClient {
     required super.onPerformAction,
     super.contentInsertionConfiguration,
     super.onFloatingCursor,
+    /// When this returns false, the IME update is ignored and the platform is
+    /// reset to the last known [currentTextEditingValue]. Used on Android to
+    /// drop ghost buffers after block-splitting shortcuts (e.g. Enter).
+    ///
+    /// Argument is [TextEditingValue.unformat] — without the leading IME hack
+    /// space (see [TextEditingValue.format] in this file).
+    this.shouldApplyImeUpdate,
   });
+
+  /// See [NonDeltaTextInputService] constructor.
+  final bool Function(TextEditingValue unformattedProposed)? shouldApplyImeUpdate;
 
   @override
   TextRange? composingTextRange;
@@ -121,12 +132,37 @@ class NonDeltaTextInputService extends TextInputService with TextInputClient {
           ? const Duration(milliseconds: 10)
           : Duration.zero,
       () async {
+        final unformattedProposed = value.unformat();
+        if (shouldApplyImeUpdate != null &&
+            !shouldApplyImeUpdate!(unformattedProposed)) {
+          const msg =
+              'SLOTE-IME: ignored IME update (stale buffer vs editor document)';
+          AppFlowyEditorLog.input.warn(msg);
+          debugPrint(msg);
+          if (_textInputConnection != null && currentTextEditingValue != null) {
+            _textInputConnection!.setEditingState(currentTextEditingValue!);
+          }
+          return;
+        }
+
         final oldValue = _currentTextEditingValue?.copyWith();
-        currentTextEditingValue = value;
+        // Do not set currentTextEditingValue = value before apply(). The IME's
+        // optimistic state often disagrees with the document after handled
+        // shortcuts (newline → new block). attach() sets the canonical value
+        // during apply; pre-assigning `value` invited Android ghost deltas.
         final willApply = await apply(deltas);
         if (!willApply) {
           currentTextEditingValue = oldValue;
-          _textInputConnection?.setEditingState(oldValue!);
+          if (oldValue != null) {
+            _textInputConnection?.setEditingState(oldValue);
+          }
+        } else if (_currentTextEditingValue == oldValue) {
+          // No attach() refreshed IME state during this transaction.
+          final formatted = value.format();
+          if (formatted.isValid()) {
+            currentTextEditingValue = formatted;
+            _textInputConnection?.setEditingState(formatted);
+          }
         }
       },
     );

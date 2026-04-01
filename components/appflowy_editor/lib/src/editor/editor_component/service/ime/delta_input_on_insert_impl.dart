@@ -10,6 +10,11 @@ Future<void> onInsert(
   List<CharacterShortcutEvent> characterShortcutEvents,
 ) async {
   AppFlowyEditorLog.input.debug('onInsert: $insertion');
+  AppFlowyEditorLog.input.debug(
+    'SLOTE-IME onInsert text="${insertion.textInserted}" '
+    'composingCollapsed=${insertion.composing.isCollapsed} '
+    'sel=${editorState.selection}',
+  );
 
   final textInserted = insertion.textInserted;
 
@@ -30,6 +35,9 @@ Future<void> onInsert(
     );
 
     if (execution) {
+      AppFlowyEditorLog.input.debug(
+        'SLOTE-IME onInsert handled by character shortcut → sel=${editorState.selection}',
+      );
       editorState.sliceUpcomingAttributes = false;
       return;
     }
@@ -69,12 +77,18 @@ Future<void> onInsert(
   final afterSelection = Selection(
     start: Position(
       path: node.path,
-      offset: insertion.selection.baseOffset,
+      offset: selection.startIndex + textInserted.length,
     ),
     end: Position(
       path: node.path,
-      offset: insertion.selection.extentOffset,
+      offset: selection.startIndex + textInserted.length,
     ),
+  );
+
+  AppFlowyEditorLog.input.debug(
+    'SLOTE-IME onInsert IME path path=${node.path} '
+    'insOffset=${selection.startIndex} imeBase=${insertion.selection.baseOffset} '
+    'afterSelection=$afterSelection',
   );
 
   final transaction = editorState.transaction

@@ -230,6 +230,78 @@ class KeyboardServiceWidgetState extends State<KeyboardServiceWidget>
     previousSelection = selection;
   }
 
+  /// Plain text of the nearest **non-empty** block before [path], skipping empty
+  /// paragraphs (e.g. blank lines from repeated Enter). Android may still hold
+  /// that block's text in the IME when the cursor sits below one or more empty
+  /// blocks; comparing only the immediate [path.previous] misses that and lets
+  /// ghost deltas through (caret jumps / typing stuck after 2+ line breaks).
+  String _nearestNonEmptyPrecedingPlain(Path path) {
+    var walk = path.previous;
+    for (var i = 0; i < 64; i++) {
+      final n = editorState.getNodeAtPath(walk);
+      final p = n?.delta?.toPlainText() ?? '';
+      if (p.isNotEmpty) {
+        return p;
+      }
+      final next = walk.previous;
+      if (next.equals(walk)) {
+        break;
+      }
+      walk = next;
+    }
+    return '';
+  }
+
+  /// Android often echoes the **previous** block's buffer after Enter splits
+  /// the document; applying that delta jumps the caret back (see SLOTE-IME logs).
+  bool _shouldApplyAndroidImeUpdate(TextEditingValue pu) {
+    final sel = editorState.selection;
+    if (sel == null || !sel.isCollapsed) {
+      return true;
+    }
+    final path = sel.start.path;
+    if (path.isEmpty || path.last <= 0) {
+      return true;
+    }
+
+    final prevPlain = _nearestNonEmptyPrecedingPlain(path);
+    if (prevPlain.isEmpty) {
+      return true;
+    }
+
+    final node = editorState.getNodeAtPath(path);
+    final delta = node?.delta;
+    if (delta == null) {
+      return true;
+    }
+
+    final plainLen = delta.toPlainText().length;
+    if (plainLen > 0) {
+      return true;
+    }
+
+    if (pu.text.isEmpty) {
+      return true;
+    }
+
+    final imeText = pu.text;
+    final matchesPrev = imeText == prevPlain || imeText == '$prevPlain\n';
+    if (!matchesPrev) {
+      return true;
+    }
+
+    final extent = pu.selection.extentOffset;
+    if (extent >= prevPlain.length) {
+      final msg =
+          'SLOTE-IME filter: REJECT ghost buffer path=$path '
+          'prevLen=${prevPlain.length} imeLen=${imeText.length} extent=$extent';
+      AppFlowyEditorLog.input.warn(msg);
+      debugPrint(msg);
+      return false;
+    }
+    return true;
+  }
+
   void _attachTextInputService(Selection selection) {
     final textEditingValue = _getCurrentTextEditingValue(selection);
     AppFlowyEditorLog.editor.debug(
@@ -242,7 +314,7 @@ class KeyboardServiceWidgetState extends State<KeyboardServiceWidget>
           viewId: View.of(context).viewId,
           enableDeltaModel: false,
           inputType: TextInputType.multiline,
-          textCapitalization: TextCapitalization.sentences,
+          textCapitalization: TextCapitalization.none,
           inputAction: TextInputAction.newline,
           keyboardAppearance: Theme.of(context).brightness,
           allowedMimeTypes:
@@ -287,11 +359,18 @@ class KeyboardServiceWidgetState extends State<KeyboardServiceWidget>
       // Remove the last '\n'.
       text = text.substring(0, text.length - 1);
 
+      // The editor's selection offsets are in document delta space, which can
+      // temporarily drift from plainText length around block-splitting (Enter).
+      // If we send an invalid selection to the platform IME, Android may stop
+      // accepting further edits after the first character.
+      final base = selection.startIndex.clamp(0, text.length);
+      final extent = selection.endIndex.clamp(0, text.length);
+
       return TextEditingValue(
         text: text,
         selection: TextSelection(
-          baseOffset: selection.startIndex,
-          extentOffset: selection.endIndex,
+          baseOffset: base,
+          extentOffset: extent,
         ),
         composing: composingTextRange,
       );
@@ -360,6 +439,8 @@ class KeyboardServiceWidgetState extends State<KeyboardServiceWidget>
 
   NonDeltaTextInputService buildTextInputService() {
     return NonDeltaTextInputService(
+      shouldApplyImeUpdate:
+          PlatformExtension.isAndroid ? _shouldApplyAndroidImeUpdate : null,
       onInsert: (insertion) async {
         for (final interceptor in interceptors) {
           final result = await interceptor.interceptInsert(
