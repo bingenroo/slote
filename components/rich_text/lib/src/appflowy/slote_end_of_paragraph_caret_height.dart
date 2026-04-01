@@ -75,6 +75,13 @@ EndOfParagraphCaretMetrics? sloteEndOfParagraphCaretMetrics({
   final toggledDiffersFromLastRun =
       (toggledSup != endRunSup) || (toggledSub != endRunSub);
 
+  /// [toggleAttribute] left the key at explicit `false` while the last run is
+  /// still script — next character uses body; caret must not stay on the
+  /// script line or snap to the previous glyph there.
+  final pendingBodyAfterScriptOff = caretAtEndOfThisNode &&
+      ((endRunSup && toggled[kSloteSuperscriptAttribute] == false) ||
+          (endRunSub && toggled[kSloteSubscriptAttribute] == false));
+
   /// Next insert uses toggled sub/sup but the last committed run is still body
   /// (or the other script). [RenderParagraph]'s EOT caret stays on the body
   /// line — use [subscriptCaretTranslateYPendingBodyBaseline] / sup nudge and
@@ -89,7 +96,10 @@ EndOfParagraphCaretMetrics? sloteEndOfParagraphCaretMetrics({
 
   bool rawSup;
   bool rawSub;
-  if (caretAtEndOfThisNode && (toggledSup || toggledSub)) {
+  if (pendingBodyAfterScriptOff) {
+    rawSup = false;
+    rawSub = false;
+  } else if (caretAtEndOfThisNode && (toggledSup || toggledSub)) {
     rawSup = toggledSup;
     rawSub = toggledSub;
   } else {
@@ -112,12 +122,22 @@ EndOfParagraphCaretMetrics? sloteEndOfParagraphCaretMetrics({
   final ignorePreviousCaretYAnchor = caretAtEndOfThisNode &&
       (pendingSubOnBodyBaseline ||
           pendingSupOnBodyBaseline ||
+          pendingBodyAfterScriptOff ||
           ((toggledSup || toggledSub) && toggledDiffersFromLastRun));
 
   double dy = 0.0;
   double edgePaddingPx = 0.0;
   var probeStyle = bodyStyle;
   var probeTextHeightBehavior = const TextHeightBehavior();
+
+  // Next insert is body but the last committed glyph is still script. Use the
+  // same tight vertical box as mid-line body carets ([RenderParagraph] EOT at a
+  // body offset), not the full cfg.line-height strut (~fontSize * lineHeight).
+  if (pendingBodyAfterScriptOff) {
+    probeStyle = bodyStyle.copyWith(height: null);
+    probeTextHeightBehavior = _kSloteScriptCaretTextHeight;
+  }
+
   if (isSuperscript || isSubscript) {
     final m = isSuperscript
         ? SloteSupSubMetrics.superscript(context, baseFontSize: baseFontSize)

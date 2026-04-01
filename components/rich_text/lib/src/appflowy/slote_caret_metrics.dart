@@ -74,6 +74,17 @@ EndOfParagraphCaretMetrics? sloteCaretMetrics({
   var rawSub = _enabled(attrs[kSloteSubscriptAttribute]);
   final sliceHadSubscript = rawSub;
 
+  // [toggleAttribute] stores explicit `false` when turning script off at a
+  // collapsed caret; the slice still reflects the committed run until the user
+  // types. Caret should match body (next insert), not the script box.
+  if (selection?.isCollapsed == true) {
+    final supExplicitOff = toggled[kSloteSuperscriptAttribute] == false;
+    final subExplicitOff = toggled[kSloteSubscriptAttribute] == false;
+    if ((rawSup && supExplicitOff) || (rawSub && subExplicitOff)) {
+      return null;
+    }
+  }
+
   // If we're in "pending typing style" mode, that should drive caret metrics.
   if (selection?.isCollapsed == true && (toggledSup || toggledSub)) {
     rawSup = toggledSup;

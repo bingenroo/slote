@@ -275,6 +275,7 @@ class _AppFlowyRichTextState extends State<AppFlowyRichText>
             : null;
 
     var usedEndOfParagraphResolver = false;
+    var eotIgnoresPreviousCaretAnchor = false;
     final eotMetricsResolver =
         widget.editorState.editorStyle.endOfParagraphCaretMetrics;
     if (isAtEnd && eotMetricsResolver != null) {
@@ -286,6 +287,7 @@ class _AppFlowyRichTextState extends State<AppFlowyRichText>
         textStyleConfiguration: textStyleConfiguration,
       );
       if (resolved != null) {
+        eotIgnoresPreviousCaretAnchor = resolved.ignorePreviousCaretYAnchor;
         cursorHeight = resolved.height;
         // At EOT, RenderParagraph may place the caret using full-line baseline
         // even when the last run is a WidgetSpan with a different baseline.
@@ -350,7 +352,14 @@ class _AppFlowyRichTextState extends State<AppFlowyRichText>
 
     // Final guard: never allow the boundary caret to be taller than the last
     // in-text caret height on that line.
-    if (previousCaretHeight != null && cursorHeight != null) {
+    //
+    // Skip when [EndOfParagraphCaretMetrics.ignorePreviousCaretYAnchor] was
+    // set: the resolver already chose body / pending-insert metrics. Capping
+    // by the previous glyph (especially subscript's short caret) would clip
+    // the I-beam after toggling script off.
+    if (previousCaretHeight != null &&
+        cursorHeight != null &&
+        !eotIgnoresPreviousCaretAnchor) {
       cursorHeight = min(cursorHeight, previousCaretHeight);
     }
 

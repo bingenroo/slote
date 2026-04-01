@@ -154,5 +154,153 @@ void main() {
       expect(inSup, isNotNull);
     },
   );
+
+  testWidgets(
+    'sloteCaretMetrics returns null when superscript toggled off (pending body insert)',
+    (tester) async {
+      late BuildContext ctx;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Builder(
+            builder: (context) {
+              ctx = context;
+              return const SizedBox.shrink();
+            },
+          ),
+        ),
+      );
+
+      final es = EditorState(
+        document: Document.fromJson({
+          'document': {
+            'type': 'page',
+            'children': [
+              {
+                'type': 'paragraph',
+                'data': {
+                  'delta': [
+                    {'insert': 'ab'},
+                    {
+                      'insert': 'cd',
+                      'attributes': {kSloteSuperscriptAttribute: true},
+                    },
+                  ],
+                },
+              },
+            ],
+          },
+        }),
+      );
+      es.editorStyle = const EditorStyle.mobile();
+      es.selection =
+          Selection.single(path: [0], startOffset: 3, endOffset: 3).normalized;
+      es.updateToggledStyle(kSloteSuperscriptAttribute, false);
+
+      final node = es.getNodeAtPath([0]);
+      expect(node, isNotNull);
+
+      final cfg = TextStyleConfiguration(
+        text: const TextStyle(fontSize: 16),
+      );
+
+      final m = sloteCaretMetrics(
+        context: ctx,
+        editorState: es,
+        node: node!,
+        position: Position(path: [0], offset: 3),
+        textStyleConfiguration: cfg,
+      );
+      expect(m, isNull);
+    },
+  );
+
+  testWidgets(
+    'sloteEndOfParagraphCaretMetrics uses body metrics when sup toggled off at EOT',
+    (tester) async {
+      late BuildContext ctx;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Builder(
+            builder: (context) {
+              ctx = context;
+              return const SizedBox.shrink();
+            },
+          ),
+        ),
+      );
+
+      final es = EditorState(
+        document: Document.fromJson({
+          'document': {
+            'type': 'page',
+            'children': [
+              {
+                'type': 'paragraph',
+                'data': {
+                  'delta': [
+                    {'insert': 'ab'},
+                    {
+                      'insert': 'cd',
+                      'attributes': {kSloteSuperscriptAttribute: true},
+                    },
+                  ],
+                },
+              },
+            ],
+          },
+        }),
+      );
+      es.editorStyle = const EditorStyle.mobile();
+      es.selection =
+          Selection.single(path: [0], startOffset: 4, endOffset: 4).normalized;
+      es.updateToggledStyle(kSloteSuperscriptAttribute, false);
+
+      final node = es.getNodeAtPath([0]);
+      expect(node, isNotNull);
+
+      final cfg = TextStyleConfiguration(
+        text: const TextStyle(fontSize: 16),
+        lineHeight: 1.5,
+      );
+
+      final m = sloteEndOfParagraphCaretMetrics(
+        context: ctx,
+        editorState: es,
+        node: node!,
+        textStyleConfiguration: cfg,
+      );
+      expect(m, isNotNull);
+      expect(m!.ignorePreviousCaretYAnchor, isTrue);
+      expect(m.dy, 0.0);
+
+      const tightBodyHeightBehavior = TextHeightBehavior(
+        applyHeightToFirstAscent: false,
+        applyHeightToLastDescent: false,
+      );
+      final tightBodyPainter = TextPainter(
+        text: TextSpan(
+          text: 'M',
+          style: cfg.text.copyWith(height: null),
+        ),
+        textDirection: TextDirection.ltr,
+        textHeightBehavior: tightBodyHeightBehavior,
+      )..layout();
+      expect(
+        (m.height - tightBodyPainter.height).abs(),
+        lessThan(0.02),
+      );
+
+      final fullLinePainter = TextPainter(
+        text: TextSpan(
+          text: 'M',
+          style: cfg.text.copyWith(height: cfg.lineHeight),
+        ),
+        textDirection: TextDirection.ltr,
+      )..layout();
+      expect(m.height, lessThan(fullLinePainter.height));
+    },
+  );
 }
 
