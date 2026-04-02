@@ -80,7 +80,14 @@ EndOfParagraphCaretMetrics? sloteCaretMetrics({
   if (selection?.isCollapsed == true) {
     final supExplicitOff = toggled[kSloteSuperscriptAttribute] == false;
     final subExplicitOff = toggled[kSloteSubscriptAttribute] == false;
-    if ((rawSup && supExplicitOff) || (rawSub && subExplicitOff)) {
+    // When switching sup <-> sub we intentionally set the opposite key to
+    // explicit `false` to override slice attributes on the next insert. In that
+    // case we must NOT treat the explicit-off as "turn script off to body".
+    final switchingToSup = toggledSup && subExplicitOff;
+    final switchingToSub = toggledSub && supExplicitOff;
+    if (!switchingToSup &&
+        !switchingToSub &&
+        ((rawSup && supExplicitOff) || (rawSub && subExplicitOff))) {
       return null;
     }
   }

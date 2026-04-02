@@ -79,8 +79,14 @@ EndOfParagraphCaretMetrics? sloteEndOfParagraphCaretMetrics({
   /// still script — next character uses body; caret must not stay on the
   /// script line or snap to the previous glyph there.
   final pendingBodyAfterScriptOff = caretAtEndOfThisNode &&
-      ((endRunSup && toggled[kSloteSuperscriptAttribute] == false) ||
-          (endRunSub && toggled[kSloteSubscriptAttribute] == false));
+      ((endRunSup &&
+              toggled[kSloteSuperscriptAttribute] == false &&
+              // If switching to sub, don't force body.
+              toggled[kSloteSubscriptAttribute] != true) ||
+          (endRunSub &&
+              toggled[kSloteSubscriptAttribute] == false &&
+              // If switching to sup, don't force body.
+              toggled[kSloteSuperscriptAttribute] != true));
 
   /// Next insert uses toggled sub/sup but the last committed run is still body
   /// (or the other script). [RenderParagraph]'s EOT caret stays on the body

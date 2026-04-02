@@ -161,7 +161,12 @@ Future<void> sloteToggleSuperscript(EditorState editorState) async {
 
   if (rawSelection.isCollapsed) {
     await editorState.toggleAttribute(kSloteSuperscriptAttribute);
-    if (editorState.toggledStyle[kSloteSuperscriptAttribute] == true) {
+    final sup = editorState.toggledStyle[kSloteSuperscriptAttribute];
+    if (sup == true) {
+      // `insertText` merges slice attrs then `toggledStyle`; explicit `false`
+      // clears the opposite script from the slice so sub/sup stay exclusive.
+      editorState.updateToggledStyle(kSloteSubscriptAttribute, false);
+    } else if (sup == false) {
       editorState.updateToggledStyle(kSloteSubscriptAttribute, null);
     }
     return;
@@ -206,7 +211,10 @@ Future<void> sloteToggleSubscript(EditorState editorState) async {
 
   if (rawSelection.isCollapsed) {
     await editorState.toggleAttribute(kSloteSubscriptAttribute);
-    if (editorState.toggledStyle[kSloteSubscriptAttribute] == true) {
+    final sub = editorState.toggledStyle[kSloteSubscriptAttribute];
+    if (sub == true) {
+      editorState.updateToggledStyle(kSloteSuperscriptAttribute, false);
+    } else if (sub == false) {
       editorState.updateToggledStyle(kSloteSuperscriptAttribute, null);
     }
     return;

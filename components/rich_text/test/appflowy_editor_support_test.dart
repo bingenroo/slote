@@ -407,6 +407,66 @@ void main() {
       expect(encoded, contains(kSloteSuperscriptAttribute));
       expect(encoded, isNot(contains(kSloteSubscriptAttribute)));
     });
+
+    test(
+      'collapsed caret after superscript typing: sub toggle is exclusive',
+      () async {
+        ensureSloteAppFlowyRichTextKeysRegistered();
+        final es = EditorState.blank(withInitialText: false);
+        final setup = es.transaction;
+        setup.insertNode([0], paragraphNode(text: 'ab'));
+        await es.apply(setup);
+
+        es.selection =
+            Selection.single(path: [0], startOffset: 0, endOffset: 2).normalized;
+        await sloteToggleSuperscript(es);
+
+        var node = es.getNodeAtPath([0]);
+        var tx = es.transaction;
+        tx.insertText(
+          node!,
+          2,
+          'c',
+          toggledAttributes: es.toggledStyle,
+        );
+        await es.apply(tx);
+
+        es.selection =
+            Selection.single(path: [0], startOffset: 3, endOffset: 3).normalized;
+
+        await sloteToggleSubscript(es);
+
+        expect(es.toggledStyle[kSloteSubscriptAttribute], isTrue);
+        expect(es.toggledStyle[kSloteSuperscriptAttribute], isFalse);
+        expect(
+          sloteIsFormatKeyActive(es, kSloteSuperscriptAttribute),
+          isFalse,
+        );
+        expect(sloteIsFormatKeyActive(es, kSloteSubscriptAttribute), isTrue);
+
+        node = es.getNodeAtPath([0]);
+        tx = es.transaction;
+        tx.insertText(
+          node!,
+          3,
+          'd',
+          toggledAttributes: es.toggledStyle,
+        );
+        await es.apply(tx);
+
+        final delta = es.getNodeAtPath([0])!.delta!;
+        TextInsert? dOp;
+        for (final op in delta) {
+          if (op is TextInsert && op.text == 'd') {
+            dOp = op;
+            break;
+          }
+        }
+        expect(dOp, isNotNull);
+        expect(dOp!.attributes![kSloteSubscriptAttribute], isTrue);
+        expect(dOp.attributes![kSloteSuperscriptAttribute], isNot(isTrue));
+      },
+    );
   });
 
   group('Caret typing style sync', () {

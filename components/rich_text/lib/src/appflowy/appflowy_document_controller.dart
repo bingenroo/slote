@@ -84,6 +84,16 @@ class RichTextEditorController {
     final node = editorState.getNodeAtPath(selection.start.path);
     final delta = node?.delta;
     final toggled = editorState.toggledStyle;
+    // If the user explicitly toggled sup/sub at a collapsed caret, respect that
+    // intent. The IME insert path merges slice attrs then `toggledStyle`, and
+    // our toggle helpers rely on explicit `false` to override a script slice.
+    //
+    // AppFlowy clears `toggledStyle` after applying a transaction; in that case
+    // this guard is false and we restore from slice attrs for continued typing.
+    if (toggled.containsKey(kSloteSuperscriptAttribute) ||
+        toggled.containsKey(kSloteSubscriptAttribute)) {
+      return;
+    }
     final currSup = toggled[kSloteSuperscriptAttribute] == true;
     final currSub = toggled[kSloteSubscriptAttribute] == true;
 

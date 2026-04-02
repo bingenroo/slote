@@ -1,5 +1,7 @@
 import 'package:appflowy_editor/appflowy_editor.dart';
 
+import 'slote_inline_attributes.dart';
+
 /// Whether [key] (e.g. a [AppFlowyRichTextKeys] partial style or Slote custom
 /// bool attribute) reads as active for toolbar / shortcuts.
 ///
@@ -11,6 +13,18 @@ bool sloteIsFormatKeyActive(EditorState editorState, String key) {
 
   if (selection.isCollapsed) {
     final toggled = editorState.toggledStyle;
+    if (key == kSloteSuperscriptAttribute ||
+        key == kSloteSubscriptAttribute) {
+      final supOn = toggled[kSloteSuperscriptAttribute] == true;
+      final subOn = toggled[kSloteSubscriptAttribute] == true;
+      if (supOn && subOn) {
+        // Matches [sloteTextSpanDecoratorForAttribute] if both appear in attrs.
+        return key == kSloteSuperscriptAttribute;
+      }
+      if (supOn != subOn) {
+        return key == kSloteSuperscriptAttribute ? supOn : subOn;
+      }
+    }
     if (toggled.containsKey(key)) {
       return toggled[key] == true;
     }
