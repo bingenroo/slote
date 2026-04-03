@@ -23,6 +23,7 @@ Entry: `example/lib/main.dart`.
 | Doc | Purpose |
 |-----|---------|
 | **[docs/ROADMAP.md](docs/ROADMAP.md)** | End-to-end roadmap: phases, feature waves (inline, blocks, TOC, media, LaTeX, …), listeners, **undo/redo** vs `components/undo_redo`. |
+| **[docs/SUPERSCRIPT_SUBSCRIPT.md](docs/SUPERSCRIPT_SUBSCRIPT.md)** | **Slote-only** superscript/subscript on AppFlowy: delta keys, toggles, rendering (`WidgetSpan`), caret/EOT hooks, markdown. |
 | **[docs/appflowy-editor-roadmap.md](docs/appflowy-editor-roadmap.md)** | AppFlowy-specific checklist (Phases 1–4 + short deferred list). |
 | **[docs/markdown-rendering.md](docs/markdown-rendering.md)** | Markdown rendering notes (**legacy Quill/Markdown; archived**). |
 | **[docs/tables.md](docs/tables.md)** | Tables overview (**legacy Quill/Markdown; archived**). |

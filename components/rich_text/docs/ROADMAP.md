@@ -26,6 +26,7 @@ This document is the **canonical plan** for Slote’s rich-text subsystem: edito
 | **Active spike**               | [`example/lib/main.dart`](../example/lib/main.dart) — `EditorState` from JSON, `AppFlowyEditor`, fixed **BIUS** toolbar (`toggleAttribute` + caret-aware active state). |
 | **Phase (AppFlowy checklist)** | **Phases 3–4 complete** in `package:rich_text` + example: `RichTextEditorController`, debounced JSON, shared BIUS entry points + command shortcuts.                     |
 | **Wave C (structural blocks)** | **C1–C5 delivered** (headings, lists, quote, divider, code block, callout) — see [Wave C](#wave-c--structural-blocks-split) below. **C6–C7** (tables, images) still **not** product/editor milestones; markdown codec tests cover table/image round-trip separately. |
+| **Superscript / subscript**    | **Done (Wave B)** — Slote-only extension on AppFlowy (delta keys, `WidgetSpan` renderer, caret/EOT fork hooks, markdown). Implementation guide: [SUPERSCRIPT_SUBSCRIPT.md](SUPERSCRIPT_SUBSCRIPT.md). |
 | **Main Slote app**             | Note body still uses plain text / Quill at root; **integration** of this editor is a separate milestone (see PRD).                                                      |
 
 ---
@@ -47,7 +48,7 @@ Phases build on each other; run the example app and tests after each major phase
 
 | Feature                     | Notes                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
 | --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Superscript / subscript** | **Implemented (Phase 1)** in `package:rich_text`: custom delta attributes + rendering via `sloteTextSpanDecoratorForAttribute`, plus selection helpers (`sloteToggleSuperscript` / `sloteToggleSubscript`). Markdown export/import supported via `sloteDocumentToMarkdown` / `sloteMarkdownToDocument` using HTML tags (`<sup>` / `<sub>`). **Open UX/editing gaps** are tracked below (deferred).                                                                                                        |
+| **Superscript / subscript** | **Done** — See [SUPERSCRIPT_SUBSCRIPT.md](SUPERSCRIPT_SUBSCRIPT.md) for architecture (attributes, toggles, `toggledStyle` sync, `WidgetSpan` layout, caret metrics, markdown). Example wires `EditorStyle.copyWith(textSpanDecorator: …, caretMetrics: …, endOfParagraphCaretHeight: …)`.                                                                                                        |
 | **Links**                   | Inline `href` (or package equivalent); dialog or paste handler. **Current behavior:** quick tap opens the URL in the system default browser; long-press opens the link format drawer.                                                                                                                                                                                                                                                                                                                     |
 | **Font size, font family**  | **Implemented (Phase 1)**: selection helpers apply AppFlowy inline attributes `font_size` / `font_family` (`sloteApplyFontSize` / `sloteApplyFontFamily`). Markdown export/import supported via `<span font_size=\"...\" font_family='\"...\"'>...` wrapper from `sloteDocumentToMarkdown`.                                                                                                                                                                                                               |
 | **Text color, highlight**   | Use / extend built-in color attributes where available. **Near-term focus — picker UX:** match **Google Docs–style mobile** behavior: a **bottom sheet** (slide-up formatting panel from the bottom; often described informally as a mobile “formatting drawer”) with swatches/options—not separate modal dialogues for raw hex input; desktop can use compact menus or the same sheet for parity. **Touchpoint:** [`example/lib/editor/format_toolbar.dart`](../example/lib/editor/format_toolbar.dart). |
@@ -56,16 +57,15 @@ Phases build on each other; run the example app and tests after each major phase
 
 <a id="sup-sub-known-limitations"></a>
 
-#### Superscript / subscript — known limitations (deferred)
+#### Superscript / subscript — remaining limitations
 
-These issues show up when formatting **one or more selected characters** (toolbar / toggles). They are **documented for later work**; no fix is implied by this list.
+Details and diagrams of the implementation live in [SUPERSCRIPT_SUBSCRIPT.md](SUPERSCRIPT_SUBSCRIPT.md). The items below are the **current** product/technical boundaries (not an old punch-list).
 
-1. **No “typing mode” from a caret** — Superscript/subscript cannot be turned on with only a **collapsed caret** (no selection). The user must select text first. **Expected:** toggle sup/sub, then **continue typing** at that level (like Docs/Word).
-2. **Cannot extend sup/sub after a single-character span** — After making a **single character** superscript or subscript, **additional typing** does not stay at that level; new characters only appear at **normal** level, typically **before** the sup/sub run. **Expected:** the caret at the end of a sup/sub run should allow typing **more** sup/sub text.
-3. **Caret skips sup/sub runs when navigating** — With a range formatted as sup/sub, **per-character caret movement** does not step **inside** the formatted run; the caret tends to **jump past** it to adjacent same-level text. **Expected:** arrow keys and taps should allow **editing inside** sup/sub spans character by character.
-4. **No nested superscript or subscript** — Nested sup/sup, sub/sub, or sup/sub combinations are **not** supported in the model or UI.
+1. **No nested superscript or subscript** — The model keeps at most one script level; sup/sup, sub/sub, and sup-inside-sub are out of scope.
+2. **Link + script** — A hyperlink with superscript/subscript uses **one** `WidgetSpan` for the whole run (gesture handling for links). Per-character caret stepping matches **plain** script runs (one placeholder per UTF-16 unit) but not all **link+script** multi-character cases.
+3. **Residual editor/fork edge cases** — Caret height at paragraph end, mixed script/body lines, and IME-specific behavior are mitigated by `sloteCaretMetrics` / `sloteEndOfParagraphCaretHeight` on the Slote fork; corner cases may still appear.
 
-**Code touchpoints (for future fixes):** `sloteToggleSuperscript` / `sloteToggleSubscript` and selection guards in [`appflowy_editor_support.dart`](../lib/src/appflowy/appflowy_editor_support.dart); caret / `toggledStyle` sync in [`appflowy_document_controller.dart`](../lib/src/appflowy/appflowy_document_controller.dart); rendering in [`slote_text_span_decorator.dart`](../lib/src/appflowy/slote_text_span_decorator.dart) (`WidgetSpan` may affect layout/caret behavior vs plain `TextSpan`).
+**Primary code:** [`slote_inline_attributes.dart`](../lib/src/appflowy/slote_inline_attributes.dart), [`appflowy_editor_support.dart`](../lib/src/appflowy/appflowy_editor_support.dart) (`sloteToggleSuperscript` / `sloteToggleSubscript`), [`appflowy_document_controller.dart`](../lib/src/appflowy/appflowy_document_controller.dart) (`_syncCaretSupSubTypingStyle`), [`slote_text_span_decorator.dart`](../lib/src/appflowy/slote_text_span_decorator.dart), [`slote_sup_sub_metrics.dart`](../lib/src/appflowy/slote_sup_sub_metrics.dart), [`slote_caret_metrics.dart`](../lib/src/appflowy/slote_caret_metrics.dart), [`slote_end_of_paragraph_caret_height.dart`](../lib/src/appflowy/slote_end_of_paragraph_caret_height.dart), [`slote_markdown_codec.dart`](../lib/src/appflowy/slote_markdown_codec.dart).
 
 ### Wave C — Structural blocks (split)
 
@@ -173,6 +173,7 @@ Use **narrow** signals for interactive toolbars; **one debounced pipe** for expe
 
 ## Related Slote docs
 
+- **[SUPERSCRIPT_SUBSCRIPT.md](SUPERSCRIPT_SUBSCRIPT.md)** — superscript/subscript (Slote extension on AppFlowy).
 - **[PRD.md](../../../PRD.md)** — product scope, component inventory, MVP alignment.
 - **[README.md](../README.md)** — package overview and links.
 

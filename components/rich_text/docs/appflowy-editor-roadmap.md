@@ -83,6 +83,8 @@ The numbered list below is the **original** narrow scope; the **full** backlog (
 
 ## Slote fork: caret height at EOT & sup/sub layout
 
+End-to-end **feature** documentation (delta keys, toggles, markdown, app wiring): [SUPERSCRIPT_SUBSCRIPT.md](SUPERSCRIPT_SUBSCRIPT.md).
+
 The app uses a **vendored** [`components/appflowy_editor`](../../appflowy_editor) (see [ROADMAP.md](ROADMAP.md) → COMPLIANCE). These hooks exist only in the fork:
 
 | Behavior | What we did | Where |

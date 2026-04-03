@@ -150,10 +150,13 @@ Selection _sloteClampSelectionToNodeText(
   ).normalized;
 }
 
-/// Toggle superscript on a **non-collapsed** selection.
+/// Toggle superscript for the current selection or **typing style** (collapsed caret).
 ///
-/// - If the whole selection is already superscript, clears it.
-/// - Otherwise sets superscript and clears subscript.
+/// **Collapsed:** updates `toggledStyle` via `toggleAttribute`, and clears the opposite
+/// script with `updateToggledStyle` so sup/sub stay mutually exclusive.
+///
+/// **Range:** if every character in selection is superscript, clears it; otherwise sets
+/// superscript and clears subscript on the range, then collapses to the end.
 Future<void> sloteToggleSuperscript(EditorState editorState) async {
   ensureSloteAppFlowyRichTextKeysRegistered();
   final rawSelection = editorState.selection;
@@ -200,10 +203,9 @@ Future<void> sloteToggleSuperscript(EditorState editorState) async {
       ).normalized;
 }
 
-/// Toggle subscript on a **non-collapsed** selection.
+/// Toggle subscript for the current selection or **typing style** (collapsed caret).
 ///
-/// - If the whole selection is already subscript, clears it.
-/// - Otherwise sets subscript and clears superscript.
+/// Same behavior as [sloteToggleSuperscript] but for `kSloteSubscriptAttribute`.
 Future<void> sloteToggleSubscript(EditorState editorState) async {
   ensureSloteAppFlowyRichTextKeysRegistered();
   final rawSelection = editorState.selection;
