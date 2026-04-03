@@ -121,13 +121,6 @@ class RichTextEditorController {
     // Sup and sub are mutually exclusive; prefer superscript if corrupted.
     if (desiredSup) desiredSub = false;
 
-    if (kDebugMode) {
-      debugPrint(
-        'DBG-SUPSUB-SYNC offset=${selection.start.offset} '
-        'currSup=$currSup currSub=$currSub desiredSup=$desiredSup desiredSub=$desiredSub',
-      );
-    }
-
     if (desiredSup == currSup && desiredSub == currSub) return;
 
     // Do not use [EditorState.toggleAttribute] for a collapsed caret here.

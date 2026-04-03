@@ -1,6 +1,5 @@
 import 'package:appflowy_editor/appflowy_editor.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
 
 import 'slote_inline_attributes.dart';
 import 'slote_sup_sub_metrics.dart';
@@ -105,13 +104,13 @@ EndOfParagraphCaretMetrics? sloteCaretMetrics({
   final isSuperscript = rawSup && !rawSub;
   final isSubscript = rawSub && !rawSup;
   if (!isSuperscript && !isSubscript) {
-    if (kDebugMode) {
-      debugPrint(
-        'DBG-SLOTE-CARET-METRICS skip offset=$clampedOffset sliceProbe=$sliceProbe '
-        'plainLen=$plainTextLength keys=${attrs.keys.toList()} '
-        'rawSup=$rawSup rawSub=$rawSub',
-      );
-    }
+    // if (kDebugMode) {
+    //   debugPrint(
+    //     'DBG-SLOTE-CARET-METRICS skip offset=$clampedOffset sliceProbe=$sliceProbe '
+    //     'plainLen=$plainTextLength keys=${attrs.keys.toList()} '
+    //     'rawSup=$rawSup rawSub=$rawSub',
+    //   );
+    // }
     return null;
   }
 

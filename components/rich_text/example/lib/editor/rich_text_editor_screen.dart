@@ -3,7 +3,6 @@ import 'dart:convert';
 
 import 'package:appflowy_editor/appflowy_editor.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
 import 'package:rich_text/rich_text.dart';
 
 import 'document_json_log.dart';
@@ -36,9 +35,6 @@ class _RichTextEditorScreenState extends State<RichTextEditorScreen> {
 
   late final RichTextEditorController _controller;
   late final Listenable _formatBarListenable;
-  StreamSubscription<EditorTransactionValue>? _debugTxSub;
-  int _debugSelSeq = 0;
-
   @override
   void initState() {
     super.initState();
@@ -56,30 +52,10 @@ class _RichTextEditorScreenState extends State<RichTextEditorScreen> {
       _controller.undoRedoListenable,
     ]);
 
-    if (kDebugMode) {
-      _controller.editorState.selectionNotifier.addListener(() {
-        final sel = _controller.editorState.selection;
-        final toggled = _controller.editorState.toggledStyle;
-        final sup = toggled[kSloteSuperscriptAttribute] == true;
-        final sub = toggled[kSloteSubscriptAttribute] == true;
-        debugPrint(
-          'DBG[$_debugSelSeq] selection=$sel sup=$sup sub=$sub',
-        );
-        _debugSelSeq++;
-      });
-
-      _debugTxSub = _controller.editorState.transactionStream.listen((event) {
-        final (time, _, options) = event;
-        debugPrint(
-          'DBG-TX time=$time inMemoryUpdate=${options.inMemoryUpdate}',
-        );
-      });
-    }
   }
 
   @override
   void dispose() {
-    _debugTxSub?.cancel();
     _controller.dispose();
     super.dispose();
   }

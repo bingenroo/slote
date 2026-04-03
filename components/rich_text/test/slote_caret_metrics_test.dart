@@ -302,5 +302,202 @@ void main() {
       expect(m.height, lessThan(fullLinePainter.height));
     },
   );
+
+  testWidgets(
+    'sloteEndOfParagraphCaretMetrics EOT: last char sup only — snap, dy 0',
+    (tester) async {
+      late BuildContext ctx;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Builder(
+            builder: (context) {
+              ctx = context;
+              return const SizedBox.shrink();
+            },
+          ),
+        ),
+      );
+
+      // Plain: "ab" body + "c" superscript. Wrong sliceIndex would read "b" as end run.
+      final es = EditorState(
+        document: Document.fromJson({
+          'document': {
+            'type': 'page',
+            'children': [
+              {
+                'type': 'paragraph',
+                'data': {
+                  'delta': [
+                    {'insert': 'ab'},
+                    {
+                      'insert': 'c',
+                      'attributes': {kSloteSuperscriptAttribute: true},
+                    },
+                  ],
+                },
+              },
+            ],
+          },
+        }),
+      );
+      es.editorStyle = const EditorStyle.mobile();
+      es.selection =
+          Selection.single(path: [0], startOffset: 3, endOffset: 3).normalized;
+      es.updateToggledStyle(kSloteSuperscriptAttribute, true);
+      es.updateToggledStyle(kSloteSubscriptAttribute, false);
+
+      final node = es.getNodeAtPath([0]);
+      expect(node, isNotNull);
+
+      final cfg = TextStyleConfiguration(
+        text: const TextStyle(fontSize: 16),
+        lineHeight: 1.5,
+      );
+
+      final m = sloteEndOfParagraphCaretMetrics(
+        context: ctx,
+        editorState: es,
+        node: node!,
+        textStyleConfiguration: cfg,
+      );
+      expect(m, isNotNull);
+      expect(m!.ignorePreviousCaretYAnchor, isFalse);
+      expect(m.dy, 0.0);
+    },
+  );
+
+  testWidgets(
+    'sloteEndOfParagraphCaretMetrics EOT: last char sub only — snap, dy 0',
+    (tester) async {
+      late BuildContext ctx;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Builder(
+            builder: (context) {
+              ctx = context;
+              return const SizedBox.shrink();
+            },
+          ),
+        ),
+      );
+
+      final es = EditorState(
+        document: Document.fromJson({
+          'document': {
+            'type': 'page',
+            'children': [
+              {
+                'type': 'paragraph',
+                'data': {
+                  'delta': [
+                    {'insert': 'ab'},
+                    {
+                      'insert': 'c',
+                      'attributes': {kSloteSubscriptAttribute: true},
+                    },
+                  ],
+                },
+              },
+            ],
+          },
+        }),
+      );
+      es.editorStyle = const EditorStyle.mobile();
+      es.selection =
+          Selection.single(path: [0], startOffset: 3, endOffset: 3).normalized;
+      es.updateToggledStyle(kSloteSubscriptAttribute, true);
+      es.updateToggledStyle(kSloteSuperscriptAttribute, false);
+
+      final node = es.getNodeAtPath([0]);
+      expect(node, isNotNull);
+
+      final cfg = TextStyleConfiguration(
+        text: const TextStyle(fontSize: 16),
+        lineHeight: 1.5,
+      );
+
+      final m = sloteEndOfParagraphCaretMetrics(
+        context: ctx,
+        editorState: es,
+        node: node!,
+        textStyleConfiguration: cfg,
+      );
+      expect(m, isNotNull);
+      expect(m!.ignorePreviousCaretYAnchor, isFalse);
+      expect(m.dy, 0.0);
+    },
+  );
+
+  testWidgets(
+    'sloteEndOfParagraphCaretMetrics EOT: toggled sup after sub run — dy 0, not body-sup nudge',
+    (tester) async {
+      late BuildContext ctx;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Builder(
+            builder: (context) {
+              ctx = context;
+              return const SizedBox.shrink();
+            },
+          ),
+        ),
+      );
+
+      // Body + one superscript char + one subscript char; caret at EOT with
+      // superscript toggled on (next insert is sup after sub — not body→sup).
+      final es = EditorState(
+        document: Document.fromJson({
+          'document': {
+            'type': 'page',
+            'children': [
+              {
+                'type': 'paragraph',
+                'data': {
+                  'delta': [
+                    {'insert': 'ab'},
+                    {
+                      'insert': 'c',
+                      'attributes': {kSloteSuperscriptAttribute: true},
+                    },
+                    {
+                      'insert': 'd',
+                      'attributes': {kSloteSubscriptAttribute: true},
+                    },
+                  ],
+                },
+              },
+            ],
+          },
+        }),
+      );
+      es.editorStyle = const EditorStyle.mobile();
+      es.selection =
+          Selection.single(path: [0], startOffset: 4, endOffset: 4).normalized;
+      es.updateToggledStyle(kSloteSuperscriptAttribute, true);
+      es.updateToggledStyle(kSloteSubscriptAttribute, false);
+
+      final node = es.getNodeAtPath([0]);
+      expect(node, isNotNull);
+
+      final cfg = TextStyleConfiguration(
+        text: const TextStyle(fontSize: 16),
+        lineHeight: 1.5,
+      );
+
+      final m = sloteEndOfParagraphCaretMetrics(
+        context: ctx,
+        editorState: es,
+        node: node!,
+        textStyleConfiguration: cfg,
+      );
+      expect(m, isNotNull);
+      expect(m!.dy, 0.0);
+      expect(m.ignorePreviousCaretYAnchor, isFalse);
+      expect(m.caretYAnchorPlainTextOffset, 3);
+    },
+  );
 }
 

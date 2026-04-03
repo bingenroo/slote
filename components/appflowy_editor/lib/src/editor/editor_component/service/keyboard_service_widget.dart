@@ -296,7 +296,7 @@ class KeyboardServiceWidgetState extends State<KeyboardServiceWidget>
           'SLOTE-IME filter: REJECT ghost buffer path=$path '
           'prevLen=${prevPlain.length} imeLen=${imeText.length} extent=$extent';
       AppFlowyEditorLog.input.warn(msg);
-      debugPrint(msg);
+      // debugPrint(msg);
       return false;
     }
     return true;

@@ -1,5 +1,4 @@
 import 'package:appflowy_editor/appflowy_editor.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import 'slote_inline_attributes.dart';
@@ -9,6 +8,24 @@ const _kSloteScriptCaretTextHeight = TextHeightBehavior(
   applyHeightToFirstAscent: false,
   applyHeightToLastDescent: false,
 );
+
+/// Plain-text offset at the boundary **after** the last superscript character
+/// (caret between char [offset]-1 and [offset]). [AppFlowyRichText] must pair
+/// this with [TextAffinity.upstream] when the next glyph is subscript so
+/// [RenderParagraph.getOffsetForCaret] uses the superscript line, not downstream
+/// subscript metrics.
+int? _sloteLastSuperscriptBoundaryPlainOffset(Delta delta, int plainLen) {
+  if (plainLen == 0) return null;
+  for (var k = plainLen; k >= 1; k--) {
+    final attrs = delta.sliceAttributes(k);
+    if (attrs != null &&
+        attrs[kSloteSuperscriptAttribute] == true &&
+        attrs[kSloteSubscriptAttribute] != true) {
+      return k;
+    }
+  }
+  return null;
+}
 
 /// Caret height at paragraph end from [EditorState.toggledStyle] so the I-beam
 /// matches the next insert (body vs superscript vs subscript), not full-line
@@ -54,7 +71,10 @@ EndOfParagraphCaretMetrics? sloteEndOfParagraphCaretMetrics({
   //   to the end of an existing run matches that run).
   final delta = node.delta!;
   final plainLen = delta.toPlainText().length;
-  final int sliceIndex = plainLen == 0 ? 0 : (plainLen - 1);
+  // [sliceAttributes]: for k>=1 returns attrs of plaintext char (k-1). To read
+  // the last character at index plainLen-1, pass plainLen (same mapping as
+  // [sloteCaretMetrics] for boundary offsets).
+  final int sliceIndex = plainLen == 0 ? 0 : plainLen;
   final Attributes? endAttrs =
       (delta.isEmpty) ? null : delta.sliceAttributes(sliceIndex);
 
@@ -88,17 +108,30 @@ EndOfParagraphCaretMetrics? sloteEndOfParagraphCaretMetrics({
               // If switching to sup, don't force body.
               toggled[kSloteSuperscriptAttribute] != true));
 
-  /// Next insert uses toggled sub/sup but the last committed run is still body
-  /// (or the other script). [RenderParagraph]'s EOT caret stays on the body
-  /// line — use [subscriptCaretTranslateYPendingBodyBaseline] / sup nudge and
-  /// skip snapping to the previous glyph.
-  ///
-  /// When the last run **is** already subscript, the previous index caret Y
-  /// matches the real script line; snapping is correct and [dy] must be 0.
+  /// Next insert uses toggled sub when the last committed run is not yet
+  /// subscript (body or superscript). [RenderParagraph]'s EOT caret may need
+  /// [subscriptCaretTranslateYPendingBodyBaseline] — see merge in AppFlowy rich
+  /// text. When the last run **is** already subscript, snap + [dy] 0.
   final pendingSubOnBodyBaseline =
       caretAtEndOfThisNode && toggledSub && !endRunSub;
+  /// Next insert is superscript but the last committed run is still **body**
+  /// (neither script). Do not use this when the last run is subscript: that
+  /// needs [dy] 0 so the EOT merge can align with the sub glyph (the
+  /// body-baseline sup nudge is wrong for sub → sup toggles).
   final pendingSupOnBodyBaseline =
-      caretAtEndOfThisNode && toggledSup && !endRunSup;
+      caretAtEndOfThisNode &&
+      toggledSup &&
+      !endRunSup &&
+      !endRunSub;
+
+  final pendingSupAfterSubscriptRun = caretAtEndOfThisNode &&
+      toggledSup &&
+      !toggledSub &&
+      endRunSub &&
+      !endRunSup;
+  final caretYAnchorPlainTextOffset = pendingSupAfterSubscriptRun
+      ? _sloteLastSuperscriptBoundaryPlainOffset(delta, plainLen)
+      : null;
 
   bool rawSup;
   bool rawSub;
@@ -125,7 +158,10 @@ EndOfParagraphCaretMetrics? sloteEndOfParagraphCaretMetrics({
 
   // Only ignore the previous glyph for EOT merges when we rely on synthetic
   // [dy] from the body baseline. If the last run is already script, keep snap.
+  // When [caretYAnchorPlainTextOffset] is set, AppFlowy uses anchor Y instead —
+  // do not set ignore (height cap uses previous glyph usefully).
   final ignorePreviousCaretYAnchor = caretAtEndOfThisNode &&
+      caretYAnchorPlainTextOffset == null &&
       (pendingSubOnBodyBaseline ||
           pendingSupOnBodyBaseline ||
           pendingBodyAfterScriptOff ||
@@ -183,29 +219,10 @@ EndOfParagraphCaretMetrics? sloteEndOfParagraphCaretMetrics({
   // which makes the caret appear too tall. [edgePaddingPx] is in-span
   // [translateY] only, not the larger pending-body subscript caret [dy].
 
-  if (kDebugMode) {
-    final scaledEm = MediaQuery.textScalerOf(context).scale(baseFontSize);
-    final pendingExtraPx =
-        SloteSupSubMetrics.subscriptPendingCaretExtraEm * scaledEm;
-    debugPrint(
-      'DBG-EOT-CARET plainLen=$plainLen sliceIndex=$sliceIndex '
-      'caretAtEnd=$caretAtEndOfThisNode off=${selection?.start.offset} '
-      'endRunSup=$endRunSup endRunSub=$endRunSub '
-      'toggledSup=$toggledSup toggledSub=$toggledSub '
-      'toggledDiffers=$toggledDiffersFromLastRun '
-      'pendSubBody=$pendingSubOnBodyBaseline pendSupBody=$pendingSupOnBodyBaseline '
-      'ignorePrevYAnchor=$ignorePreviousCaretYAnchor '
-      'isSup=$isSuperscript isSub=$isSubscript '
-      'scaledEm=${scaledEm.toStringAsFixed(2)} '
-      'inSpanTy=${isSubscript ? SloteSupSubMetrics.subscript(context, baseFontSize: baseFontSize).translateY.toStringAsFixed(2) : "n/a"} '
-      'pendingExtraPx=${isSubscript ? pendingExtraPx.toStringAsFixed(2) : "n/a"} '
-      'dy=${dy.toStringAsFixed(2)} h=${(painter.height + edgePaddingPx).toStringAsFixed(2)}',
-    );
-  }
-
   return EndOfParagraphCaretMetrics(
     height: painter.height + edgePaddingPx,
     dy: dy,
     ignorePreviousCaretYAnchor: ignorePreviousCaretYAnchor,
+    caretYAnchorPlainTextOffset: caretYAnchorPlainTextOffset,
   );
 }

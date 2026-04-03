@@ -109,10 +109,6 @@ class _AppFlowyRichTextState extends State<AppFlowyRichText>
   final placeholderTextKey = GlobalKey();
 
   // Debug-only caret logging (throttled to avoid spam).
-  int? _lastLoggedCaretOffset;
-  double? _lastLoggedCaretHeight;
-  bool? _lastLoggedCaretIsAtEnd;
-
   RenderParagraph? get _renderParagraph =>
       textKey.currentContext?.findRenderObject() as RenderParagraph?;
 
@@ -279,7 +275,6 @@ class _AppFlowyRichTextState extends State<AppFlowyRichText>
     final eotMetricsResolver =
         widget.editorState.editorStyle.endOfParagraphCaretMetrics;
     if (isAtEnd && eotMetricsResolver != null) {
-      final rpCaretYBeforeEot = cursorOffset.dy;
       final resolved = eotMetricsResolver(
         context: context,
         editorState: widget.editorState,
@@ -289,38 +284,45 @@ class _AppFlowyRichTextState extends State<AppFlowyRichText>
       if (resolved != null) {
         eotIgnoresPreviousCaretAnchor = resolved.ignorePreviousCaretYAnchor;
         cursorHeight = resolved.height;
-        // At EOT, RenderParagraph may place the caret using full-line baseline
-        // even when the last run is a WidgetSpan with a different baseline.
-        // Anchor Y to the last in-text caret only when the two disagree.
-        //
-        // If the resolver sets [ignorePreviousCaretYAnchor] (pending script on
-        // the body baseline, or toggled style differs from the last run),
-        // apply [dy]; when the last run is already sub/sup, snap uses the
-        // previous glyph Y and [dy] is 0.
-        final bigDyDrift = previousCaretOffset != null &&
-            (cursorOffset.dy - previousCaretOffset.dy).abs() > 0.5;
-        final branchSnap =
-            !resolved.ignorePreviousCaretYAnchor && bigDyDrift;
-        if (branchSnap) {
-          cursorOffset = Offset(cursorOffset.dx, previousCaretOffset.dy);
-        } else {
+        final anchorOff = resolved.caretYAnchorPlainTextOffset;
+        if (anchorOff != null &&
+            _renderParagraph != null &&
+            anchorOff >= 0 &&
+            anchorOff <= plainTextLength) {
+          // Y from a prior in-line plain offset (e.g. after last superscript
+          // glyph); X stays at paragraph end.
+          //
+          // At a sup→sub boundary, [anchorOff] equals the offset between the
+          // two glyphs. Default affinity is downstream, which anchors Y to the
+          // **sub** line — use upstream so Y follows the superscript caret.
+          final anchorPos = TextPosition(
+            offset: anchorOff,
+            affinity: TextAffinity.upstream,
+          );
+          final anchorDy =
+              _renderParagraph!.getOffsetForCaret(anchorPos, Rect.zero).dy;
+          cursorOffset = Offset(cursorOffset.dx, anchorDy);
           cursorOffset = cursorOffset.translate(0, resolved.dy);
+        } else {
+          // At EOT, RenderParagraph may place the caret using full-line baseline
+          // even when the last run is a WidgetSpan with a different baseline.
+          // Anchor Y to the last in-text caret only when the two disagree.
+          //
+          // If the resolver sets [ignorePreviousCaretYAnchor] (pending script on
+          // the body baseline, or toggled style differs from the last run),
+          // apply [dy]; when the last run is already sub/sup, snap uses the
+          // previous glyph Y and [dy] is 0.
+          final bigDyDrift = previousCaretOffset != null &&
+              (cursorOffset.dy - previousCaretOffset.dy).abs() > 0.5;
+          final branchSnap =
+              !resolved.ignorePreviousCaretYAnchor && bigDyDrift;
+          if (branchSnap) {
+            cursorOffset = Offset(cursorOffset.dx, previousCaretOffset.dy);
+          } else {
+            cursorOffset = cursorOffset.translate(0, resolved.dy);
+          }
         }
         usedEndOfParagraphResolver = true;
-        if (kDebugMode) {
-          debugPrint(
-            'DBG-EOT-MERGE path=${position.path} off=${position.offset} '
-            'plainLen=$plainTextLength '
-            'rpCaretY=${rpCaretYBeforeEot.toStringAsFixed(2)} '
-            'prevIdxY=${previousCaretOffset?.dy.toStringAsFixed(2) ?? "null"} '
-            'prevIdxH=${previousCaretHeight?.toStringAsFixed(2) ?? "null"} '
-            'bigDrift=$bigDyDrift ignorePrev=${resolved.ignorePreviousCaretYAnchor} '
-            'branch=${branchSnap ? "snapNoDy" : "translateDy"} '
-            'resolvedDy=${resolved.dy.toStringAsFixed(2)} '
-            'h=${resolved.height.toStringAsFixed(2)} '
-            'cursorY=${cursorOffset.dy.toStringAsFixed(2)}',
-          );
-        }
       }
     }
 
@@ -381,25 +383,6 @@ class _AppFlowyRichTextState extends State<AppFlowyRichText>
       cursorHeight ?? 16.0,
     );
 
-    if (kDebugMode) {
-      final shouldLog = (_lastLoggedCaretOffset != position.offset) ||
-          (_lastLoggedCaretIsAtEnd != isAtEnd) ||
-          (_lastLoggedCaretHeight == null ||
-              (cursorHeight != null &&
-                  (_lastLoggedCaretHeight! - cursorHeight).abs() > 0.25));
-      if (shouldLog) {
-        _lastLoggedCaretOffset = position.offset;
-        _lastLoggedCaretIsAtEnd = isAtEnd;
-        _lastLoggedCaretHeight = cursorHeight;
-        debugPrint(
-          'DBG-CARET path=${position.path} offset=${position.offset} '
-          'isAtEnd=$isAtEnd usedEOT=$usedEndOfParagraphResolver '
-          'usedCaretMetrics=$usedCaretMetricsResolver '
-          'height=${(cursorHeight ?? -1).toStringAsFixed(2)} '
-          'rect=$rect',
-        );
-      }
-    }
     return rect;
   }
 

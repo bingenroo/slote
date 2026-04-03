@@ -19,6 +19,7 @@ class EndOfParagraphCaretMetrics {
     required this.height,
     this.dy = 0.0,
     this.ignorePreviousCaretYAnchor = false,
+    this.caretYAnchorPlainTextOffset,
   });
 
   final double height;
@@ -33,6 +34,12 @@ class EndOfParagraphCaretMetrics {
   /// Use when [EditorState.toggledStyle] requests superscript/subscript that
   /// differs from the last run — snapping would keep the old script's Y.
   final bool ignorePreviousCaretYAnchor;
+
+  /// When non-null, [AppFlowyRichText] sets the caret **Y** from
+  /// [RenderParagraph.getOffsetForCaret] at this plain-text offset (keeps **X**
+  /// from the paragraph end). Use when EOT Y matches the wrong script (e.g.
+  /// superscript toggled on after subscript: align with the last superscript line).
+  final int? caretYAnchorPlainTextOffset;
 }
 
 typedef EndOfParagraphCaretMetricsResolver = EndOfParagraphCaretMetrics? Function({
