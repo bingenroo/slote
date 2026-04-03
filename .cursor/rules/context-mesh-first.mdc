@@ -20,7 +20,7 @@ This project uses **Context Mesh** (MCP server). **You MUST call at least one Co
 ### Efficiency rules
 
 1. **Prefer combo tools** — `get_symbol_context` replaces `get_symbol` + `get_callers` + `get_dependents` in ONE call. Always use it when you need more than just a definition.
-2. **Prefer CM file tools** — `list_files` and `read_lines` work from the index (no disk I/O, partial-path matching). Use them instead of Glob/Read when possible.
+2. **Prefer CM file tools** — `list_files` and `read_lines` work from the index (no disk I/O). `list_files` accepts a **substring** of the path/basename when the pattern has no glob characters (`*` `?` `[`); otherwise it uses **glob** matching. Use them instead of Glob/Read when possible.
 3. **Call independent tools in parallel** to minimize round-trips.
 
 ### Tool selection by scenario
@@ -53,7 +53,7 @@ This project uses **Context Mesh** (MCP server). **You MUST call at least one Co
 | Scenario | Tool(s) |
 |---|---|
 | Open-ended / broad question | `search_code("question")` |
-| List files by pattern | `list_files(pattern)` — uses index, no Glob needed |
+| List files by pattern | `list_files(pattern)` — index-backed; substring or glob (see efficiency rules) |
 | Read specific lines | `read_lines(path, start, end)` — partial-path match, no Read needed |
 | Codebase stats (size, languages) | `get_stats()` |
 | Frameworks, deps, build tools | `get_ecosystem_context()` |
