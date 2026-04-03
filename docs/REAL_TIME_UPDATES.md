@@ -191,8 +191,7 @@ To verify real-time updates are working:
 
 - `lib/src/services/local_db.dart` - Singleton service implementation
 - `lib/src/views/home.dart` - Home view with StreamBuilder
-- `lib/src/views/create_note.dart` - Note creation view
-- `lib/src/views/create_note_zoompan.dart` - Alternative note creation view
+- `lib/src/views/create_note.dart` - Create/edit note (AppFlowy body, `rich_text`)
 
 ## Future Improvements
 

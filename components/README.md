@@ -5,8 +5,8 @@ This repository contains reusable component packages for the Slote application.
 ## Packages
 
 - **viewport**: Viewport/zoom/pan functionality
-- **undo_redo**: Generic undo/redo for plain text fields (**planned deprecation** once the note body uses AppFlowy from `rich_text` — see `rich_text/docs/ROADMAP.md`)
-- **rich_text**: Rich text (**AppFlowy Editor**, Document JSON); **`example/`** is the active spike; **`lib/`** placeholder until API promotion — see `rich_text/docs/ROADMAP.md`
+- **undo_redo**: Generic undo/redo for plain text fields — **root app no longer depends on it**; **`example/`** remains for demos (optional package deletion — see `rich_text/docs/ROADMAP.md`)
+- **rich_text**: Rich text (**AppFlowy Editor**, Document JSON); **`lib/`** is the public API; main app note body uses it from `lib/src/views/create_note.dart`; **`example/`** for experiments — see `rich_text/docs/ROADMAP.md`
 - **draw**: Custom drawing implementation
 - **theme**: Theming system
 - **shared**: Shared utilities and resources
@@ -29,7 +29,7 @@ Each component includes a standalone **example app** in its `example/` directory
 - **draw/example/** – Drawing tools, colors, stroke width, eraser, highlighter
 - **rich_text/example/** – AppFlowy editor spike (JSON, BIUS toolbar); roadmap: `rich_text/docs/ROADMAP.md`
 - **viewport/example/** – Zoom, pan, scroll, boundary constraints
-- **undo_redo/example/** – Plain-text undo/redo (legacy path; remove after AppFlowy body integration)
+- **undo_redo/example/** – Standalone plain-text undo demo (not used by root app)
 
 ### Quick start
 
@@ -59,14 +59,14 @@ Each package can be used as a path dependency in `pubspec.yaml`:
 dependencies:
   viewport:
     path: components/viewport
-  undo_redo:
-    path: components/undo_redo
+  rich_text:
+    path: components/rich_text
   # ... etc
 ```
 
 ## Data Storage
 
-**Note**: These components are database-agnostic and do not include data persistence. The main Slote app (at repo root) uses **Hive** (a lightweight key-value database for Flutter) for local storage of notes and application data.
+**Note**: These components are database-agnostic and do not include data persistence. The main Slote app (at repo root) uses **SQLite** (`sqflite`) for local note storage.
 
 For information about Hive usage in the main application, see `PRD.md` section 6.4 (Local Storage).
 

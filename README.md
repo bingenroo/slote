@@ -35,8 +35,8 @@ This is a **monorepo** containing:
   - Platform-specific code (Android, iOS, Web, Windows, macOS, Linux)
 - `**components/**` - Reusable component packages
   - `viewport/` - Viewport/zoom/pan functionality
-  - `undo_redo/` - Undo/redo system
-  - `rich_text/` - Rich text editing (Word-style)
+  - `undo_redo/` - Standalone plain-text undo demo (root app does not depend on it)
+  - `rich_text/` - Rich text (AppFlowy Document JSON; used by main note editor)
   - `draw/` - Custom drawing implementation
   - `theme/` - Theming system
   - `shared/` - Shared utilities and resources
@@ -418,18 +418,15 @@ Flutter uses **`lib/main.dart`** at the root as the entry point.
 
 1. **`lib/main.dart`** – Starts the app, initializes theme preferences (using the **theme** component), then builds the main `App` widget from **`lib/src/app.dart`**.
 2. **`lib/src/app.dart`** – Builds the real UI: navigation, screens, theming. It uses the **theme** and **shared** components.
-3. When you open or edit a note, screens like **`lib/src/views/create_note.dart`** and **`lib/src/views/create_note_zoompan.dart`** run. Those screens **import and use**:
-   - **viewport** – zoom/pan and viewport surface
-   - **undo_redo** – undo/redo for text
-   - **theme** and **shared** – where needed
+3. When you open or edit a note, **`lib/src/views/create_note.dart`** runs. It uses **`rich_text`** (AppFlowy editor, `RichTextEditorController`, format toolbar) plus **theme** and **shared** as needed.
 
-So the flow is: **root `main.dart`** → **app.dart** → your views; the views then **call** the component packages (viewport, undo_redo, theme, shared). Root `main.dart` does not call every component directly; it only uses theme and app.dart. The rest of the inclusion happens in the screens that need each component.
+So the flow is: **root `main.dart`** → **app.dart** → your views; each view imports the packages it needs. Root `main.dart` does not wire every component directly.
 
 **How components are included:**
 
-- In the root **`pubspec.yaml`**, the six components are listed as dependencies with `path: components/...` (viewport, undo_redo, rich_text, draw, theme, shared).
-- When you run `flutter run` or `flutter pub get`, Flutter reads that list and **links** those local folders as packages.
-- Any file in the root app that has `import 'package:viewport/viewport.dart'` (or theme, shared, undo_redo, etc.) is then **using** that component. So the full app does not “include” every component in one place; **each screen imports only the components it needs**. Root `main.dart` only imports theme and app.dart; the rest of the inclusion happens in the screens that use viewport, undo_redo, shared, etc.
+- In the root **`pubspec.yaml`**, components are listed as `path: components/...` dependencies (e.g. **rich_text**, **draw**, **theme**, **shared**, **viewport**).
+- When you run `flutter run` or `flutter pub get`, Flutter **links** those local folders as packages.
+- Any file that `import`s `package:rich_text/...` (or theme, shared, etc.) is **using** that component. **Each screen imports only what it needs.**
 
 #### Running a single-component example
 
@@ -458,7 +455,7 @@ Flutter then uses **`components/viewport/example/lib/main.dart`** (not the root 
 
 - **Root `lib/main.dart`** → starts the app, uses **theme** → builds **`lib/src/app.dart`**
 - **`lib/src/app.dart`** → uses **theme** and **shared**, shows your screens
-- **Screens** (e.g. create_note, create_note_zoompan) → use **viewport**, **undo_redo**, **theme**, **shared** (and draw/rich_text where used)
+- **Screens** (e.g. `create_note`) → use **rich_text**, **theme**, **shared** (and other components where imported)
 
 **Viewport example:**
 
@@ -479,8 +476,6 @@ Components are developed independently but used by the main app via path depende
 dependencies:
   viewport:
     path: components/viewport
-  undo_redo:
-    path: components/undo_redo
   rich_text:
     path: components/rich_text
   draw:

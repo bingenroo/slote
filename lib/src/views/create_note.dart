@@ -668,7 +668,7 @@ class _BottomRichTextToolbar extends StatelessWidget {
             ),
             _formatToggle(
               context: context,
-              enabled: rangeSelection,
+              enabled: hasSelection,
               selected: sloteIsFormatKeyActive(
                 editorState,
                 kSloteSuperscriptAttribute,
@@ -680,7 +680,7 @@ class _BottomRichTextToolbar extends StatelessWidget {
             ),
             _formatToggle(
               context: context,
-              enabled: rangeSelection,
+              enabled: hasSelection,
               selected: sloteIsFormatKeyActive(
                 editorState,
                 kSloteSubscriptAttribute,

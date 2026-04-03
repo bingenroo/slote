@@ -25,9 +25,15 @@ This document is the **canonical plan** for Slote’s rich-text subsystem: edito
 | ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Active spike**               | [`example/lib/main.dart`](../example/lib/main.dart) — `EditorState` from JSON, `AppFlowyEditor`, fixed **BIUS** toolbar (`toggleAttribute` + caret-aware active state). |
 | **Phase (AppFlowy checklist)** | **Phases 3–4 complete** in `package:rich_text` + example: `RichTextEditorController`, debounced JSON, shared BIUS entry points + command shortcuts.                     |
-| **Wave C (structural blocks)** | **C1–C5 delivered** (headings, lists, quote, divider, code block, callout) — see [Wave C](#wave-c--structural-blocks-split) below. **C6–C7** (tables, images) still **not** product/editor milestones; markdown codec tests cover table/image round-trip separately. |
+| **Wave C (structural blocks)** | **C1–C5 delivered** (headings, lists, quote, divider, code block, callout) — see [Wave C](#wave-c--structural-blocks-split) below. **C6–C7** (tables, images): basic insert actions exist in the example toolbar, but full product/editor UX and app-boundary storage/picker story are still deferred (codec round-trip is covered by tests). |
 | **Superscript / subscript**    | **Done (Wave B)** — Slote-only extension on AppFlowy (delta keys, `WidgetSpan` renderer, caret/EOT fork hooks, markdown). Implementation guide: [SUPERSCRIPT_SUBSCRIPT.md](SUPERSCRIPT_SUBSCRIPT.md). |
-| **Main Slote app**             | Note body still uses plain text / Quill at root; **integration** of this editor is a separate milestone (see PRD).                                                      |
+| **Main Slote app**             | **Note body integrated** — [`lib/src/views/create_note.dart`](../../../lib/src/views/create_note.dart): `RichTextEditorController` (single `EditorState`), AppFlowy Document JSON persisted via [`lib/src/services/slote_rich_text_storage.dart`](../../../lib/src/services/slote_rich_text_storage.dart), bottom toolbar undo/redo via `sloteEditor*` + `undoRedoListenable`. Legacy/non-JSON bodies normalize or fall back to empty doc. |
+
+## Next (Slote-focused “what’s next”)
+
+1. Wave D: implement **Outline / TOC** (walk headings on a debounced `transactionStream`, render hierarchy, tap-to-jump).
+2. Wave E: finish editor polish for product quality (theme bridge, mobile/desktop toolbar behavior, and performance/debounce for large docs).
+3. Tables/images (C6–C7): define the next product slice beyond basic insert (editing UX + app-level storage/picker wiring). Markdown codec interchange is already in place.
 
 ---
 
@@ -49,11 +55,11 @@ Phases build on each other; run the example app and tests after each major phase
 | Feature                     | Notes                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
 | --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Superscript / subscript** | **Done** — See [SUPERSCRIPT_SUBSCRIPT.md](SUPERSCRIPT_SUBSCRIPT.md) for architecture (attributes, toggles, `toggledStyle` sync, `WidgetSpan` layout, caret metrics, markdown). Example wires `EditorStyle.copyWith(textSpanDecorator: …, caretMetrics: …, endOfParagraphCaretHeight: …)`.                                                                                                        |
-| **Links**                   | Inline `href` (or package equivalent); dialog or paste handler. **Current behavior:** quick tap opens the URL in the system default browser; long-press opens the link format drawer.                                                                                                                                                                                                                                                                                                                     |
+| **Links**                   | Inline `href` with the Slote UI flow: quick tap opens the URL; long-press (or toolbar action) opens the **link format drawer** implemented as a bottom sheet (`showModalBottomSheet`) in `slote_format_drawers.dart`.                                                                                                                                                                                                                                                                                                                     |
 | **Font size, font family**  | **Implemented (Phase 1)**: selection helpers apply AppFlowy inline attributes `font_size` / `font_family` (`sloteApplyFontSize` / `sloteApplyFontFamily`). Markdown export/import supported via `<span font_size=\"...\" font_family='\"...\"'>...` wrapper from `sloteDocumentToMarkdown`.                                                                                                                                                                                                               |
-| **Text color, highlight**   | Use / extend built-in color attributes where available. **Near-term focus — picker UX:** match **Google Docs–style mobile** behavior: a **bottom sheet** (slide-up formatting panel from the bottom; often described informally as a mobile “formatting drawer”) with swatches/options—not separate modal dialogues for raw hex input; desktop can use compact menus or the same sheet for parity. **Touchpoint:** [`example/lib/editor/format_toolbar.dart`](../example/lib/editor/format_toolbar.dart). |
+| **Text color, highlight**   | **Implemented (Phase 1, example):** color + highlight picker as a bottom sheet with preset swatches, applying attributes to the current selection (`showSloteColorFormatDrawer` in `slote_format_drawers.dart`). **Touchpoint:** [`example/lib/editor/format_toolbar.dart`](../example/lib/editor/format_toolbar.dart).                                                                                                                                                                                                                                                                                                                     |
 | **Alignment**               | **Implemented (Phase 1, example toolbar)**: block-level `align` via `blockComponentAlign` with `left` / `center` / `right` / `justify` (`justify` uses `TextAlign.justify` on text blocks in vendored `appflowy_editor`). Slote example toolbar exposes all four. Main app wiring is deferred.                                                                                                                                                                                                            |
-| **Clear formatting**        | Single command stripping partial styles on selection; respects `EditorState` history.                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| **Clear formatting**        | **Implemented (Phase 1):** single command stripping partial inline styles on selection; respects `EditorState` history.                                                                                                                                                                                                                                                                                                                                                                                                                     |
 
 <a id="sup-sub-known-limitations"></a>
 
@@ -89,8 +95,8 @@ These remain **out of scope** for the current editor/product slice: no dedicated
 
 | Slice | Feature | Notes |
 | ----- | ------- | ----- |
-| **C6** | **Tables** | Full **editing UX** (insert from chrome, complex manipulation) and any Slote-specific table behavior — schedule after the delivered block set. Higher complexity than quote/hr/code. |
-| **C7** | **Images** | Embed block **in product**: storage policy at app boundary (paths, blobs, encryption), picker UX, and main-app wiring — not just codec round-trip. |
+| **C6** | **Tables** | Basic insert (e.g. 2×2) exists in the example toolbar, but full **editing UX** (insert chrome, complex manipulation) and any Slote-specific table behavior are deferred. Higher complexity than quote/hr/code. |
+| **C7** | **Images** | Basic insert (URL) exists in the example toolbar, but product embedding is deferred: app-boundary storage policy (paths/blobs/encryption), picker UX, and main-app wiring — not just codec round-trip. |
 
 ### Wave D — Advanced content
 
@@ -138,24 +144,25 @@ Use **narrow** signals for interactive toolbars; **one debounced pipe** for expe
 
 ### Today (rest of repo)
 
-- **`components/undo_redo`**: Generic stack + **`TextUndoRedoController` / `UnifiedUndoRedoController`** used by the **main app** for **plain `TextFormField`-style** body text (`create_note*.dart`).
-- **AppFlowy `EditorState`**: Own **transaction history**; undo/redo replays edits made through the editor. **All rich-text actions** (BIUS, blocks, links, …) should go through **transactions** so **one** history stack covers them.
+- **Main app note body:** Uses **AppFlowy** only (`CreateNoteView` in [`lib/src/views/create_note.dart`](../../../lib/src/views/create_note.dart)); no `undo_redo` package on that path.
+- **`components/undo_redo`**: Generic stack + **`TextUndoRedoController` / `UnifiedUndoRedoController`** — still present as a **component** (example app + optional reuse); **root `slote` no longer depends on it**.
+- **AppFlowy `EditorState`**: Own **transaction history**; undo/redo replays edits made through the editor. **All rich-text actions** (BIUS, blocks, links, …) go through **transactions** so **one** history stack covers them.
 
 ### Recommendation
 
-1. **Do not duplicate** document undo inside `undo_redo` when the note body is AppFlowy-driven. Wire **Undo/Redo** toolbar actions to **`EditorState`** / the **`sloteEditor*`** helpers above (same stack as typing).
-2. **After** the note body uses AppFlowy end-to-end, **remove** `UnifiedUndoRedoController` (and `undo_redo` imports) from note screens for that field.
-3. **Deprecate `components/undo_redo`** when nothing in the repo imports it:
+1. **Do not duplicate** document undo inside `undo_redo` when the note body is AppFlowy-driven — **done for `CreateNoteView`** (toolbar actions use **`EditorState`** / **`sloteEditor*`**).
+2. **After** the note body uses AppFlowy end-to-end, **remove** `UnifiedUndoRedoController` (and `undo_redo` imports) from note screens for that field — **done** (legacy `create_note_zoompan` / `create_note_OGbackup` screens removed).
+3. **Deprecate `components/undo_redo`** when nothing in the repo imports it (optional final step):
    - Either **delete** the package and drop the path dependency from root `pubspec.yaml`, **or**
    - **Move** a tiny generic helper into `rich_text/lib/src/` if a non-editor widget still needs stack-based undo (unlikely for v1).
 4. **Drawing undo** remains owned by **`draw`** / stroke model until a product decision unifies stacks; not blocked on `undo_redo`.
 
 ### Planned removal checklist (execute when integrating rich_text into the app)
 
-- [ ] Note body uses `EditorState` / `AppFlowyEditor` from `rich_text`.
-- [ ] Undo/redo UI calls editor history, verified across BIUS + blocks.
-- [ ] Remove `package:undo_redo/undo_redo.dart` from `create_note*.dart` (and any other callers).
-- [ ] Remove `undo_redo` from root `pubspec.yaml` if unused.
+- [x] Note body uses `EditorState` / `AppFlowyEditor` from `rich_text`.
+- [x] Undo/redo UI calls editor history, verified across BIUS + blocks.
+- [x] Remove `package:undo_redo/undo_redo.dart` from `create_note*.dart` (and any other callers).
+- [x] Remove `undo_redo` from root `pubspec.yaml` if unused.
 - [ ] Delete or archive `components/undo_redo` and update [PRD.md](../../../PRD.md), [components/README.md](../../README.md), and [COMPONENT_TEST_PLATFORMS.md](../../COMPONENT_TEST_PLATFORMS.md).
 
 ---

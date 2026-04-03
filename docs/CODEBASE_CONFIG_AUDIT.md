@@ -6,7 +6,7 @@ This document lists every directory that contains configuration tied to the repo
 
 | File | Contents |
 |------|----------|
-| `pubspec.yaml` | `name: slote`, `description: "Slote - Cross-Platform Note-Taking Application"`, dependency keys `viewport`, `undo_redo`, `rich_text`, `draw`, `theme`, `shared` |
+| `pubspec.yaml` | `name: slote`, `description: "Slote - Cross-Platform Note-Taking Application"`, dependency keys `viewport`, `rich_text`, `draw`, `theme`, `shared` (among others) |
 | `analysis_options.yaml` | No package name (generic linter config) |
 | `devtools_options.yaml` | No package name |
 

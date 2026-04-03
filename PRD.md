@@ -66,7 +66,7 @@ This section describes the **current state of the Slote codebase**: which compon
 | **Entry & theme**     | `main.dart` initializes theme (via `ThemeProvider`), runs optional Hive→SQLite migration when enabled, then runs `App`.                                                                                                                                                                                                                                                                                                                                                          |
 | **App shell**         | `app.dart`: `MaterialApp` with light/dark theme from `ThemeProvider`, home = `HomeView`.                                                                                                                                                                                                                                                                                                                                                                                         |
 | **Home screen**       | `views/home.dart`: List/grid of notes from `LocalDBService`, theme toggle, list/grid toggle, FAB to create note. Selection mode (long-press) for multi-delete with Lottie delete confirmation. Uses `NotesList` / `NotesGrid` and `EmptyView`.                                                                                                                                                                                                                                   |
-| **Create/Edit note**  | `views/create_note_zoompan.dart` (primary): Note editor with title + body, **draw vs text mode** toggle, zoom/pan surface (pinch, 1‑finger scroll vs pan), drawing overlay (currently **Scribble**-based with a stub when scribble package is not used), pen/eraser toolbar, pen settings popup (stroke width, colors), undo/redo bar. Auto-save with debounce; load/save note and drawing data via `LocalDBService`. Orientation change scales drawing (width) to fixed height. |
+| **Create/Edit note**  | `views/create_note.dart`: **AppFlowy** note editor via `package:rich_text` — `RichTextEditorController`, `AppFlowyEditor`, title field, bottom **format toolbar** (BIUS, headings, lists, blocks, undo/redo via `sloteEditor*`). Note **`body`** is persisted as **AppFlowy Document JSON** (see `services/slote_rich_text_storage.dart`); debounced saves to `LocalDBService`. **Drawing** in-note (`drawingData`) is still **not** wired in this screen (see §2.3). |
 | **Note model**        | `model/note.dart`: `Note` with `id`, `title`, `body`, `drawingData` (JSON string), `lastMod`. `toMap` / `fromMap` for DB.                                                                                                                                                                                                                                                                                                                                                        |
 | **Local persistence** | `services/local_db.dart`: SQLite (`notes.db`) via `sqflite`; table `notes` (id, title, body, drawingData, lastMod). Singleton `LocalDBService` with `saveNote`, `getAllNotes`, `getNote`, `deleteNote`, and `listenAllNotes()` stream for reactive UI.                                                                                                                                                                                                                           |
 | **Migration**         | `services/hive_to_sqlite_migration.dart`: One-time migration from Hive to SQLite (gated by env flag).                                                                                                                                                                                                                                                                                                                                                                            |
@@ -93,15 +93,15 @@ Rich text editing for Slote, moving to **AppFlowy Editor** with **Document JSON*
 
 | Area | Description |
 | ---- | ----------- |
-| **`lib/`** | **Placeholder** today; public API (`RichTextController`, editor widget, exports) will be added as the AppFlowy integration is promoted from the example. |
-| **`example/`** | **Active spike** — `EditorState` + `AppFlowyEditor`, load from JSON, BIUS toolbar (`toggleAttribute`), caret-aware format indicators; this is the engineering sandbox until `lib/` ships. |
+| **`lib/`** | **Active** — exports AppFlowy helpers (`RichTextEditorController`, BIUS/toolbar entry points, shortcuts, markdown codec, undo helpers). Main app composes `AppFlowyEditor` + toolbars in `lib/src/views/create_note.dart`. |
+| **`example/`** | **Spike / sandbox** — full demo UI (`EditorState` + `AppFlowyEditor`, JSON log, extended toolbar); used for day‑to‑day editor experiments. |
 | **Roadmap** | **[components/rich_text/docs/ROADMAP.md](components/rich_text/docs/ROADMAP.md)** — end-to-end phases: foundation (JSON, BIUS, debounced JSON callback, shortcuts), then extended inline (super/subscript, links, fonts, colors, alignment, clear formatting), blocks (headings H1–H6, lists, quote, divider, code, tables, callouts), media (images), formula (LaTeX), outline/TOC, theming bridge. |
 | **AppFlowy checklist** | **[components/rich_text/docs/appflowy-editor-roadmap.md](components/rich_text/docs/appflowy-editor-roadmap.md)** — Phases 1–4 (JSON confidence, BIUS toolbar, controller + `transactionStream` debounce, shortcut parity). |
 | **Legacy** | Former **Quill + markdown** design is **archived in prose** only: [components/rich_text/IMPLEMENTATION.md](components/rich_text/IMPLEMENTATION.md) (not the active codebase in `lib/`). |
 
-**Root app** still uses **flutter_quill** / plain body fields in places; **target** is to persist rich content as **AppFlowy Document JSON** (or a versioned `.slote` envelope) once `rich_text` is integrated into the note editor.
+**Root app** persists the note **body** as **AppFlowy Document JSON** via `create_note.dart` and `slote_rich_text_storage.dart`. **flutter_quill** is not a root dependency (legacy Quill design is documented only in `rich_text/IMPLEMENTATION.md`).
 
-**Undo/redo (rich text):** Provided by **AppFlowy `EditorState` history** for all editor transactions. The separate **`undo_redo`** package (see §2.6) is for **plain text fields** today and is **planned for removal** from the app once the note body uses AppFlowy end-to-end — see ROADMAP “Undo/redo” section.
+**Undo/redo (rich text):** Provided by **AppFlowy `EditorState` history** in the note editor. The **`undo_redo`** component package (§2.6) is **no longer** used by the root app; it remains available for its **example** or future reuse until deleted — see ROADMAP “Undo/redo” section.
 
 ### 2.5 Component: `viewport` (`components/viewport`)
 
@@ -117,11 +117,11 @@ Zoom and pan for a scrollable content area.
 | **TransformAwareScrollbar** | Scrollbar that respects zoom/pan.                                                          |
 | **Example app**             | `example/`: zoom (pinch, limits), pan, scrollbar, boundary behavior, content height/stats. |
 
-**Note**: The main app implements its own zoom/pan in `create_note_zoompan.dart` (`ZoomPanSurface` there), not the `viewport` package. The `viewport` component is available for future unification or reuse.
+**Note**: The main app note screen does **not** use `viewport` today; `viewport` remains available for zoom/pan reuse (e.g. future drawing canvas or unified note chrome).
 
 ### 2.6 Component: `undo_redo` (`components/undo_redo`)
 
-Generic undo/redo and text-specific + unified controllers — used by the **main app** for **plain `TextEditingController` / `TextFormField`** note body text today.
+Generic undo/redo and text-specific + unified controllers — **not** depended on by the **root app** after note body migration to AppFlowy; **example** app still demonstrates plain-text undo.
 
 | Feature                       | Description                                                                                                                       |
 | ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
@@ -131,7 +131,7 @@ Generic undo/redo and text-specific + unified controllers — used by the **main
 | **UndoRedoState**             | Base and `TextState` for text undo.                                                                                               |
 | **Example app**               | `example/`: text field with undo/redo, clear history, state indicators.                                                           |
 
-**Consolidation plan:** When the note body uses **AppFlowy** from `rich_text`, **undo/redo for typing and formatting** should come from **`EditorState`** (single transaction history). At that point, **remove** `UnifiedUndoRedoController` from note screens for the body field, drop the **`undo_redo`** path dependency if nothing else imports it, and **delete or archive** `components/undo_redo`. Drawing undo remains with **`draw`** / stroke stack until explicitly unified. Detailed checklist: [components/rich_text/docs/ROADMAP.md](components/rich_text/docs/ROADMAP.md) (“Undo/redo”).
+**Consolidation plan:** **Done for the note body** — `CreateNoteView` uses **`EditorState`** history only; root **`pubspec.yaml`** no longer lists `undo_redo`. Optional cleanup: **delete or archive** `components/undo_redo` when you no longer need the standalone example. Drawing undo remains with **`draw`** / stroke stack until explicitly unified. Detailed checklist: [components/rich_text/docs/ROADMAP.md](components/rich_text/docs/ROADMAP.md) (“Undo/redo”).
 
 ### 2.7 Component: `theme` (`components/theme`)
 
@@ -164,11 +164,11 @@ Cross-platform CLI for database and emulator workflows (e.g. pull SQLite DB from
 
 | Layer         | Implemented                                                                                          | Not yet in main app / Planned                                    |
 | ------------- | ---------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
-| **App**       | Home, create note, SQLite, theme, zoom/pan in note, text + drawing (scribble/stub), undo/redo (text) | Open existing note from list; folders; .slote format; PDF export |
+| **App**       | Home, create note, SQLite, theme; note **body** = AppFlowy Document JSON via `rich_text`               | Drawing in note UI; folders; .slote format; PDF export         |
 | **draw**      | Full component + example                                                                             | Wired into note editor (replace scribble)                        |
-| **rich_text** | **Spike in `example/`** (AppFlowy + BIUS); `lib/` placeholder until API promotion                    | Integrate into note editor; Document JSON persistence            |
-| **viewport**  | Full component + example                                                                             | Optional: reuse in note screen instead of custom ZoomPanSurface  |
-| **undo_redo** | Text + unified wrapper + example (**planned deprecation** once body uses AppFlowy undo)               | Remove after `rich_text` integration; drawing undo via `draw`    |
+| **rich_text** | **`lib/`** API + main-app **`create_note.dart`**; **`example/`** for experiments                      | TOC/outline, polish (see ROADMAP)                                |
+| **viewport**  | Full component + example                                                                             | Optional: reuse in note screen or drawing chrome                 |
+| **undo_redo** | Text + unified wrapper + **example** only (root app does not depend on package)                       | Optional: delete package if example no longer needed             |
 | **theme**     | In use                                                                                               | —                                                                |
 | **shared**    | In use                                                                                               | —                                                                |
 
@@ -680,7 +680,7 @@ To enable faster, decentralized development, each component in `components/` now
 1. **draw/example/** - Drawing functionality testing (pen, eraser, highlighter, color selection, stroke width)
 2. **rich_text/example/** - AppFlowy editor spike (Document JSON, BIUS toolbar); full feature set tracked in `components/rich_text/docs/ROADMAP.md`
 3. **viewport/example/** - Zoom/pan/viewport testing (zoom controls, content height, boundary constraints)
-4. **undo_redo/example/** - Undo/redo for plain text fields (planned removal after AppFlowy body integration — see `rich_text` ROADMAP)
+4. **undo_redo/example/** - Standalone plain-text undo demo (root app no longer uses this package; optional removal — see `rich_text` ROADMAP)
 
 **Usage**:
 
