@@ -11,6 +11,7 @@ export 'src/appflowy/slote_caret_metrics.dart';
 export 'src/appflowy/slote_end_of_paragraph_caret_height.dart';
 export 'src/appflowy/slote_format_toolbar_state.dart';
 export 'src/appflowy/slote_format_drawers.dart';
+export 'src/appflowy/slote_block_component_builders.dart';
 export 'src/appflowy/slote_heading_support.dart';
 export 'src/appflowy/slote_outline.dart';
 export 'src/appflowy/slote_markdown_codec.dart';

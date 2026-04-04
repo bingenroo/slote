@@ -209,6 +209,9 @@ class _HeadingBlockComponentWidgetState
     return TextStyle(
       fontSize: fontSize,
       fontWeight: FontWeight.bold,
+      // Explicit height overrides paragraph [lineHeight] when merging via
+      // [TextSpan.updateTextStyle]; otherwise the line box and caret stay tall.
+      height: 1.0,
     );
   }
 }

@@ -341,19 +341,22 @@ class _AppFlowyRichTextState extends State<AppFlowyRichText>
       }
     }
 
-    // Merging placeholder height can undo a shrunk caret on non-empty text.
-    if (placeholderCursorHeight != null) {
-      final skipPlaceholderHeightMerge =
-          (usedEndOfParagraphResolver || usedCaretMetricsResolver) &&
-              delta != null &&
-              delta.isNotEmpty;
-      if (!skipPlaceholderHeightMerge) {
-        cursorHeight = max(cursorHeight ?? 0, placeholderCursorHeight);
-      }
+    // Placeholder merge: only when the paragraph is empty. For non-empty text
+    // the placeholder layer is cleared (`text: ''`) but still lays out with a
+    // strut — merging `max(cursor, placeholder)` inflates the caret (e.g. H1
+    // mid-line) beyond the main [RenderParagraph] box. Empty paragraphs still
+    // need the placeholder for caret size/position.
+    if (placeholderCursorHeight != null &&
+        (delta == null || delta.isEmpty)) {
+      cursorHeight = max(cursorHeight ?? 0, placeholderCursorHeight);
     }
 
     // Final guard: never allow the boundary caret to be taller than the last
     // in-text caret height on that line.
+    //
+    // Apply only when custom caret metrics ran: those can overshoot line box.
+    // If both heights come from [RenderParagraph], [min] can wrongly shrink
+    // the EOT caret (boundary vs last-glyph metrics differ), e.g. headings.
     //
     // Skip when [EndOfParagraphCaretMetrics.ignorePreviousCaretYAnchor] was
     // set: the resolver already chose body / pending-insert metrics. Capping
@@ -361,7 +364,8 @@ class _AppFlowyRichTextState extends State<AppFlowyRichText>
     // the I-beam after toggling script off.
     if (previousCaretHeight != null &&
         cursorHeight != null &&
-        !eotIgnoresPreviousCaretAnchor) {
+        !eotIgnoresPreviousCaretAnchor &&
+        (usedEndOfParagraphResolver || usedCaretMetricsResolver)) {
       cursorHeight = min(cursorHeight, previousCaretHeight);
     }
 

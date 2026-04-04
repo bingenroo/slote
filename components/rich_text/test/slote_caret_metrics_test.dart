@@ -431,6 +431,67 @@ void main() {
   );
 
   testWidgets(
+    'sloteEndOfParagraphCaretMetrics returns null at EOT for plain heading (no script)',
+    (tester) async {
+      late BuildContext ctx;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Builder(
+            builder: (context) {
+              ctx = context;
+              return const SizedBox.shrink();
+            },
+          ),
+        ),
+      );
+
+      final es = EditorState(
+        document: Document.fromJson({
+          'document': {
+            'type': 'page',
+            'children': [
+              {
+                'type': 'heading',
+                'data': {
+                  'delta': [
+                    {'insert': 'Header 1'},
+                  ],
+                  'level': 1,
+                },
+              },
+            ],
+          },
+        }),
+      );
+      es.editorStyle = const EditorStyle.mobile();
+      es.selection =
+          Selection.single(path: [0], startOffset: 8, endOffset: 8).normalized;
+
+      final node = es.getNodeAtPath([0]);
+      expect(node, isNotNull);
+
+      final cfg = TextStyleConfiguration(
+        text: const TextStyle(fontSize: 16),
+        lineHeight: 1.5,
+      );
+
+      final m = sloteEndOfParagraphCaretMetrics(
+        context: ctx,
+        editorState: es,
+        node: node!,
+        textStyleConfiguration: cfg,
+      );
+      expect(
+        m,
+        isNull,
+        reason:
+            'Body-sized EOT probe must not override heading caret from RenderParagraph',
+      );
+    },
+  );
+
+  testWidgets(
     'sloteEndOfParagraphCaretMetrics EOT: toggled sup after sub run — dy 0, not body-sup nudge',
     (tester) async {
       late BuildContext ctx;

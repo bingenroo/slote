@@ -113,19 +113,24 @@ class _CreateNoteViewState extends State<CreateNoteView> {
     showModalBottomSheet<void>(
       context: context,
       showDragHandle: true,
+      isScrollControlled: true,
       builder: (sheetContext) {
-        final maxH = math.min(
-          420.0,
-          MediaQuery.sizeOf(sheetContext).height * 0.5,
-        );
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.only(bottom: 8),
+        final screenH = MediaQuery.sizeOf(sheetContext).height;
+        final sheetBodyHeight = math.min(420.0, screenH * 0.5);
+        return Padding(
+          padding: EdgeInsets.only(
+            bottom: math.max(
+              8.0,
+              MediaQuery.viewPaddingOf(sheetContext).bottom,
+            ),
+          ),
+          child: SizedBox(
+            height: sheetBodyHeight,
             child: Column(
-              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
                   child: Text(
                     'Outline',
                     style: GoogleFonts.poppins(
@@ -134,8 +139,7 @@ class _CreateNoteViewState extends State<CreateNoteView> {
                     ),
                   ),
                 ),
-                SizedBox(
-                  height: maxH,
+                Expanded(
                   child: _OutlineListBody(
                     entries: _outline,
                     onEntryTap: (e) {
@@ -395,6 +399,7 @@ class _CreateNoteViewState extends State<CreateNoteView> {
         child: AppFlowyEditor(
           editorState: editorState,
           editorStyle: editorStyle,
+          blockComponentBuilders: sloteRichTextBlockComponentBuilders,
           commandShortcutEvents:
               standardCommandShortcutsWithSloteInlineHandlers(),
         ),

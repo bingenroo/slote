@@ -1,4 +1,5 @@
 import 'package:appflowy_editor/appflowy_editor.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import 'slote_inline_attributes.dart';
@@ -155,6 +156,25 @@ EndOfParagraphCaretMetrics? sloteEndOfParagraphCaretMetrics({
 
   final isSuperscript = rawSup && !rawSub;
   final isSubscript = rawSub && !rawSup;
+
+  // Heading blocks and inline fontSize runs use different metrics than
+  // [textStyleConfiguration.text]. This resolver previously always returned a
+  // body-sized TextPainter probe at EOT; AppFlowyRichText then did
+  // min(probe, previousGlyph), which kept the short height and clipped the
+  // caret on headings. Delegate to RenderParagraph when we are not fixing
+  // superscript/subscript or pending-body-after-script EOT behavior.
+  if (!pendingBodyAfterScriptOff && !isSuperscript && !isSubscript) {
+    assert(() {
+      if (node.type == HeadingBlockKeys.type) {
+        debugPrint(
+          'SLOTE EOT caret: skip custom metrics (use paragraph caret height); '
+          'plainLen=$plainLen',
+        );
+      }
+      return true;
+    }());
+    return null;
+  }
 
   // Only ignore the previous glyph for EOT merges when we rely on synthetic
   // [dy] from the body baseline. If the last run is already script, keep snap.
