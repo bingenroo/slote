@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math' as math;
 
 import 'package:appflowy_editor/appflowy_editor.dart';
 import 'package:flutter/material.dart';
@@ -24,6 +25,7 @@ class CreateNoteView extends StatefulWidget {
 
 class _CreateNoteViewState extends State<CreateNoteView> {
   final _titleController = TextEditingController();
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
 
   final LocalDBService _localDb = LocalDBService();
 
@@ -31,6 +33,8 @@ class _CreateNoteViewState extends State<CreateNoteView> {
 
   late final RichTextEditorController _richTextController;
   late final Listenable _formatBarListenable;
+
+  List<SloteOutlineEntry> _outline = const [];
 
   // Cached state used by the persistence layer (so back navigation can flush).
   String _latestBodyJsonString = sloteEmptyDocumentJsonString();
@@ -64,6 +68,7 @@ class _CreateNoteViewState extends State<CreateNoteView> {
             normalizeNoteBodyToDocumentJsonString(jsonEncode(json));
         _requestSave();
       },
+      onDebouncedDocumentChanged: _refreshOutline,
     );
 
     _titleController.addListener(_onTitleChanged);
@@ -73,6 +78,78 @@ class _CreateNoteViewState extends State<CreateNoteView> {
       _richTextController.editorState.toggledStyleNotifier,
       _richTextController.undoRedoListenable,
     ]);
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _refreshOutline();
+    });
+  }
+
+  void _refreshOutline() {
+    if (!mounted) return;
+    final next = sloteCollectOutlineEntries(
+      _richTextController.editorState.document,
+    );
+    setState(() => _outline = next);
+  }
+
+  static const double _kOutlineWideBreakpoint = 600;
+
+  Future<void> _jumpToOutlineEntry(SloteOutlineEntry entry) async {
+    final es = _richTextController.editorState;
+    es.scrollService?.jumpTo(entry.path.first);
+    await es.updateSelectionWithReason(
+      Selection.collapsed(Position(path: entry.path, offset: 0)),
+      reason: SelectionUpdateReason.uiEvent,
+      extraInfo: const {'selectionExtraInfoDisableToolbar': true},
+    );
+  }
+
+  void _showOutline() {
+    final width = MediaQuery.sizeOf(context).width;
+    if (width >= _kOutlineWideBreakpoint) {
+      _scaffoldKey.currentState?.openEndDrawer();
+      return;
+    }
+    showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetContext) {
+        final maxH = math.min(
+          420.0,
+          MediaQuery.sizeOf(sheetContext).height * 0.5,
+        );
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Text(
+                    'Outline',
+                    style: GoogleFonts.poppins(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+                SizedBox(
+                  height: maxH,
+                  child: _OutlineListBody(
+                    entries: _outline,
+                    onEntryTap: (e) {
+                      Navigator.pop(sheetContext);
+                      unawaited(_jumpToOutlineEntry(e));
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 
   @override
@@ -231,7 +308,40 @@ class _CreateNoteViewState extends State<CreateNoteView> {
         );
     final editorState = _richTextController.editorState;
 
+    final wideOutline = MediaQuery.sizeOf(context).width >= _kOutlineWideBreakpoint;
+
     return Scaffold(
+      key: _scaffoldKey,
+      endDrawer: wideOutline
+          ? Drawer(
+              child: SafeArea(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                      child: Text(
+                        'Outline',
+                        style: GoogleFonts.poppins(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                    Expanded(
+                      child: _OutlineListBody(
+                        entries: _outline,
+                        onEntryTap: (e) {
+                          Navigator.pop(context);
+                          unawaited(_jumpToOutlineEntry(e));
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            )
+          : null,
       appBar: AppBar(
         toolbarHeight: 52,
         leading: IconButton(
@@ -263,6 +373,15 @@ class _CreateNoteViewState extends State<CreateNoteView> {
         actions: [
           IconButton(
             icon: FaIcon(
+              FontAwesomeIcons.listUl,
+              size: 18,
+              color: Theme.of(context).colorScheme.onPrimary,
+            ),
+            onPressed: _showOutline,
+            tooltip: 'Outline',
+          ),
+          IconButton(
+            icon: FaIcon(
               FontAwesomeIcons.trash,
               size: 18,
               color: Theme.of(context).colorScheme.onPrimary,
@@ -288,6 +407,51 @@ class _CreateNoteViewState extends State<CreateNoteView> {
           layout: SloteToolbarLayout.verticalScroll,
         ),
       ),
+    );
+  }
+}
+
+class _OutlineListBody extends StatelessWidget {
+  const _OutlineListBody({
+    required this.entries,
+    required this.onEntryTap,
+  });
+
+  final List<SloteOutlineEntry> entries;
+  final ValueChanged<SloteOutlineEntry> onEntryTap;
+
+  @override
+  Widget build(BuildContext context) {
+    if (entries.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Text(
+            'No headings yet',
+            style: GoogleFonts.poppins(
+              fontSize: 15,
+              color: Theme.of(context).hintColor,
+            ),
+          ),
+        ),
+      );
+    }
+    return ListView.builder(
+      itemCount: entries.length,
+      itemBuilder: (context, index) {
+        final e = entries[index];
+        return ListTile(
+          contentPadding: EdgeInsets.only(
+            left: 16 + (e.level - 1) * 16,
+            right: 16,
+          ),
+          title: Text(
+            e.title,
+            style: GoogleFonts.poppins(fontSize: 15),
+          ),
+          onTap: () => onEntryTap(e),
+        );
+      },
     );
   }
 }

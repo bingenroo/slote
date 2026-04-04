@@ -28,12 +28,12 @@ This document is the **canonical plan** for Slote’s rich-text subsystem: edito
 | **Wave C (structural blocks)** | **C1–C5 delivered** (headings, lists, quote, divider, code block, callout) — see [Wave C](#wave-c--structural-blocks-split) below. **C6–C7** (tables, images): basic insert actions exist in the example toolbar, but full product/editor UX and app-boundary storage/picker story are still deferred (codec round-trip is covered by tests). |
 | **Superscript / subscript**    | **Done (Wave B)** — Slote-only extension on AppFlowy (delta keys, `WidgetSpan` renderer, caret/EOT fork hooks, markdown). Implementation guide: [SUPERSCRIPT_SUBSCRIPT.md](SUPERSCRIPT_SUBSCRIPT.md). |
 | **Main Slote app**             | **Note body integrated** — [`lib/src/views/create_note.dart`](../../../lib/src/views/create_note.dart): `RichTextEditorController` (single `EditorState`), AppFlowy Document JSON persisted via [`lib/src/services/slote_rich_text_storage.dart`](../../../lib/src/services/slote_rich_text_storage.dart), bottom toolbar undo/redo via `sloteEditor*` + `undoRedoListenable`. Legacy/non-JSON bodies normalize or fall back to empty doc. |
+| **Outline / TOC (Wave D)**     | **Done** — [`slote_outline.dart`](../lib/src/appflowy/slote_outline.dart) (`sloteCollectOutlineEntries`); [`RichTextEditorController`](../lib/src/appflowy/appflowy_document_controller.dart) `onDebouncedDocumentChanged` (same debounce as JSON); main app: outline AppBar action, modal sheet (&lt;600dp) / `endDrawer` (≥600dp), scroll + selection jump. |
 
 ## Next (Slote-focused “what’s next”)
 
-1. Wave D: implement **Outline / TOC** (walk headings on a debounced `transactionStream`, render hierarchy, tap-to-jump).
-2. Wave E: finish editor polish for product quality (theme bridge, mobile/desktop toolbar behavior, and performance/debounce for large docs).
-3. Tables/images (C6–C7): define the next product slice beyond basic insert (editing UX + app-level storage/picker wiring). Markdown codec interchange is already in place.
+1. Wave E: finish editor polish for product quality (theme bridge, mobile/desktop toolbar behavior, and performance/debounce for large docs).
+2. Tables/images (C6–C7): define the next product slice beyond basic insert (editing UX + app-level storage/picker wiring). Markdown codec interchange is already in place.
 
 ---
 
@@ -103,7 +103,7 @@ These remain **out of scope** for the current editor/product slice: no dedicated
 | Feature             | Notes                                                                                                                                 |
 | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
 | **Formula (LaTeX)** | Inline or block embed; renderer + editing UX.                                                                                         |
-| **Outline / TOC**   | **Chrome**, not a single delta: walk document (on debounced `transactionStream` or equivalent), show headings hierarchy, jump on tap. |
+| **Outline / TOC**   | **Done (main app)** — debounced outline refresh (`onDebouncedDocumentChanged` + [`sloteCollectOutlineEntries`](../lib/src/appflowy/slote_outline.dart)); hierarchy UI + tap-to-jump in [`create_note.dart`](../../../lib/src/views/create_note.dart). |
 
 ### Wave E — Editor polish & theming
 

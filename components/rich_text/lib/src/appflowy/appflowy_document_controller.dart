@@ -19,6 +19,7 @@ class RichTextEditorController {
   RichTextEditorController({
     required Document document,
     this.onDocumentJsonChanged,
+    this.onDebouncedDocumentChanged,
     this.debounce = const Duration(milliseconds: 200),
     int? maxHistoryItemSize,
     Duration minHistoryItemDuration = const Duration(milliseconds: 50),
@@ -38,6 +39,7 @@ class RichTextEditorController {
   factory RichTextEditorController.fromJson(
     Map<String, dynamic> documentJson, {
     void Function(Map<String, Object> json)? onDocumentJsonChanged,
+    VoidCallback? onDebouncedDocumentChanged,
     Duration debounce = const Duration(milliseconds: 200),
     int? maxHistoryItemSize,
     Duration minHistoryItemDuration = const Duration(milliseconds: 50),
@@ -45,6 +47,7 @@ class RichTextEditorController {
     return RichTextEditorController(
       document: Document.fromJson(documentJson),
       onDocumentJsonChanged: onDocumentJsonChanged,
+      onDebouncedDocumentChanged: onDebouncedDocumentChanged,
       debounce: debounce,
       maxHistoryItemSize: maxHistoryItemSize,
       minHistoryItemDuration: minHistoryItemDuration,
@@ -61,6 +64,9 @@ class RichTextEditorController {
 
   /// Debounced snapshot of [EditorState.document] via [Document.toJson].
   final void Function(Map<String, Object> json)? onDocumentJsonChanged;
+
+  /// Called on the same debounce schedule as [onDocumentJsonChanged] (e.g. TOC).
+  final VoidCallback? onDebouncedDocumentChanged;
 
   final Duration debounce;
 
@@ -168,20 +174,23 @@ class RichTextEditorController {
   }
 
   void _scheduleDebouncedEmit() {
-    if (onDocumentJsonChanged == null) return;
+    if (onDocumentJsonChanged == null && onDebouncedDocumentChanged == null) {
+      return;
+    }
     _debounceTimer?.cancel();
-    _debounceTimer = Timer(debounce, _emitDocumentJson);
+    _debounceTimer = Timer(debounce, _emitDebounced);
   }
 
-  void _emitDocumentJson() {
+  void _emitDebounced() {
     if (editorState.isDisposed) return;
+    onDebouncedDocumentChanged?.call();
     onDocumentJsonChanged?.call(editorState.document.toJson());
   }
 
   /// Emit [Document.toJson] immediately (cancels a pending debounced emit).
   void flushDocumentNotification() {
     _debounceTimer?.cancel();
-    _emitDocumentJson();
+    _emitDebounced();
   }
 
   void dispose() {
