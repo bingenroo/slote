@@ -2,9 +2,9 @@
 
 ## Slote - Cross-Platform Note-Taking Application
 
-### Version: 2.0
+### Version: 2.2
 
-### Last Updated: March 22, 2025
+### Last Updated: April 4, 2026
 
 ---
 
@@ -56,7 +56,8 @@ This section describes the **current state of the Slote codebase**: which compon
 ### 2.1 Repository Layout
 
 - **Root**: Main Flutter app (`lib/`, `pubspec.yaml`), platform folders (`android/`, `ios/`, `macos/`, `windows/`, `linux/`, `web/`), and tooling (`cmd.py` for DB/emulator operations).
-- **`components/`**: Reusable Flutter packages used by the main app and testable in isolation via `example/` apps.
+- **`components/`**: Reusable Flutter packages used by the main app and testable in isolation via `example/` apps (`draw`, `rich_text`, `viewport`, `theme`, `shared`).
+- **`components/appflowy_editor`**: Vendored fork of **AppFlowy Editor** resolved via root `dependency_overrides` (caret metrics, Slote-specific editor behavior). Licensing: see [components/appflowy_editor/COMPLIANCE.md](components/appflowy_editor/COMPLIANCE.md).
 - **`assets/`**: Animations (e.g. Lottie) and other app assets.
 
 ### 2.2 Main Application (`lib/`)
@@ -66,74 +67,63 @@ This section describes the **current state of the Slote codebase**: which compon
 | **Entry & theme**     | `main.dart` initializes theme (via `ThemeProvider`), runs optional Hive→SQLite migration when enabled, then runs `App`.                                                                                                                                                                                                                                                                                                                                                          |
 | **App shell**         | `app.dart`: `MaterialApp` with light/dark theme from `ThemeProvider`, home = `HomeView`.                                                                                                                                                                                                                                                                                                                                                                                         |
 | **Home screen**       | `views/home.dart`: List/grid of notes from `LocalDBService`, theme toggle, list/grid toggle, FAB to create note. Selection mode (long-press) for multi-delete with Lottie delete confirmation. Uses `NotesList` / `NotesGrid` and `EmptyView`.                                                                                                                                                                                                                                   |
-| **Create/Edit note**  | `views/create_note.dart`: **AppFlowy** note editor via `package:rich_text` — `RichTextEditorController`, `AppFlowyEditor`, title field, bottom **format toolbar** (BIUS, headings, lists, blocks, undo/redo via `sloteEditor*`). Note **`body`** is persisted as **AppFlowy Document JSON** (see `services/slote_rich_text_storage.dart`); debounced saves to `LocalDBService`. **Drawing** in-note (`drawingData`) is still **not** wired in this screen (see §2.3). |
+| **Create/Edit note**  | `views/create_note.dart`: **`SloteRichTextEditorScaffold`** + **`RichTextEditorController`** from `package:rich_text`; note **`body`** is **AppFlowy Document JSON** (normalize/save via `services/slote_rich_text_storage.dart`). **Outline / TOC** UI is provided by the scaffold (modal on narrow widths, end drawer on wide); app bar exposes “Outline”. **Drawing**: **`DrawController`** + **`SloteDrawScaffold`** in `bodyFooter` (fixed-height drawing strip below the editor); **`drawingData`** is JSON from `DrawController.toJson` / `fromJson`, saved with the note. App bar toggles **drawing on vs view-only** (`_isDrawingMode`). |
 | **Note model**        | `model/note.dart`: `Note` with `id`, `title`, `body`, `drawingData` (JSON string), `lastMod`. `toMap` / `fromMap` for DB.                                                                                                                                                                                                                                                                                                                                                        |
 | **Local persistence** | `services/local_db.dart`: SQLite (`notes.db`) via `sqflite`; table `notes` (id, title, body, drawingData, lastMod). Singleton `LocalDBService` with `saveNote`, `getAllNotes`, `getNote`, `deleteNote`, and `listenAllNotes()` stream for reactive UI.                                                                                                                                                                                                                           |
 | **Migration**         | `services/hive_to_sqlite_migration.dart`: One-time migration from Hive to SQLite (gated by env flag).                                                                                                                                                                                                                                                                                                                                                                            |
-| **Drawing in app**    | Drawing in the note editor is implemented via a **scribble-style API** (ScribbleNotifier, Sketch, Erasing, Scribble widget). The codebase includes a **scribble stub** (`scribble_stub.dart`) so it can compile without the external scribble package; there is a TODO to replace this with **slote_draw** (the `draw` component).                                                                                                                                               |
+| **Drawing in app**    | Ink is **`package:draw`**. The note screen owns persistence and composition (`drawingData` JSON). Stroke **undo/redo** is not implemented yet; rendering uses **`perfect_freehand`** (see §2.3 and [components/draw/docs/ROADMAP.md](components/draw/docs/ROADMAP.md)).                                                                                                                                               |
 
 ### 2.3 Component: `draw` (`components/draw`)
 
-Custom drawing for Slote.
+Custom drawing for Slote; **wired into** `create_note.dart` for `drawingData` JSON.
 
 | Feature            | Description                                                                                                     |
 | ------------------ | --------------------------------------------------------------------------------------------------------------- |
-| **DrawController** | Central controller: set color, stroke width, tool (pen/eraser/highlighter/shape).                               |
-| **DrawCanvas**     | Canvas widget that uses the controller to render strokes.                                                       |
+| **DrawController** | Central controller: color, stroke width, tool (pen / eraser / highlighter / shape), **`pressureEnabled`**; **`toJson` / `fromJson`** with **`schemaVersion`** and legacy decode. |
+| **DrawCanvas**     | `CustomPaint` + optional **`documentTransform`** (`Matrix4`): samples stored in **document space**, paint applies the same transform. |
+| **Stroke model**   | Immutable **`StrokeSample`** lists (`x`, `y`, optional pressure) + metadata. **`StrokeRenderer`** uses [`perfect_freehand`](https://pub.dev/packages/perfect_freehand) **`getStroke`** (filled paths). |
+| **Gestures**       | **`GestureDetector`** pan sampling today; dedicated **1-finger draw / 2-finger pan** pointer routing (via **`Listener`**) is **Wave B** per draw roadmap. |
 | **Tools**          | Pen, eraser, highlighter, shape tool.                                                                           |
-| **Stroke model**   | Stroke data and `StrokeRenderer` for painting.                                                                  |
-| **Stylus**         | `StylusDetector` and `PressureHandler` for stylus-aware input.                                                  |
-| **Example app**    | `example/`: pen, eraser, highlighter, color picker (8 colors), stroke width (1–20px), clear, draw vs view mode. |
+| **Stylus**         | `StylusDetector` and `PressureHandler` (product wiring and per-sample pressure in the persisted model are roadmap work). |
+| **UI**             | **`SloteDrawScaffold`** — chrome used by the main app’s note screen.                                            |
+| **Example app**    | `example/`: isolated loop for tools, colors, stroke width, clear, draw vs view mode.                          |
 
-**Note**: The main app’s note editor does not yet use `draw`; it uses the scribble-based path (or stub). Integration of `draw` into the note screen is planned.
+**Engineering direction (canonical):** [components/draw/docs/ROADMAP.md](components/draw/docs/ROADMAP.md) — **`perfect_freehand`** (`getStroke`) and **document-space** samples with optional **`Matrix4`** on **`DrawCanvas`** / **`SloteDrawScaffold`** are in place (**Wave A**). Next: wire the live matrix from **`package:viewport`** (**`ZoomPanSurface.onTransformChanged`**) in the note shell (**Wave G**), **`Listener`**-based stroke vs pan routing (**Wave B**), stroke/pixel eraser (**Wave D**), **ink undo/redo** (**Wave E**). **Wave G** is end-to-end viewport + AppFlowy + ink with a single transform owner.
 
 ### 2.4 Component: `rich_text` (`components/rich_text`)
 
-Rich text editing for Slote, moving to **AppFlowy Editor** with **Document JSON** as the canonical model (markdown/Delta only for import/export or migration where needed).
+Rich text editing for Slote on **AppFlowy Editor** with **Document JSON** as the canonical model (Markdown via `slote_markdown_codec` for import/export and tests; not the live editing model).
 
 | Area | Description |
 | ---- | ----------- |
-| **`lib/`** | **Active** — exports AppFlowy helpers (`RichTextEditorController`, BIUS/toolbar entry points, shortcuts, markdown codec, undo helpers). Main app composes `AppFlowyEditor` + toolbars in `lib/src/views/create_note.dart`. |
-| **`example/`** | **Spike / sandbox** — full demo UI (`EditorState` + `AppFlowyEditor`, JSON log, extended toolbar); used for day‑to‑day editor experiments. |
-| **Roadmap** | **[components/rich_text/docs/ROADMAP.md](components/rich_text/docs/ROADMAP.md)** — end-to-end phases: foundation (JSON, BIUS, debounced JSON callback, shortcuts), then extended inline (super/subscript, links, fonts, colors, alignment, clear formatting), blocks (headings H1–H6, lists, quote, divider, code, tables, callouts), media (images), formula (LaTeX), outline/TOC, theming bridge. |
-| **AppFlowy checklist** | **[components/rich_text/docs/appflowy-editor-roadmap.md](components/rich_text/docs/appflowy-editor-roadmap.md)** — Phases 1–4 (JSON confidence, BIUS toolbar, controller + `transactionStream` debounce, shortcut parity). |
-| **Legacy** | Former **Quill + markdown** design is **archived in prose** only: [components/rich_text/IMPLEMENTATION.md](components/rich_text/IMPLEMENTATION.md) (not the active codebase in `lib/`). |
+| **`lib/`** | **Active** — exports `RichTextEditorController`, **`SloteRichTextEditorScaffold`**, **`FormatToolbar`** (shared with the main app), AppFlowy helpers, markdown codec, **`sloteEditorUndo` / `sloteEditorRedo`** wrappers, `undoRedoListenable`, outline collection (`sloteCollectOutlineEntries`). Root **`dependency_overrides`** point **`appflowy_editor`** at **[components/appflowy_editor](components/appflowy_editor)** (fork). |
+| **`example/`** | **Spike / sandbox** — same public APIs as the app plus JSON logging; used for editor experiments. |
+| **Roadmap** | **[components/rich_text/docs/ROADMAP.md](components/rich_text/docs/ROADMAP.md)** — rolling status: foundation (Phases 1–4) and **Wave B** inline work largely **shipped** (sup/sub, links drawer, font size/family, text color/highlight, alignment, clear formatting). **Wave C1–C5** **delivered** (headings through **H5**, bulleted/numbered/checkbox lists, quote, divider, plain code block, callout). **Wave D — outline/TOC** **delivered** in scaffold + `create_note`. **C6–C7** (tables, images): basic toolbar insert exists; full editing UX and app-level storage/picker are **deferred**. **Wave E** (theming bridge, mobile/desktop polish, performance) and formula/LaTeX remain **next**. |
+| **AppFlowy checklist** | **[components/rich_text/docs/appflowy-editor-roadmap.md](components/rich_text/docs/appflowy-editor-roadmap.md)** — historical milestone list; prefer the main rich_text ROADMAP for current status. |
+| **Legacy** | Former **Quill + markdown** design is **archived in prose** only: [components/rich_text/IMPLEMENTATION.md](components/rich_text/IMPLEMENTATION.md). |
 
-**Root app** persists the note **body** as **AppFlowy Document JSON** via `create_note.dart` and `slote_rich_text_storage.dart`. **flutter_quill** is not a root dependency (legacy Quill design is documented only in `rich_text/IMPLEMENTATION.md`).
+**Root app** persists the note **body** as **AppFlowy Document JSON** via `create_note.dart` and `slote_rich_text_storage.dart`. **flutter_quill** is not a dependency.
 
-**Undo/redo (rich text):** Provided by **AppFlowy `EditorState` history** in the note editor. The **`undo_redo`** component package (§2.6) is **no longer** used by the root app; it remains available for its **example** or future reuse until deleted — see ROADMAP “Undo/redo” section.
+**Undo/redo (rich text):** **AppFlowy `EditorState.undoManager`** — see `appflowy_undo_support.dart` and ROADMAP. The standalone **`components/undo_redo`** package was **removed**. **Ink undo/redo** is planned inside **`draw`** ([draw ROADMAP](components/draw/docs/ROADMAP.md)); a unified note-level Cmd+Z across editor + ink is **explicitly deferred** until product needs it.
 
 ### 2.5 Component: `viewport` (`components/viewport`)
 
-Zoom and pan for a scrollable content area.
+Zoom, pan, and scroll for a scrollable content area — implemented with a top-level **`Listener`** (low-level pointers, wheel, trackpad) and an internal **`Matrix4`** transform.
 
 | Feature                     | Description                                                                                |
 | --------------------------- | ------------------------------------------------------------------------------------------ |
 | **ViewportSurface**         | High-level viewport widget.                                                                |
-| **ZoomPanSurface**          | Zoom/pan transform and gesture handling.                                                   |
+| **ZoomPanSurface**          | Applies **`Transform`**, handles pinch zoom, **1-finger pan** (when not in drawing-navigation mode), wheel / trackpad scroll; exposes **`onTransformChanged(Matrix4)`** for children (e.g. ink in document space). |
 | **GestureHandler**          | Pointer/gesture logic for pinch and pan.                                                   |
 | **BoundaryManager**         | Keeps content within bounds.                                                               |
 | **ContentMeasurer**         | Measures content for layout.                                                               |
 | **TransformAwareScrollbar** | Scrollbar that respects zoom/pan.                                                          |
+| **Drawing vs navigation**   | **`isDrawingMode`** / **`isDrawingActive`** gate pan vs pinch so drawing and zoom do not fight (see source; wire to `SloteDrawScaffold` / stroke lifecycle in product). |
 | **Example app**             | `example/`: zoom (pinch, limits), pan, scrollbar, boundary behavior, content height/stats. |
 
-**Note**: The main app note screen does **not** use `viewport` today; `viewport` remains available for zoom/pan reuse (e.g. future drawing canvas or unified note chrome).
+**Note**: Root **`pubspec.yaml`** depends on **`viewport`**, but **`create_note.dart` does not import it yet** — the note page still uses a **fixed drawing footer** without a shared transform. **Planned integration** is **[Wave G — viewport + editor + ink](components/draw/docs/ROADMAP.md#wave-g--note-shell-viewport--editor--ink)** in the draw roadmap (scroll ownership vs AppFlowy internal scroll is called out there).
 
-### 2.6 Component: `undo_redo` (`components/undo_redo`)
-
-Generic undo/redo and text-specific + unified controllers — **not** depended on by the **root app** after note body migration to AppFlowy; **example** app still demonstrates plain-text undo.
-
-| Feature                       | Description                                                                                                                       |
-| ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| **UndoRedoController\<T\>**   | Generic: `getCurrentState`, `restoreState`, optional `stateEquals`; history (max 50), undo/redo.                                  |
-| **TextUndoRedoController**    | Wraps `TextEditingController`; state = text + selection.                                                                          |
-| **UnifiedUndoRedoController** | Currently wraps text only; accepts a `scribbleNotifier` parameter for future drawing undo (to be wired when drawing uses `draw`). |
-| **UndoRedoState**             | Base and `TextState` for text undo.                                                                                               |
-| **Example app**               | `example/`: text field with undo/redo, clear history, state indicators.                                                           |
-
-**Consolidation plan:** **Done for the note body** — `CreateNoteView` uses **`EditorState`** history only; root **`pubspec.yaml`** no longer lists `undo_redo`. Optional cleanup: **delete or archive** `components/undo_redo` when you no longer need the standalone example. Drawing undo remains with **`draw`** / stroke stack until explicitly unified. Detailed checklist: [components/rich_text/docs/ROADMAP.md](components/rich_text/docs/ROADMAP.md) (“Undo/redo”).
-
-### 2.7 Component: `theme` (`components/theme`)
+### 2.6 Component: `theme` (`components/theme`)
 
 Theming for the app.
 
@@ -144,7 +134,7 @@ Theming for the app.
 
 Used by the main app in `App` and home/note UI for theme mode and styles.
 
-### 2.8 Component: `shared` (`components/shared`)
+### 2.7 Component: `shared` (`components/shared`)
 
 Shared strings, assets, and widgets.
 
@@ -156,21 +146,21 @@ Shared strings, assets, and widgets.
 
 Used by the main app and by components that need common copy or assets.
 
-### 2.9 Tooling: `cmd.py`
+### 2.8 Tooling: `cmd.py`
 
 Cross-platform CLI for database and emulator workflows (e.g. pull SQLite DB from Android, open in DB Browser, list/pick device). Not part of the Flutter runtime.
 
-### 2.10 Summary Table
+### 2.9 Summary Table
 
-| Layer         | Implemented                                                                                          | Not yet in main app / Planned                                    |
-| ------------- | ---------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
-| **App**       | Home, create note, SQLite, theme; note **body** = AppFlowy Document JSON via `rich_text`               | Drawing in note UI; folders; .slote format; PDF export         |
-| **draw**      | Full component + example                                                                             | Wired into note editor (replace scribble)                        |
-| **rich_text** | **`lib/`** API + main-app **`create_note.dart`**; **`example/`** for experiments                      | TOC/outline, polish (see ROADMAP)                                |
-| **viewport**  | Full component + example                                                                             | Optional: reuse in note screen or drawing chrome                 |
-| **undo_redo** | Text + unified wrapper + **example** only (root app does not depend on package)                       | Optional: delete package if example no longer needed             |
-| **theme**     | In use                                                                                               | —                                                                |
-| **shared**    | In use                                                                                               | —                                                                |
+| Layer         | In the codebase today                                                                                 | Product / engineering still open (see roadmaps)                 |
+| ------------- | ----------------------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
+| **App**       | **Home** (list/grid, selection delete), **create note** (title + rich text + **drawing footer** + outline), **SQLite** `notes` table, **theme** | **Folders**; **.slote** import/export; **PDF** export; in-note **Find**; draft/scratchpad; shortcuts panel — not implemented in `lib/` yet |
+| **draw**      | **`package:draw`** + **example**; **wired** in `create_note` (`drawingData` JSON)                      | **`perfect_freehand`**, document-space + **`Matrix4`** from viewport, gesture + eraser + **ink undo/redo**; **[Wave G](components/draw/docs/ROADMAP.md#wave-g--note-shell-viewport--editor--ink)** composes viewport + editor + ink ([draw ROADMAP](components/draw/docs/ROADMAP.md)) |
+| **rich_text** | **`lib/`** + **example**; scaffold/toolbar shared with app; **TOC/outline** in note screen              | **Wave E** polish; **C6–C7** tables/images product slice ([rich_text ROADMAP](components/rich_text/docs/ROADMAP.md)) |
+| **appflowy_editor** | **Vendored fork** under `components/appflowy_editor` (override)                               | Track upstream / compliance ([COMPLIANCE.md](components/appflowy_editor/COMPLIANCE.md)) |
+| **viewport**  | Full component + **example**; **`ZoomPanSurface`** + transform callbacks documented for draw            | **Product:** compose around note editor + ink per draw roadmap **Wave G** (not in `create_note` yet) |
+| **theme**     | In use                                                                                                | —                                                               |
+| **shared**    | In use                                                                                                | —                                                               |
 
 ---
 
@@ -318,9 +308,13 @@ The following sections align with the **Cleaned Up Feature List** and roadmap ph
 
 ### 7.1 Drawing & Typing Integration
 
-**MVP:** Pen tool, eraser, 5–6 colors, **clean architectural separation** between draw and type layers so they do not overlap. On mobile: touch vs. stylus disambiguation from day one.
+**Implementation today:** Typed content is **AppFlowy Document JSON** in the editor; ink is a **separate** `package:draw` layer in a **footer** region below the editor, persisted as **`drawingData`**. **`package:viewport`** is **not** composed into the note screen yet — **shared zoom/pan/scroll + one `Matrix4` for text and ink** is **[Wave G](components/draw/docs/ROADMAP.md#wave-g--note-shell-viewport--editor--ink)** in the draw roadmap.
 
-**Post-MVP (v1.1+):** Stylus button mapping (e.g. map button to erase while holding). Pressure sensitivity tiers, palm rejection fine-tuning, shape tools, straight-line detection — validate demand first.
+**MVP (product):** Pen tool, eraser, limited palette, **no overlap bugs** between draw and type. On mobile: touch vs. stylus disambiguation from day one.
+
+**Engineering direction:** **`perfect_freehand`** for stroke outlines, **`CustomPaint`**, and **`package:viewport`** (**`ZoomPanSurface`**, **`onTransformChanged`**, **`isDrawingMode` / `isDrawingActive`**) for pan/zoom/scroll in the note shell, per [components/draw/docs/ROADMAP.md](components/draw/docs/ROADMAP.md).
+
+**Post-MVP (v1.1+):** Stylus button mapping (e.g. map button to erase while holding). Pressure toggle and straight-line (draw-and-hold) are specified on the draw roadmap. Palm rejection fine-tuning — validate demand first.
 
 **Deferred:** Shape recognition, high-fidelity pressure tiers. Ship drawing well before adding complexity.
 
@@ -333,11 +327,13 @@ The following sections align with the **Cleaned Up Feature List** and roadmap ph
 
 ### 7.2 Rich Text Formatting
 
-**Engineering direction:** **`components/rich_text`** on **AppFlowy Editor**, **Document JSON** as canonical storage; phased delivery in [components/rich_text/docs/ROADMAP.md](components/rich_text/docs/ROADMAP.md) (inline → blocks → media → LaTeX/TOC, etc.).
+**Engineering direction:** **`components/rich_text`** on **AppFlowy Editor** (vendored **`appflowy_editor`** fork), **Document JSON** as canonical storage; phased delivery in [components/rich_text/docs/ROADMAP.md](components/rich_text/docs/ROADMAP.md).
 
-**MVP (product):** Bold, italic, underline, headings (H1/H2/H3), highlight, bullet/numbered lists. Basic doc elements: dividers, code blocks, blockquotes, tables. Highlight-to-apply toolbar. Find (Ctrl+F). Not full MS Word — keep it lightweight.
+**Shipped in codebase (high level):** BIUS, headings through **H5**, lists (bulleted, numbered, checkbox), quote, divider, plain code block, callout, links (with format drawer), font size/family, text color and highlight, alignment, clear formatting, superscript/subscript (with documented limitations), **outline/TOC** in the editor scaffold, editor undo/redo via AppFlowy history.
 
-**v1.1:** Find and Replace (Ctrl+H). Table of contents with scroll hover preview.
+**MVP (product) gaps vs. vision:** In-note **Find (Ctrl+F)** and full **table** editing UX are not product-complete in the root app yet; tables/images have partial toolbar hooks — see ROADMAP **C6–C7**.
+
+**v1.1:** Find and Replace (Ctrl+H). TOC “scroll hover preview” may evolve with Wave E polish.
 
 **User Stories**
 
@@ -572,8 +568,8 @@ The following sections align with the **Cleaned Up Feature List** and roadmap ph
 
 ### 9.1 Main Interface
 
-- **Navigation**: Sidebar with folder tree, top toolbar, status bar
-- **Note Editor**: Unified canvas (draw + type), drawing toolbar, format bar for text, zoom controls
+- **Navigation (today)**: **Home** with list/grid toggle and FAB; **no** folder sidebar in the root app yet (flat note list). Product north star remains folder tree + status affordances.
+- **Note Editor (today)**: **`SloteRichTextEditorScaffold`** — **AppFlowy** body, **format toolbar**, **outline** affordance, **app bar** (back, title, draw on/off, outline, close/delete flow). **Drawing** is a **`SloteDrawScaffold`** **footer** below the editor (not a single merged infinite canvas yet). **Target shell:** **`package:viewport`** (**`ZoomPanSurface`**) wrapping editor + ink with one transform — **[Wave G](components/draw/docs/ROADMAP.md#wave-g--note-shell-viewport--editor--ink)** ([draw ROADMAP](components/draw/docs/ROADMAP.md)).
 
 ### 9.2 Hamburger Menu / Settings
 
@@ -664,11 +660,11 @@ To view/edit the database from an Android emulator:
 
 ### 10.5 Development Infrastructure
 
-**Status**: ✅ Implemented (January 2025)
+**Status**: ✅ Implemented (updated continuously; see component READMEs and roadmaps)
 
 #### Component Test Platforms
 
-To enable faster, decentralized development, each component in `components/` now has a standalone test application in its `example/` directory. This infrastructure allows developers to:
+To enable faster, decentralized development, each component in `components/` has a standalone test application in its `example/` directory where applicable. This infrastructure allows developers to:
 
 - **Test Components Independently**: Each component can be tested in isolation without running the full Slote app
 - **Faster Development Cycles**: Reduced startup time and focused debugging environments
@@ -677,10 +673,11 @@ To enable faster, decentralized development, each component in `components/` now
 
 **Implemented Test Platforms**:
 
-1. **draw/example/** - Drawing functionality testing (pen, eraser, highlighter, color selection, stroke width)
-2. **rich_text/example/** - AppFlowy editor spike (Document JSON, BIUS toolbar); full feature set tracked in `components/rich_text/docs/ROADMAP.md`
-3. **viewport/example/** - Zoom/pan/viewport testing (zoom controls, content height, boundary constraints)
-4. **undo_redo/example/** - Standalone plain-text undo demo (root app no longer uses this package; optional removal — see `rich_text` ROADMAP)
+1. **draw/example/** — Drawing loop (tools, colors, stroke width); root app also exercises **`SloteDrawScaffold`** in `create_note.dart`
+2. **rich_text/example/** — Same scaffold/toolbar stack as the app, plus JSON logging; feature status in [components/rich_text/docs/ROADMAP.md](components/rich_text/docs/ROADMAP.md)
+3. **viewport/example/** — Zoom/pan/viewport (zoom controls, content height, boundary constraints)
+
+**Not present:** **`components/undo_redo`** was removed from the repository (plain-text demo only; editor undo is AppFlowy; ink undo is planned in **`draw`**).
 
 **Usage**:
 
@@ -763,7 +760,7 @@ Slote targets Android, iOS, web, and desktop from a single Flutter codebase. The
 - Mind mapping
 - Whiteboard mode
 
-_(Code syntax highlighting was specified for the legacy Quill path; the AppFlowy spike will add fenced code blocks first, then optional highlight/intellisense per [components/rich_text/docs/ROADMAP.md](components/rich_text/docs/ROADMAP.md).)_
+_(Plain **code blocks** are in place ([rich_text ROADMAP](components/rich_text/docs/ROADMAP.md) Wave C4); optional **syntax highlighting** / intellisense is **Wave E** polish.)_
 
 ### 12.2 Platform Expansion
 
@@ -804,18 +801,18 @@ _(Code syntax highlighting was specified for the legacy Quill path; the AppFlowy
 
 | Feature                                                   | Phase                           | Notes                                            |
 | --------------------------------------------------------- | ------------------------------- | ------------------------------------------------ |
-| Draw + Type (pen, eraser, colors, layer separation)       | MVP                             | Core differentiator; ship clean, no overlap bugs |
-| Rich text (bold, italic, headings, lists, highlight)      | MVP                             | Simplified; not full Word                        |
-| Doc elements (dividers, code blocks, blockquotes, tables) | MVP                             | Basic set                                        |
-| Find (Ctrl+F)                                             | MVP                             | Replace in v1.1                                  |
-| Folder hierarchy (Finder/Explorer model)                  | MVP                             | Table stakes                                     |
+| Draw + Type (pen, eraser, colors, layer separation)       | MVP                             | **In app:** `package:draw` footer + persistence; **roadmap:** `perfect_freehand`, **`package:viewport`** shell (**[Wave G](components/draw/docs/ROADMAP.md#wave-g--note-shell-viewport--editor--ink)**), ink undo ([draw ROADMAP](components/draw/docs/ROADMAP.md)) |
+| Rich text (bold, italic, headings, lists, highlight)      | MVP                             | **Largely in** `rich_text` + note screen; see [rich_text ROADMAP](components/rich_text/docs/ROADMAP.md) |
+| Doc elements (dividers, code blocks, blockquotes, tables) | MVP                             | **C1–C5** blocks shipped; **tables** = partial (insert vs full UX per ROADMAP C6) |
+| Find (Ctrl+F)                                             | MVP                             | **Not in root app yet**; Replace in v1.1         |
+| Folder hierarchy (Finder/Explorer model)                  | MVP                             | **Not in root app yet**; table stakes for product |
 | .slote format, drag-drop, PDF export                      | MVP                             | Offline-first, no account                        |
 | Cross-Platform (Desktop + Mobile + Web)                   | MVP                             | Flutter: all in MVP                              |
 | Draft/Scratchpad                                          | MVP                             | Widget in v1.1                                   |
 | Shortcuts (desktop + mobile panel)                        | MVP                             |                                                  |
 | Theming (light, dark, 2–3 accents)                        | MVP                             |                                                  |
 | Find & Replace, Image insert, Stylus mapping              | v1.1                            |                                                  |
-| Markdown export, .bak backup, Sticky notes, TOC           | v1.1                            |                                                  |
+| Markdown export, .bak backup, Sticky notes, TOC polish    | v1.1                            | **Outline/TOC** already in editor scaffold; v1.1 may add hover preview etc. |
 | Widgets for draft (native bridge)                         | v1.1                            |                                                  |
 | WiFi local sync, Local collaboration                      | v1.2                            |                                                  |
 | Word/PNG export, Community forum                          | v1.2                            |                                                  |

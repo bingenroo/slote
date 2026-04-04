@@ -62,14 +62,6 @@ components/
       ios/
       ...
     lib/
-
-  undo_redo/
-    example/
-      lib/main.dart
-      test/widget_test.dart
-      pubspec.yaml
-      README.md
-    lib/
 ```
 
 ## Example apps
@@ -132,27 +124,6 @@ flutter run
 
 ```bash
 cd components/viewport/example
-flutter pub get
-flutter run
-```
-
-### 4. Undo/redo example
-
-**Location**: `components/undo_redo/example/`
-
-**Note:** Intended for **plain `TextEditingController`** undo. **Planned removal** after the note body uses AppFlowy (`EditorState` history) — see `components/rich_text/docs/ROADMAP.md`.
-
-**Demonstrates**:
-
-- Undo/redo with text editing
-- Can undo/redo state
-- History clear
-- State indicators
-
-**Run**:
-
-```bash
-cd components/undo_redo/example
 flutter pub get
 flutter run
 ```

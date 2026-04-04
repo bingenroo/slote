@@ -1,6 +1,6 @@
 # AppFlowy Editor integration roadmap (`rich_text`)
 
-**Full product and feature roadmap:** see **[ROADMAP.md](ROADMAP.md)** (end-to-end phases, feature waves, listeners, `undo_redo` consolidation).
+**Full product and feature roadmap:** see **[ROADMAP.md](ROADMAP.md)** (end-to-end phases, feature waves, listeners, AppFlowy undo/redo).
 
 This file stays focused on **AppFlowy Editor** milestones: Document JSON, BIUS, controller/debounce, shortcuts, and short-term deferred items.
 

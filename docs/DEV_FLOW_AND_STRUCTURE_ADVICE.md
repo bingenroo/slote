@@ -8,8 +8,8 @@ Recommendations to speed up the Slote monorepo dev process: extend `cmd.py` as t
 
 ## Current state (summary)
 
-- **Monorepo:** Main app at repo root + [components/](../components/) (viewport, rich_text, draw, undo_redo, theme, shared). No root-level Melos, no CI.
-- **Component test/example apps:** Several packages have a runnable app under `example/` or `test/` (e.g. viewport has `example/`, draw/rich_text/undo_redo have `example/`). Workflow is manual: `cd components/<name>/example` (or `test/`), `flutter pub get`, `flutter run`.
+- **Monorepo:** Main app at repo root + [components/](../components/) (viewport, rich_text, draw, theme, shared). No root-level Melos, no CI.
+- **Component test/example apps:** Several packages have a runnable app under `example/` or `test/` (e.g. viewport has `example/`, draw/rich_text have `example/`). Workflow is manual: `cd components/<name>/example` (or `test/`), `flutter pub get`, `flutter run`.
 - **Tests:** Widget tests exist in the main app [test/](../test/) and in component example/test apps. Some may still be the default Flutter counter test; if a test app’s home screen is not the counter, that widget test would fail. No integration tests; no automated test run across the repo.
 - **Docs:** [README.md](../README.md), [COMPONENT_TEST_PLATFORMS.md](../components/COMPONENT_TEST_PLATFORMS.md), [CONCURRENT_DEVELOPMENT_GUIDE.md](CONCURRENT_DEVELOPMENT_GUIDE.md) describe setup and concurrent work. A single “daily workflow” entry point and scripts can reduce repetition.
 
@@ -91,7 +91,7 @@ This gives a single “green/red” for “the repo builds and passes analysis a
   - **Working on a component:** run `python3 cmd.py component run <name>` (or cd to `components/<name>/example` and `flutter run`), edit `../lib/`, hot reload; run `flutter test` in that app before pushing.
   - **Working on the app:** from repo root, `flutter run` or `python3 cmd.py run`; run `flutter test` at root before pushing.
   - **Before merging:** run `python3 cmd.py test`, and optionally smoke-test the main app (run and use the feature that uses your component).
-- Optionally add a small **ownership** table (e.g. in README or DEV_WORKFLOW): who’s primary for which component (viewport, rich_text, draw, undo_redo). Reduces “who do I ask?” and avoids two people changing the same component without coordination.
+- Optionally add a small **ownership** table (e.g. in README or DEV_WORKFLOW): who’s primary for which component (viewport, rich_text, draw). Reduces “who do I ask?” and avoids two people changing the same component without coordination.
 
 No structural change beyond the app-at-root assumption—only one clear entry point for “how we develop and test.”
 

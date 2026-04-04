@@ -1,16 +1,12 @@
 # draw
 
-A new Flutter project.
+Custom drawing for Slote (`package:draw`). Public API: [`lib/draw.dart`](lib/draw.dart).
 
-## Getting Started
+**Engineering roadmap:** [docs/ROADMAP.md](docs/ROADMAP.md) — waves A–G, **`package:viewport`** (**`ZoomPanSurface`**, Wave G note shell), `perfect_freehand`, gestures, erasure, ink undo/redo vs AppFlowy history.
 
-This project is a starting point for a Flutter application.
+## Getting started
 
-A few resources to get you started if this is your first Flutter project:
+- **Isolated loop:** `cd components/draw/example` → `flutter pub get` → `flutter run`.
+- **Main app:** root [`pubspec.yaml`](../pubspec.yaml) depends on this package via `path: components/draw`; note screen uses `DrawController` / `SloteDrawScaffold` (see roadmap touchpoints).
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
-
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+For general Flutter setup, see [Flutter documentation](https://docs.flutter.dev/).

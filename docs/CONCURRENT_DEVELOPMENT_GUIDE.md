@@ -10,7 +10,7 @@ With the new component-based structure, concurrent development is **highly feasi
 
 ### 1. Independent Development
 
-Each component (`slote_viewport`, `slote_rich_text`, `slote_undo_redo`, `slote_draw`, `slote_theme`) is:
+Each component (`slote_viewport`, `slote_rich_text`, `slote_draw`, `slote_theme`) is:
 - **Self-contained**: Has its own directory, `pubspec.yaml`, and dependencies
 - **Isolated**: Changes to one component don't affect others
 - **Versioned independently**: Can be developed and tested separately

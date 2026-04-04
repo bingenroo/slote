@@ -5,7 +5,6 @@ This repository contains reusable component packages for the Slote application.
 ## Packages
 
 - **viewport**: Viewport/zoom/pan functionality
-- **undo_redo**: Generic undo/redo for plain text fields — **root app no longer depends on it**; **`example/`** remains for demos (optional package deletion — see `rich_text/docs/ROADMAP.md`)
 - **rich_text**: Rich text (**AppFlowy Editor**, Document JSON); **`lib/`** is the public API; main app note body uses it from `lib/src/views/create_note.dart`; **`example/`** for experiments — see `rich_text/docs/ROADMAP.md`
 - **draw**: Custom drawing implementation
 - **theme**: Theming system
@@ -29,7 +28,6 @@ Each component includes a standalone **example app** in its `example/` directory
 - **draw/example/** – Drawing tools, colors, stroke width, eraser, highlighter
 - **rich_text/example/** – AppFlowy editor spike (JSON, BIUS toolbar); roadmap: `rich_text/docs/ROADMAP.md`
 - **viewport/example/** – Zoom, pan, scroll, boundary constraints
-- **undo_redo/example/** – Standalone plain-text undo demo (not used by root app)
 
 ### Quick start
 

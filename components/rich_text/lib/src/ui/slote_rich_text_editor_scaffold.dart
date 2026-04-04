@@ -35,6 +35,7 @@ class SloteRichTextEditorScaffold extends StatefulWidget {
     this.outlineEmptyTextStyle,
     this.outlineEntryTextStyle,
     this.blockComponentBuilders,
+    this.bodyFooter,
   });
 
   final RichTextEditorController controller;
@@ -56,6 +57,9 @@ class SloteRichTextEditorScaffold extends StatefulWidget {
   final TextStyle? outlineEntryTextStyle;
 
   final Map<String, BlockComponentBuilder>? blockComponentBuilders;
+
+  /// Optional panel below the editor (e.g. drawing). Kept above the format toolbar.
+  final Widget? bodyFooter;
 
   @override
   State<SloteRichTextEditorScaffold> createState() =>
@@ -196,13 +200,29 @@ class SloteRichTextEditorScaffoldState extends State<SloteRichTextEditorScaffold
           : null,
       appBar: widget.appBar,
       body: SafeArea(
-        child: AppFlowyEditor(
-          editorState: es,
-          editorStyle: editorStyle,
-          blockComponentBuilders: builders,
-          commandShortcutEvents:
-              standardCommandShortcutsWithSloteInlineHandlers(),
-        ),
+        child: widget.bodyFooter == null
+            ? AppFlowyEditor(
+                editorState: es,
+                editorStyle: editorStyle,
+                blockComponentBuilders: builders,
+                commandShortcutEvents:
+                    standardCommandShortcutsWithSloteInlineHandlers(),
+              )
+            : Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Expanded(
+                    child: AppFlowyEditor(
+                      editorState: es,
+                      editorStyle: editorStyle,
+                      blockComponentBuilders: builders,
+                      commandShortcutEvents:
+                          standardCommandShortcutsWithSloteInlineHandlers(),
+                    ),
+                  ),
+                  widget.bodyFooter!,
+                ],
+              ),
       ),
       bottomNavigationBar: SafeArea(
         top: false,

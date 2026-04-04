@@ -40,7 +40,7 @@ This document is the single entry point for day-to-day development: setup, runni
 
 - **Run the component’s test app** (from repo root):
   ```bash
-  python3 cmd.py component run viewport   # or rich_text, draw, undo_redo
+  python3 cmd.py component run viewport   # or rich_text, draw
   ```
   Or: `cd components/viewport/example` then `flutter run`.
 
@@ -58,7 +58,7 @@ This document is the single entry point for day-to-day development: setup, runni
    ```bash
    python3 cmd.py test
    ```
-   This runs `flutter test` at repo root and in each component test app (viewport, rich_text, draw, undo_redo). Fix any failures.
+   This runs `flutter test` at repo root and in each component test app (viewport, rich_text, draw). Fix any failures.
 
 2. **Smoke-test in the main app**  
    Run the main app (`python3 cmd.py run`) and use the feature that uses your component (e.g. viewport in a note, drawing, rich text) to confirm nothing is broken.
@@ -72,7 +72,6 @@ To reduce “who do I ask?” and avoid two people changing the same component w
 | slote_viewport | (assign)      |
 | slote_rich_text| (assign)      |
 | slote_draw     | (assign)      |
-| slote_undo_redo| (assign)      |
 | slote_theme    | (assign)      |
 | slote_shared   | (assign)      |
 

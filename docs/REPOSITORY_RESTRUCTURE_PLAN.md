@@ -1,6 +1,6 @@
 ---
 name: Repository Restructure Plan
-overview: "Restructure 3 separate git repos into 2 repos: slote_app (main app with models, views, controllers, HiveDB) and components (reusable sub-components: viewport, undo_redo, rich_text, draw). Remove scribble/flutter_drawing_board dependencies. Preserve all git history and branches."
+overview: "Restructure 3 separate git repos into 2 repos: slote_app (main app with models, views, controllers, HiveDB) and components (reusable sub-components: viewport, undo_redo, rich_text, draw). Drawing is a first-party `package:draw` component. Preserve all git history and branches."
 todos:
   - id: create_components_repo
     content: Create components repository and initialize git
@@ -31,12 +31,12 @@ todos:
     dependencies:
       - create_package_structure
   - id: create_draw_package
-    content: Create slote_draw package structure for custom drawing implementation (replacing scribble)
+    content: Create slote_draw package structure for custom drawing implementation
     status: pending
     dependencies:
       - create_package_structure
-  - id: remove_scribble_deps
-    content: Remove scribble and flutter_drawing_board dependencies from slote_app
+  - id: draw_package_deps
+    content: Remove legacy third-party drawing package dependencies from slote_app (done — ink is package:draw)
     status: pending
     dependencies:
       - create_draw_package
@@ -50,7 +50,7 @@ todos:
       - create_rich_text_package
       - create_draw_package
   - id: update_slote_app_imports
-    content: Update all imports in slote_app to use component packages and remove scribble imports
+    content: Update all imports in slote_app to use component packages
     status: pending
     dependencies:
       - update_slote_app_deps
@@ -60,7 +60,7 @@ todos:
     dependencies:
       - update_slote_app_imports
   - id: cleanup_slote_app
-    content: Remove extracted files from slote_app, remove scribble code, and verify app builds
+    content: Remove extracted files from slote_app and verify app builds
     status: pending
     dependencies:
       - migrate_models_views_controllers
@@ -70,6 +70,8 @@ todos:
     dependencies:
       - cleanup_slote_app
 ---
+
+**Update (2026):** The monorepo no longer includes `components/undo_redo` (removed). Note-body undo/redo is **AppFlowy** `EditorState` history via `package:rich_text`. Drawing undo is expected to live in **`draw`** when implemented. Ink is **`package:draw`** (see [`components/draw/docs/ROADMAP.md`](../components/draw/docs/ROADMAP.md)). The YAML frontmatter `todos` and the plan body below remain **historical** planning text.
 
 # Repository Restructure Plan
 
@@ -84,7 +86,7 @@ Restructure the current 3-repo setup into 2 repos with a component-based archite
 
 - Models, views, controllers, and HiveDB **stay in slote_app**
 - Break down into focused sub-components instead of monolithic packages
-- Remove `scribble` and `flutter_drawing_board` dependencies (will be replaced with custom `slote_draw`)
+- Drawing lives in **`components/draw`** (`package:draw`) instead of external drawing packages
 - Better organization aligned with PRD features
 
 ## Current State
@@ -92,8 +94,7 @@ Restructure the current 3-repo setup into 2 repos with a component-based archite
 **Repositories:**
 
 - `/Users/bingenro/Documents/Slote/slote_app` (branches: main, noobee, the_bird)
-- `/Users/bingenro/Documents/Slote/scribble` (branches: main) - **Will be removed**
-- `/Users/bingenro/Documents/Slote/flutter_drawing_board` (branches: master) - **Will be removed**
+- Any former standalone drawing-related repos are **out of scope** for this monorepo; use **`package:draw`** only
 
 **Current slote_app structure:**
 
@@ -126,11 +127,9 @@ Restructure the current 3-repo setup into 2 repos with a component-based archite
 - `lib/src/views/widgets/notes_*.dart` - Note-specific widgets (grid, list, items)
 - Controllers (to be created/identified)
 
-**To remove:**
+**To remove (historical intent — achieved):**
 
-- All `scribble` package usage
-- All `flutter_drawing_board` package usage
-- Drawing code that depends on scribble (will be replaced with custom implementation)
+- Third-party drawing packages in favor of **`package:draw`**
 
 ## Target Structure
 
@@ -243,10 +242,10 @@ slote_app/
    - **slote_viewport**: Reusable zoom/pan functionality
    - **slote_undo_redo**: Generic undo/redo system (works with any editable content)
    - **slote_rich_text**: Rich text editing (can be used independently)
-   - **slote_draw**: Custom drawing (replaces scribble, tailored to app needs)
+   - **slote_draw**: Custom drawing (`package:draw`, tailored to app needs)
    - **slote_theme**: Theming system (reusable across features)
 
-3. **Custom Draw Implementation**: Replacing `scribble` and `flutter_drawing_board` with `slote_draw` allows:
+3. **Custom Draw Implementation**: A first-party `slote_draw` / `package:draw` allows:
 
    - Full control over drawing behavior
    - Better integration with text editing
@@ -270,11 +269,9 @@ slote_app/
    - Initialize git repository
    - Create initial commit with README
 
-2. **Note on scribble/flutter_drawing_board**
+2. **Note on drawing dependencies**
 
-   - These repos will NOT be migrated (they're being replaced)
-   - Code can be referenced for inspiration but not directly used
-   - Remove all dependencies from slote_app
+   - Use **`package:draw`** in the monorepo; do not add external drawing UI packages that duplicate gesture/state ownership
 
 ### Phase 2: Create Component Packages
 
@@ -316,7 +313,7 @@ slote_app/
 8. **Create Draw package (slote_draw)**
 
    - Create new package structure
-   - Design drawing architecture (replacing scribble)
+   - Design drawing architecture (first-party ink, see `components/draw/docs/ROADMAP.md`)
    - Implement basic drawing tools:
      - Pen tool
      - Eraser tool
@@ -334,12 +331,10 @@ slote_app/
 
 ### Phase 3: Update slote_app
 
-10. **Remove scribble dependencies**
+10. **Drawing dependencies**
 
-    - Remove `scribble` from `pubspec.yaml`
-    - Remove `flutter_drawing_board` from `pubspec.yaml` (if present)
-    - Remove all `import 'package:scribble/...'` statements
-    - Remove scribble-related code from `create_note.dart`
+    - Depend on **`package:draw`** (path: `components/draw`) only for ink
+    - Keep `create_note.dart` wired to `DrawController` / `SloteDrawScaffold` and `drawingData` JSON
 
 11. **Update slote_app dependencies**
 
@@ -364,7 +359,7 @@ slote_app/
 12. **Update imports in slote_app**
 
     - Update all imports to use component packages
-    - Refactor `create_note.dart` to use `slote_draw` instead of scribble
+    - Refactor `create_note.dart` to use `slote_draw` / `package:draw` for ink
     - Integrate `slote_rich_text` for text editing
     - Use `slote_viewport` for zoom/pan
     - Use `slote_undo_redo` for undo/redo
@@ -379,7 +374,7 @@ slote_app/
 14. **Clean up slote_app**
 
     - Remove extracted files
-    - Remove scribble-related code
+    - Remove obsolete drawing code superseded by `package:draw`
     - Update `lib/main.dart` to initialize components properly
     - Ensure app builds and runs
 
@@ -427,31 +422,15 @@ slote_app/
 
 ## Migration Strategy for Drawing
 
-### Replacing Scribble with slote_draw
+### `package:draw` (current)
 
-**Current scribble usage:**
+**Approach:**
 
-- `ScribbleNotifier` for drawing state
-- `ScribbleSketch` for drawing data
-- JSON serialization for saving drawings
+- **`DrawController`** for drawing state; **`Stroke`** / **`StrokeSample`** model; versioned JSON (`schemaVersion`) with legacy decode
+- **`perfect_freehand`** for stroke outlines; optional **`documentTransform`** for viewport alignment (see draw roadmap **Wave G**)
+- Note screen persists **`drawingData`** next to AppFlowy document JSON
 
-**New slote_draw approach:**
-
-- Custom `DrawController` for drawing state
-- Custom `Stroke` model for drawing data
-- Efficient binary or JSON serialization
-- Better integration with text editing
-- Stylus support built-in
-
-**Migration steps:**
-
-1. Create `slote_draw` package structure
-2. Implement basic drawing (pen, eraser)
-3. Implement stroke rendering
-4. Add serialization (compatible with existing note format initially)
-5. Replace scribble in `create_note.dart`
-6. Test drawing functionality
-7. Add advanced features (stylus, shapes, etc.)
+**Historical note:** Older plans referred to third-party drawing packages; the monorepo standard is **`components/draw`** only.
 
 ## Git History Preservation Strategy
 

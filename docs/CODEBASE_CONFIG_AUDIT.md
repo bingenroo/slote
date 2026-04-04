@@ -48,19 +48,6 @@ This document lists every directory that contains configuration tied to the repo
 |------|----------|
 | `pubspec.yaml` | `name: draw_example`, `description: Example app for draw component`, dependency `draw: path: ../` |
 
-## components/undo_redo
-
-| File | Contents |
-|------|----------|
-| `pubspec.yaml` | `name: undo_redo`, `description: Generic undo/redo system for Slote` |
-| (platform config at package root uses `undo_redo` / `com.example.undo_redo`) |
-
-### components/undo_redo/example
-
-| File | Contents |
-|------|----------|
-| `pubspec.yaml` | `name: undo_redo_example`, `description: Example app for undo_redo component`, dependency `undo_redo: path: ../` |
-
 ## components/rich_text
 
 | File | Contents |
@@ -94,10 +81,8 @@ This document lists every directory that contains configuration tied to the repo
 
 ## Summary
 
-- **YAML:** 11 `pubspec.yaml` files, 5 `analysis_options.yaml` files, 1 `devtools_options.yaml`. Only pubspecs contain the package/repo name.
-- **Android:** 5 `build.gradle.kts` files (root app, viewport/example, draw, undo_redo, rich_text).
-- **iOS:** 5 `Info.plist` files (root app, viewport/example, draw, undo_redo, rich_text).
-- **macOS:** 5 `AppInfo.xcconfig` files (same set).
-- **Web:** 5 `manifest.json` files (same set).
+- **YAML:** 9 `pubspec.yaml` files under root + `components/` (excluding vendored `appflowy_editor`), 5 `analysis_options.yaml` files, 1 `devtools_options.yaml`. Only pubspecs contain the package/repo name.
+- **Android:** 4 Flutter app targets with `android/` (root app, viewport/example, draw, rich_text).
+- **iOS / macOS / Web:** same four app targets plus their `example/` variants where present (see tree above).
 
-All of these use the **slote** / **Slote** naming for the root app; component packages use **viewport**, **draw**, **undo_redo**, **rich_text**, **theme**, **shared**; example apps use **viewport_example**, etc. To rename the repo or packages, update the values in the files listed above and then update all Dart `import 'package:...'` and any Kotlin/Swift package paths that reference `com.example.*`.
+All of these use the **slote** / **Slote** naming for the root app; component packages use **viewport**, **draw**, **rich_text**, **theme**, **shared**; example apps use **viewport_example**, etc. To rename the repo or packages, update the values in the files listed above and then update all Dart `import 'package:...'` and any Kotlin/Swift package paths that reference `com.example.*`.

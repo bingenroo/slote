@@ -1,6 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:vector_math/vector_math_64.dart';
 
+/// Low-level pointer math for [ZoomPanSurface].
+///
+/// All [Offset] positions are in the **same local space** as the pointer events
+/// delivered to the surrounding [Listener] (viewport / surface coordinates), not
+/// in the transformed child’s content space. [ZoomPanSurface] combines these
+/// with [Matrix4] inverses to scale around a focal point.
 class GestureHandler {
   final Map<int, Offset> _pointers = {};
 
@@ -84,7 +90,7 @@ class GestureHandler {
     }
   }
 
-  // Nnew method for 1-finger panning
+  /// One-finger pan: translation in listener-local space applied to [_initialPanTransform].
   Matrix4? calculatePanTransform() {
     if (_pointers.length != 1 ||
         _initialPanPosition == null ||
@@ -113,9 +119,7 @@ class GestureHandler {
     final currentDistance = _distance(positions[0], positions[1]);
     final currentFocal = _midPoint(positions[0], positions[1]);
 
-    // Calculate scale change
     final scaleRatio = currentDistance / _initialDistance!;
-    // final newScale = _initialScale! * scaleRatio;
 
     // Calculate focal point movement
     final focalDelta = currentFocal - _focalPoint!;

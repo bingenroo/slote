@@ -546,7 +546,7 @@ def cmd_run(args):
 
 
 # Component test apps (packages that have a runnable test/ app)
-COMPONENT_TEST_APPS = ["viewport", "rich_text", "draw", "undo_redo"]
+COMPONENT_TEST_APPS = ["viewport", "rich_text", "draw"]
 
 
 def get_component_example_dirs():
@@ -1011,12 +1011,12 @@ def main():
 
     component_run_parser = component_subparsers.add_parser(
         "run",
-        help="Run a component's test app (e.g. viewport, rich_text, draw, undo_redo)"
+        help="Run a component's test app (e.g. viewport, rich_text, draw)"
     )
     component_run_parser.add_argument(
         "name",
         choices=COMPONENT_TEST_APPS,
-        help="Component name: viewport, rich_text, draw, undo_redo",
+        help="Component name: viewport, rich_text, draw",
     )
     component_run_parser.add_argument(
         "flutter_args",

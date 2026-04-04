@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:draw/draw.dart';
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -37,7 +38,11 @@ class _CreateNoteViewState extends State<CreateNoteView> {
 
   // Cached state used by the persistence layer (so back navigation can flush).
   String _latestBodyJsonString = sloteEmptyDocumentJsonString();
+  late String _latestDrawingJsonString;
   Timer? _titleSaveDebounceTimer;
+
+  late final DrawController _drawController;
+  bool _isDrawingMode = true;
 
   bool _suppressSaves = false;
   bool _saveAgain = false;
@@ -70,6 +75,11 @@ class _CreateNoteViewState extends State<CreateNoteView> {
       onDebouncedDocumentChanged: _refreshOutline,
     );
 
+    _drawController = DrawController();
+    _hydrateDrawingFromNote();
+    _latestDrawingJsonString = jsonEncode(_drawController.toJson());
+    _drawController.addListener(_onDrawingChanged);
+
     _titleController.addListener(_onTitleChanged);
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -85,6 +95,24 @@ class _CreateNoteViewState extends State<CreateNoteView> {
     setState(() => _outline = next);
   }
 
+  void _hydrateDrawingFromNote() {
+    final raw = widget.note?.drawingData;
+    if (raw == null || raw.isEmpty) return;
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is Map<String, dynamic>) {
+        _drawController.fromJson(decoded);
+      }
+    } catch (_) {
+      // Ignore legacy or corrupt drawing payloads.
+    }
+  }
+
+  void _onDrawingChanged() {
+    _latestDrawingJsonString = jsonEncode(_drawController.toJson());
+    _requestSave();
+  }
+
   static const double _kOutlineWideBreakpoint = 600;
 
   @override
@@ -93,6 +121,8 @@ class _CreateNoteViewState extends State<CreateNoteView> {
     _titleSaveDebounceTimer?.cancel();
     _titleController.removeListener(_onTitleChanged);
     _titleController.dispose();
+    _drawController.removeListener(_onDrawingChanged);
+    _drawController.dispose();
     _richTextController.dispose();
     super.dispose();
   }
@@ -151,21 +181,24 @@ class _CreateNoteViewState extends State<CreateNoteView> {
         plainTextPreviewFromDocumentJsonString(bodyJsonString).trim();
     final hasMeaningfulContent =
         titleTrimmed.isNotEmpty || previewTrimmed.isNotEmpty;
+    final hasDrawing = _drawController.strokes.isNotEmpty;
 
     // For new notes, don't create a record until we have user content.
-    if (_currentNote == null && !hasMeaningfulContent) return;
+    if (_currentNote == null && !hasMeaningfulContent && !hasDrawing) return;
 
     final now = DateTime.now();
 
     if (_currentNote != null) {
       // Avoid unnecessary writes when nothing changed.
       if (_currentNote!.title == title &&
-          _currentNote!.body == bodyJsonString) {
+          _currentNote!.body == bodyJsonString &&
+          _currentNote!.drawingData == _latestDrawingJsonString) {
         return;
       }
       _currentNote = _currentNote!.copyWith(
         title: title,
         body: bodyJsonString,
+        drawingData: _latestDrawingJsonString,
         lastMod: now,
       );
     } else {
@@ -173,6 +206,7 @@ class _CreateNoteViewState extends State<CreateNoteView> {
         id: DateTime.now().millisecondsSinceEpoch & 0xFFFFFFFF,
         title: title,
         body: bodyJsonString,
+        drawingData: _latestDrawingJsonString,
         lastMod: now,
       );
     }
@@ -254,6 +288,18 @@ class _CreateNoteViewState extends State<CreateNoteView> {
       outlineTitleTextStyle: outlineTitle,
       outlineEmptyTextStyle: outlineEmpty,
       outlineEntryTextStyle: outlineEntry,
+      bodyFooter: SizedBox(
+        height: 300,
+        child: Material(
+          color: Theme.of(context).colorScheme.surface,
+          child: SloteDrawScaffold(
+            controller: _drawController,
+            isDrawingMode: _isDrawingMode,
+            selectedToolColor: scheme.primary,
+            selectedColorBorderColor: scheme.primary,
+          ),
+        ),
+      ),
       appBar: AppBar(
         toolbarHeight: 52,
         leading: IconButton(
@@ -281,6 +327,19 @@ class _CreateNoteViewState extends State<CreateNoteView> {
           cursorColor: scheme.onPrimary,
         ),
         actions: [
+          IconButton(
+            icon: FaIcon(
+              _isDrawingMode
+                  ? FontAwesomeIcons.pen
+                  : FontAwesomeIcons.eye,
+              size: 18,
+              color: scheme.onPrimary,
+            ),
+            onPressed: () {
+              setState(() => _isDrawingMode = !_isDrawingMode);
+            },
+            tooltip: _isDrawingMode ? 'Drawing on' : 'Drawing off (view)',
+          ),
           IconButton(
             icon: FaIcon(
               FontAwesomeIcons.listUl,

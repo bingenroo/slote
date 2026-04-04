@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
+
+import '../draw_tool.dart';
 import '../stroke/stroke.dart';
-import '../draw_controller.dart';
 
 /// Shape tool for drawing shapes
 class ShapeTool {
@@ -8,22 +9,25 @@ class ShapeTool {
     Offset start,
     Offset end,
     Color color,
-    double strokeWidth,
-  ) {
-    // Create rectangle from start to end
+    double strokeWidth, {
+    bool pressureEnabled = true,
+  }) {
     final points = [
       start,
       Offset(end.dx, start.dy),
       end,
       Offset(start.dx, end.dy),
-      start, // Close the rectangle
+      start,
     ];
 
     return Stroke(
-      points: points,
+      samples: points
+          .map((o) => StrokeSample(o.dx, o.dy, null))
+          .toList(),
       color: color,
       strokeWidth: strokeWidth,
       tool: DrawTool.shape,
+      pressureEnabled: pressureEnabled,
     );
   }
 }

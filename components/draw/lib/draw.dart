@@ -2,6 +2,7 @@
 library draw;
 
 export 'src/draw_controller.dart';
+export 'src/draw_tool.dart';
 export 'src/draw_canvas.dart';
 export 'src/tools/pen_tool.dart';
 export 'src/tools/eraser_tool.dart';
@@ -11,3 +12,4 @@ export 'src/stroke/stroke.dart';
 export 'src/stroke/stroke_renderer.dart';
 export 'src/stylus/stylus_detector.dart';
 export 'src/stylus/pressure_handler.dart';
+export 'src/ui/slote_draw_scaffold.dart';

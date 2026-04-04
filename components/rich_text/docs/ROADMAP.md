@@ -1,6 +1,6 @@
 # Rich text — end-to-end roadmap (`components/rich_text`)
 
-This document is the **canonical plan** for Slote’s rich-text subsystem: editor stack, features, phases, listeners, and how **undo/redo** fits relative to [`components/undo_redo`](../../undo_redo).
+This document is the **canonical plan** for Slote’s rich-text subsystem: editor stack, features, phases, listeners, and **undo/redo** (AppFlowy `EditorState` history only — the former standalone `components/undo_redo` package was removed).
 
 **Implementation detail (AppFlowy):** [appflowy-editor-roadmap.md](appflowy-editor-roadmap.md) tracks AppFlowy-specific milestones (JSON spike, BIUS, controller, shortcuts).
 
@@ -136,40 +136,31 @@ Use **narrow** signals for interactive toolbars; **one debounced pipe** for expe
 | ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Inline toolbar (BIUS, colors, …)** | `selectionNotifier`, `toggledStyleNotifier`, plus **derived state** from node at caret (e.g. `delta.sliceAttributes`). Add `transactionStream` only if you observe staleness.                                                                                                                                                                              |
 | **Persistence / preview / TOC**      | **`transactionStream`** (debounced ~200 ms) → emit JSON, refresh outline.                                                                                                                                                                                                                                                                                  |
-| **Undo / redo buttons (editor)**     | **`sloteEditorCanUndo` / `sloteEditorCanRedo`** + **`sloteEditorUndo` / `sloteEditorRedo`** on **`EditorState.undoManager`**, and **`RichTextEditorController.undoRedoListenable`** (notifies when the can-undo/can-redo pair changes; microtask-deferred so it matches AppFlowy’s post-`apply` history). Not the generic `undo_redo` package (see below). |
+| **Undo / redo buttons (editor)**     | **`sloteEditorCanUndo` / `sloteEditorCanRedo`** + **`sloteEditorUndo` / `sloteEditorRedo`** on **`EditorState.undoManager`**, and **`RichTextEditorController.undoRedoListenable`** (notifies when the can-undo/can-redo pair changes; microtask-deferred so it matches AppFlowy’s post-`apply` history). |
 
 ---
 
-## Undo/redo: `undo_redo` vs AppFlowy
+## Undo/redo (AppFlowy)
 
-### In `package:rich_text` (today)
+### In `package:rich_text`
 
 - **AppFlowy-only API**: [`appflowy_undo_support.dart`](../lib/src/appflowy/appflowy_undo_support.dart) exports **`sloteEditorCanUndo`**, **`sloteEditorCanRedo`**, **`sloteEditorUndo`**, **`sloteEditorRedo`** — thin wrappers over **`EditorState.undoManager`** (same stack as AppFlowy’s standard undo/redo shortcuts).
 - **`RichTextEditorController`**: optional **`maxHistoryItemSize`** / **`minHistoryItemDuration`** forwarded to **`EditorState`**; **`undoRedoListenable`** (a Flutter `Listenable`) rebuilds toolbar enablement when undo/redo availability changes.
 - **Toolbar + example**: undo/redo on [`FormatToolbar`](../lib/src/ui/slote_default_format_toolbar.dart); [`SloteRichTextEditorScaffold`](../lib/src/ui/slote_rich_text_editor_scaffold.dart) merges selection, toggled-style, and `undoRedoListenable`. [`rich_text_editor_screen.dart`](../example/lib/editor/rich_text_editor_screen.dart) is a thin shell + JSON log.
 
-### Today (rest of repo)
+### Rest of repo
 
-- **Main app note body:** Uses **AppFlowy** only (`CreateNoteView` in [`lib/src/views/create_note.dart`](../../../lib/src/views/create_note.dart)); no `undo_redo` package on that path.
-- **`components/undo_redo`**: Generic stack + **`TextUndoRedoController` / `UnifiedUndoRedoController`** — still present as a **component** (example app + optional reuse); **root `slote` no longer depends on it**.
+- **Main app note body:** Uses **AppFlowy** only (`CreateNoteView` in [`lib/src/views/create_note.dart`](../../../lib/src/views/create_note.dart)).
 - **AppFlowy `EditorState`**: Own **transaction history**; undo/redo replays edits made through the editor. **All rich-text actions** (BIUS, blocks, links, …) go through **transactions** so **one** history stack covers them.
+- **Former `components/undo_redo` package:** Removed from the repo (it was only a generic/plain-text demo; nothing in the root app depended on it). **Drawing undo** will live in **`draw`** / stroke model when implemented; a future **note-level** unified Cmd+Z would orchestrate editor + draw stacks if product requires it.
 
-### Recommendation
-
-1. **Do not duplicate** document undo inside `undo_redo` when the note body is AppFlowy-driven — **done for `CreateNoteView`** (toolbar actions use **`EditorState`** / **`sloteEditor*`**).
-2. **After** the note body uses AppFlowy end-to-end, **remove** `UnifiedUndoRedoController` (and `undo_redo` imports) from note screens for that field — **done** (legacy `create_note_zoompan` / `create_note_OGbackup` screens removed).
-3. **Deprecate `components/undo_redo`** when nothing in the repo imports it (optional final step):
-   - Either **delete** the package and drop the path dependency from root `pubspec.yaml`, **or**
-   - **Move** a tiny generic helper into `rich_text/lib/src/` if a non-editor widget still needs stack-based undo (unlikely for v1).
-4. **Drawing undo** remains owned by **`draw`** / stroke model until a product decision unifies stacks; not blocked on `undo_redo`.
-
-### Planned removal checklist (cleanup after main-app adoption of `package:rich_text`)
+### Checklist (historical)
 
 - [x] Note body uses `EditorState` / `AppFlowyEditor` from `rich_text`.
 - [x] Undo/redo UI calls editor history, verified across BIUS + blocks.
-- [x] Remove `package:undo_redo/undo_redo.dart` from `create_note*.dart` (and any other callers).
-- [x] Remove `undo_redo` from root `pubspec.yaml` if unused.
-- [ ] Delete or archive `components/undo_redo` and update [PRD.md](../../../PRD.md), [components/README.md](../../README.md), and [COMPONENT_TEST_PLATFORMS.md](../../COMPONENT_TEST_PLATFORMS.md).
+- [x] Remove `package:undo_redo/undo_redo.dart` from note screens (no remaining callers).
+- [x] Remove `undo_redo` from root `pubspec.yaml` (already absent).
+- [x] Delete `components/undo_redo`; update PRD, `components/README.md`, `COMPONENT_TEST_PLATFORMS.md`, CI, and `cmd.py`.
 
 ---
 

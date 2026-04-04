@@ -34,10 +34,9 @@ This is a **monorepo** containing:
   - SQLite database (`notes.db`) for notes storage
   - Platform-specific code (Android, iOS, Web, Windows, macOS, Linux)
 - `**components/**` - Reusable component packages
-  - `viewport/` - Viewport/zoom/pan functionality
-  - `undo_redo/` - Standalone plain-text undo demo (root app does not depend on it)
+  - `viewport/` - Zoom, pan, scroll (`ZoomPanSurface`, transform callbacks); **planned** note-shell integration with editor + ink — see [components/draw/docs/ROADMAP.md](components/draw/docs/ROADMAP.md) (Wave G)
   - `rich_text/` - Rich text (AppFlowy Document JSON; used by main note editor)
-  - `draw/` - Custom drawing implementation
+  - `draw/` - Custom drawing (`package:draw`); roadmap links viewport + `perfect_freehand` + ink undo — [components/draw/docs/ROADMAP.md](components/draw/docs/ROADMAP.md)
   - `theme/` - Theming system
   - `shared/` - Shared utilities and resources
 - `**cmd.py**` (project root) - Unified command-line tool for emulator, database, and running the app (see below).
@@ -159,7 +158,6 @@ All commands are run as `python3 cmd.py <command> ...` (or `./cmd.py` on macOS/L
 | `cmd.py viewport [CMD...]` | Run command in `components/viewport/example` (default: `flutter run`). E.g. `viewport flutter pub get`. |
 | `cmd.py draw [CMD...]` | Same, in `components/draw/example` |
 | `cmd.py rich_text [CMD...]` | Same, in `components/rich_text/example` |
-| `cmd.py undo_redo [CMD...]` | Same, in `components/undo_redo/example` |
 | `cmd.py component run <name> [flutter_args...]` | Run that component’s **test** app (`flutter run` from `components/<name>/test`) |
 | `cmd.py db open [mode]` | Open `notes.db` in DB Browser. Modes: `auto`, `android`, `ios`, `host`, `web` |
 | `cmd.py db push` | Push `notes.db` from current dir to Android device |
@@ -400,7 +398,7 @@ This section explains how the app starts, what calls what, and how components ar
 
 #### Two ways to run
 
-1. **Full Slote app** (project root) – The real product: notes, drawing, viewport, undo/redo, etc.
+1. **Full Slote app** (project root) – The real product: notes, **rich text + drawing** on the note screen, SQLite, theme, etc. **`package:viewport`** is a dependency but **not** yet used inside the note editor UI; zoom/pan/scroll unification with text and ink is tracked in **[components/draw/docs/ROADMAP.md](components/draw/docs/ROADMAP.md)** (Wave G). **Undo/redo** today is **AppFlowy editor history** for the note body; **ink** undo is not implemented yet (same roadmap).
 2. **Example apps** (one per component) – Small demos to try a single component without the rest of the app.
 
 #### Running the full app from the project root
@@ -418,7 +416,7 @@ Flutter uses **`lib/main.dart`** at the root as the entry point.
 
 1. **`lib/main.dart`** – Starts the app, initializes theme preferences (using the **theme** component), then builds the main `App` widget from **`lib/src/app.dart`**.
 2. **`lib/src/app.dart`** – Builds the real UI: navigation, screens, theming. It uses the **theme** and **shared** components.
-3. When you open or edit a note, **`lib/src/views/create_note.dart`** runs. It uses **`rich_text`** (AppFlowy editor, `RichTextEditorController`, format toolbar) plus **theme** and **shared** as needed.
+3. When you open or edit a note, **`lib/src/views/create_note.dart`** runs. It uses **`rich_text`** (AppFlowy editor, `RichTextEditorController`, `SloteRichTextEditorScaffold`, format toolbar, outline), **`draw`** (`DrawController`, `SloteDrawScaffold`, persisted `drawingData`), plus **theme** and **shared** as needed.
 
 So the flow is: **root `main.dart`** → **app.dart** → your views; each view imports the packages it needs. Root `main.dart` does not wire every component directly.
 
@@ -442,12 +440,12 @@ python3 cmd.py viewport flutter pub get
 Or manually:
 
 ```bash
-cd components/viewport/example   # or draw, rich_text, undo_redo
+cd components/viewport/example   # or draw, rich_text
 flutter pub get
 flutter run
 ```
 
-Flutter then uses **`components/viewport/example/lib/main.dart`** (not the root `lib/main.dart`). That file builds a small app that only uses the **viewport** package. No notes, no full app – just the viewport demo. Same idea for draw, rich_text, and undo_redo: each has an **`example/`** folder with its own **`lib/main.dart`** that uses only that component.
+Flutter then uses **`components/viewport/example/lib/main.dart`** (not the root `lib/main.dart`). That file builds a small app that only uses the **viewport** package. No notes, no full app – just the viewport demo. Same idea for **draw** and **rich_text**: each has an **`example/`** folder with its own **`lib/main.dart`** that uses only that component.
 
 #### Call flow (plain words)
 
@@ -455,7 +453,7 @@ Flutter then uses **`components/viewport/example/lib/main.dart`** (not the root 
 
 - **Root `lib/main.dart`** → starts the app, uses **theme** → builds **`lib/src/app.dart`**
 - **`lib/src/app.dart`** → uses **theme** and **shared**, shows your screens
-- **Screens** (e.g. `create_note`) → use **rich_text**, **theme**, **shared** (and other components where imported)
+- **Screens** (e.g. `create_note`) → use **rich_text**, **draw**, **theme**, **shared** (and other components where imported)
 
 **Viewport example:**
 
@@ -498,6 +496,7 @@ Each component can be tried in isolation via its **example** app (e.g. `componen
 
 - [Development workflow](docs/DEV_WORKFLOW.md) – day-to-day setup, run, test, and before-merge steps
 - [Product Requirements Document (PRD)](PRD.md)
+- [Draw subsystem roadmap](components/draw/docs/ROADMAP.md) – `perfect_freehand`, viewport (**Wave G**), gestures, ink undo/redo vs editor history
 - [Slote Components](components/README.md) – packages and component test apps
 - [Component Example Apps](components/COMPONENT_TEST_PLATFORMS.md)
 - [Running on Emulator Guide](docs/RUNNING_ON_EMULATOR.md) – Android emulator setup and troubleshooting
@@ -507,7 +506,7 @@ Each component can be tried in isolation via its **example** app (e.g. `componen
 
 ## Project Status
 
-This project is in active development. See the [PRD](PRD.md) for feature roadmap and priorities.
+This project is in active development. See the [PRD](PRD.md) for product scope and priorities. For **drawing + zoom/pan + editor alignment**, the engineering source of truth is **[components/draw/docs/ROADMAP.md](components/draw/docs/ROADMAP.md)** (includes **`package:viewport`** integration **Wave G**).
 
 ## License
 

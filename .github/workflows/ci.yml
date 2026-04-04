@@ -26,7 +26,7 @@ jobs:
 
       - name: Analyze component packages
         run: |
-          for dir in components/viewport components/undo_redo components/rich_text components/draw components/theme components/shared; do
+          for dir in components/viewport components/rich_text components/draw components/theme components/shared; do
             if [ -d "$dir" ]; then
               echo "Analyzing $dir..."
               flutter analyze "$dir" || exit 1

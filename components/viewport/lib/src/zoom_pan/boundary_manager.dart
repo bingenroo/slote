@@ -1,6 +1,11 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
+/// When scaled content is **shorter** than the viewport, Y translation is
+/// clamped to this band so the user can nudge content slightly instead of
+/// locking to a single row (horizontal small content is **centered** instead).
+const double kVerticalOverscrollSlack = 50.0;
+
 class BoundaryManager {
   final Size contentSize;
   final Size viewportSize;
@@ -14,6 +19,11 @@ class BoundaryManager {
     this.maxScale = 3.0,
   });
 
+  /// Returns a new matrix with **uniform scale** and **translation** only.
+  ///
+  /// Any rotation or skew in [transform] is discarded; scale is taken from
+  /// [Matrix4.getMaxScaleOnAxis]. This matches [ZoomPanSurface]’s translate+scale
+  /// navigation model.
   Matrix4 constrain(Matrix4 transform) {
     // Extract current values
     final scale = transform.getMaxScaleOnAxis();
@@ -40,8 +50,10 @@ class BoundaryManager {
 
     // Vertical constraints
     if (scaledHeight <= viewportSize.height) {
-      // Content smaller than viewport - allow some flexibility
-      constrainedY = constrainedY.clamp(-50.0, 50.0); // Allow small over-scroll
+      constrainedY = constrainedY.clamp(
+        -kVerticalOverscrollSlack,
+        kVerticalOverscrollSlack,
+      );
     } else {
       // Content larger than viewport - prevent over-pan
       final minY = viewportSize.height - scaledHeight;
@@ -111,7 +123,10 @@ class BoundaryManager {
     }
 
     if (scaledHeight <= viewportSize.height) {
-      ty = ((viewportSize.height - scaledHeight) / 2).clamp(-50.0, 50.0);
+      ty = ((viewportSize.height - scaledHeight) / 2).clamp(
+        -kVerticalOverscrollSlack,
+        kVerticalOverscrollSlack,
+      );
     } else {
       final scrollableHeight = scaledHeight - viewportSize.height;
       ty = -scrollY.clamp(0.0, 1.0) * scrollableHeight;

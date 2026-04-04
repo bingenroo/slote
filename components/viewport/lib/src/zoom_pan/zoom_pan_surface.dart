@@ -25,6 +25,13 @@ class ZoomPanController {
   }
 }
 
+/// Pans and zooms a child with a [Listener] (not [GestureDetector]) so pointer
+/// routing stays predictable for drawing overlays.
+///
+/// **Coordinates:** Pointer positions are in the **Listener’s local coordinates**
+/// (viewport space). The child sits under a [Transform]; [onTransformChanged]
+/// publishes the matrix integrators should use for document-space ink and
+/// hit-testing (e.g. Slote `draw`).
 class ZoomPanSurface extends StatefulWidget {
   final Widget child;
   final bool isDrawingMode;
@@ -94,38 +101,32 @@ class _ZoomPanSurfaceState extends State<ZoomPanSurface> {
     _notifyTransformChanged();
   }
 
+  /// Updates measured content size; [BoundaryManager] is built in [build] from
+  /// [_contentSize] and current viewport constraints (single source of truth).
   void _updateContentSize(Size size) {
     setState(() {
-      // Always update _contentSize, but prefer provided contentHeight for height
       if (widget.contentHeight != null) {
         _contentSize = Size(_viewport.width, widget.contentHeight!);
       } else {
         _contentSize = size;
       }
-
-      // Always recreate BoundaryManager with correct content size
-      if (_viewport != Size.zero) {
-        _boundaryManager = BoundaryManager(
-          contentSize: _contentSize,
-          viewportSize: _viewport,
-          minScale: widget.minScale,
-          maxScale: widget.maxScale,
-        );
-      }
     });
   }
 
+  /// Clamps [_transform] with [BoundaryManager] and notifies listeners.
+  ///
+  /// Always calls [_notifyTransformChanged] when a manager exists so pinch
+  /// updates still propagate when the matrix is already in bounds (see
+  /// two-finger branch in [_handlePointerMove]).
   void _constrainTransform() {
-    if (_boundaryManager != null) {
-      final constrained = _boundaryManager!.constrain(_transform);
-
-      if (constrained != _transform) {
-        setState(() {
-          _transform = constrained;
-        });
-        _notifyTransformChanged();
-      }
+    if (_boundaryManager == null) return;
+    final constrained = _boundaryManager!.constrain(_transform);
+    if (constrained != _transform) {
+      setState(() {
+        _transform = constrained;
+      });
     }
+    _notifyTransformChanged();
   }
 
   void _notifyTransformChanged() {
@@ -158,6 +159,10 @@ class _ZoomPanSurfaceState extends State<ZoomPanSurface> {
           _transform = newTransform;
         });
         _constrainTransform();
+        // Pinch before first layout: no boundary manager yet, but transform moved.
+        if (_boundaryManager == null) {
+          _notifyTransformChanged();
+        }
       }
     }
     // Handle 1-finger pan (drag-to-scroll at any scale when not drawing)
@@ -257,10 +262,6 @@ class _ZoomPanSurfaceState extends State<ZoomPanSurface> {
     return LayoutBuilder(
       builder: (context, constraints) {
         final viewportSize = Size(constraints.maxWidth, constraints.maxHeight);
-        _viewport = viewportSize;
-
-        // Use provided contentHeight, or measured _contentSize, or a fallback larger than
-        // viewport so the first drag/wheel can scroll before ContentMeasurer reports (post-frame).
         final effectiveContentSize = widget.contentHeight != null
             ? Size(viewportSize.width, widget.contentHeight!)
             : (_contentSize != Size.zero
@@ -273,6 +274,8 @@ class _ZoomPanSurfaceState extends State<ZoomPanSurface> {
           minScale: widget.minScale,
           maxScale: widget.maxScale,
         );
+
+        _viewport = viewportSize;
         _boundaryManager = boundaryManager;
 
         return Stack(
