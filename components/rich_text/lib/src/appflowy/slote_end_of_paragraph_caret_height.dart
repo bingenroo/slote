@@ -1,5 +1,4 @@
 import 'package:appflowy_editor/appflowy_editor.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import 'slote_inline_attributes.dart';
@@ -88,7 +87,8 @@ EndOfParagraphCaretMetrics? sloteEndOfParagraphCaretMetrics({
   final toggledSub = toggled[kSloteSubscriptAttribute] == true;
 
   final selection = editorState.selection;
-  final bool caretAtEndOfThisNode = selection != null &&
+  final bool caretAtEndOfThisNode =
+      selection != null &&
       selection.isCollapsed &&
       selection.start.path.equals(node.path) &&
       selection.start.offset == plainLen;
@@ -99,7 +99,8 @@ EndOfParagraphCaretMetrics? sloteEndOfParagraphCaretMetrics({
   /// [toggleAttribute] left the key at explicit `false` while the last run is
   /// still script — next character uses body; caret must not stay on the
   /// script line or snap to the previous glyph there.
-  final pendingBodyAfterScriptOff = caretAtEndOfThisNode &&
+  final pendingBodyAfterScriptOff =
+      caretAtEndOfThisNode &&
       ((endRunSup &&
               toggled[kSloteSuperscriptAttribute] == false &&
               // If switching to sub, don't force body.
@@ -115,24 +116,24 @@ EndOfParagraphCaretMetrics? sloteEndOfParagraphCaretMetrics({
   /// text. When the last run **is** already subscript, snap + [dy] 0.
   final pendingSubOnBodyBaseline =
       caretAtEndOfThisNode && toggledSub && !endRunSub;
+
   /// Next insert is superscript but the last committed run is still **body**
   /// (neither script). Do not use this when the last run is subscript: that
   /// needs [dy] 0 so the EOT merge can align with the sub glyph (the
   /// body-baseline sup nudge is wrong for sub → sup toggles).
   final pendingSupOnBodyBaseline =
-      caretAtEndOfThisNode &&
-      toggledSup &&
-      !endRunSup &&
-      !endRunSub;
+      caretAtEndOfThisNode && toggledSup && !endRunSup && !endRunSub;
 
-  final pendingSupAfterSubscriptRun = caretAtEndOfThisNode &&
+  final pendingSupAfterSubscriptRun =
+      caretAtEndOfThisNode &&
       toggledSup &&
       !toggledSub &&
       endRunSub &&
       !endRunSup;
-  final caretYAnchorPlainTextOffset = pendingSupAfterSubscriptRun
-      ? _sloteLastSuperscriptBoundaryPlainOffset(delta, plainLen)
-      : null;
+  final caretYAnchorPlainTextOffset =
+      pendingSupAfterSubscriptRun
+          ? _sloteLastSuperscriptBoundaryPlainOffset(delta, plainLen)
+          : null;
 
   bool rawSup;
   bool rawSub;
@@ -180,7 +181,8 @@ EndOfParagraphCaretMetrics? sloteEndOfParagraphCaretMetrics({
   // [dy] from the body baseline. If the last run is already script, keep snap.
   // When [caretYAnchorPlainTextOffset] is set, AppFlowy uses anchor Y instead —
   // do not set ignore (height cap uses previous glyph usefully).
-  final ignorePreviousCaretYAnchor = caretAtEndOfThisNode &&
+  final ignorePreviousCaretYAnchor =
+      caretAtEndOfThisNode &&
       caretYAnchorPlainTextOffset == null &&
       (pendingSubOnBodyBaseline ||
           pendingSupOnBodyBaseline ||
@@ -201,9 +203,13 @@ EndOfParagraphCaretMetrics? sloteEndOfParagraphCaretMetrics({
   }
 
   if (isSuperscript || isSubscript) {
-    final m = isSuperscript
-        ? SloteSupSubMetrics.superscript(context, baseFontSize: baseFontSize)
-        : SloteSupSubMetrics.subscript(context, baseFontSize: baseFontSize);
+    final m =
+        isSuperscript
+            ? SloteSupSubMetrics.superscript(
+              context,
+              baseFontSize: baseFontSize,
+            )
+            : SloteSupSubMetrics.subscript(context, baseFontSize: baseFontSize);
     // Measure scripts tightly: avoid inheriting line-height leading.
     probeStyle = bodyStyle.copyWith(
       fontSize: baseFontSize * m.fontScale,
@@ -217,14 +223,13 @@ EndOfParagraphCaretMetrics? sloteEndOfParagraphCaretMetrics({
                     SloteSupSubMetrics.superscriptCaretTranslateYFactor
                 : 0.0)
             : isSubscript
-                ? (pendingSubOnBodyBaseline
-                    ? SloteSupSubMetrics
-                        .subscriptCaretTranslateYPendingBodyBaseline(
-                        context,
-                        baseFontSize: baseFontSize,
-                      )
-                    : 0.0)
-                : m.translateY;
+            ? (pendingSubOnBodyBaseline
+                ? SloteSupSubMetrics.subscriptCaretTranslateYPendingBodyBaseline(
+                  context,
+                  baseFontSize: baseFontSize,
+                )
+                : 0.0)
+            : m.translateY;
     probeTextHeightBehavior = _kSloteScriptCaretTextHeight;
   }
 

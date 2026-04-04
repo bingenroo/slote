@@ -5,7 +5,7 @@ import 'package:rich_text/rich_text.dart';
 void main() {
   group('slote_markdown_codec code blocks', () {
     test('import: fenced code block becomes code node', () {
-      final doc = sloteMarkdownToDocument('```\nprint(\"hi\")\n```\n');
+      final doc = sloteMarkdownToDocument('```\nprint("hi")\n```\n');
       final node = doc.root.children.first;
       expect(node.type, CodeBlockKeys.type);
     });
@@ -13,13 +13,12 @@ void main() {
     test('export: code node becomes fenced code block', () async {
       final es = EditorState.blank(withInitialText: false);
       final t = es.transaction;
-      t.insertNode([0], codeBlockNode(text: 'print(\"hi\")'));
+      t.insertNode([0], codeBlockNode(text: 'print("hi")'));
       await es.apply(t);
 
       final md = sloteDocumentToMarkdown(es.document);
       expect(md, contains('```'));
-      expect(md, contains('print(\"hi\")'));
+      expect(md, contains('print("hi")'));
     });
   });
 }
-

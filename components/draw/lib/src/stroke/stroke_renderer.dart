@@ -8,6 +8,10 @@ import 'stroke.dart';
 ///
 /// [DrawTool.eraser] strokes are not drawn; real erasure is Wave D.
 class StrokeRenderer {
+  /// Opaque (or nearly opaque) highlighter strokes get this ink alpha at draw time.
+  /// Strokes that already bake in low alpha (legacy) are left unchanged.
+  static const double _highlighterInkOpacity = 0.38;
+
   static void render(
     Canvas canvas,
     Stroke stroke, {
@@ -26,15 +30,21 @@ class StrokeRenderer {
     final path = Path()..addPolygon(outline, true);
 
     final paint = Paint()
-      ..color = stroke.color
+      ..color = _fillColor(stroke)
       ..style = PaintingStyle.fill
       ..isAntiAlias = true;
 
-    if (stroke.tool == DrawTool.highlighter) {
-      paint.blendMode = BlendMode.srcOver;
-    }
-
     canvas.drawPath(path, paint);
+  }
+
+  static Color _fillColor(Stroke stroke) {
+    if (stroke.tool != DrawTool.highlighter) return stroke.color;
+    final a = stroke.color.a;
+    // Already translucent (e.g. legacy strokes) — do not double-apply.
+    if (a < 0.95) return stroke.color;
+    return stroke.color.withValues(
+      alpha: (a * _highlighterInkOpacity).clamp(0.0, 1.0),
+    );
   }
 
   static List<PointVector> _toPointVectors(Stroke stroke) {
@@ -56,7 +66,8 @@ class StrokeRenderer {
     final simulatePressure = stroke.pressureEnabled &&
         stroke.samples.every((s) => s.pressure == null);
 
-    final size = (stroke.strokeWidth * 2).clamp(1.0, 256.0);
+    final widthFactor = stroke.tool == DrawTool.highlighter ? 3.25 : 2.0;
+    final size = (stroke.strokeWidth * widthFactor).clamp(1.0, 256.0);
 
     final thinning = stroke.tool == DrawTool.highlighter ? 0.0 : 0.5;
 

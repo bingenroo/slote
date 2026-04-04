@@ -1,5 +1,5 @@
 /// Shared utilities and resources for Slote
-library shared;
+library;
 
 export 'src/res/strings.dart';
 export 'src/res/assets.dart';

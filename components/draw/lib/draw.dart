@@ -1,5 +1,5 @@
 /// Custom drawing implementation for Slote
-library draw;
+library;
 
 export 'src/draw_controller.dart';
 export 'src/draw_tool.dart';

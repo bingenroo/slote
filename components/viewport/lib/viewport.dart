@@ -1,5 +1,5 @@
 /// Viewport/zoom/pan functionality for Slote
-library viewport;
+library;
 
 export 'src/viewport/viewport_surface.dart';
 export 'src/zoom_pan/zoom_pan_surface.dart';

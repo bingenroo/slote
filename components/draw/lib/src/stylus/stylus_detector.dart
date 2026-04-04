@@ -1,5 +1,4 @@
 import 'package:flutter/gestures.dart';
-import 'package:flutter/material.dart';
 
 /// Detects stylus input
 class StylusDetector {
@@ -19,4 +18,3 @@ class StylusDetector {
     return null;
   }
 }
-

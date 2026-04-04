@@ -125,8 +125,9 @@ Selection _sloteClampSelectionToNodeText(
   Selection selection,
 ) {
   if (selection.isCollapsed) return selection;
-  if (selection.start.path.length != selection.end.path.length)
+  if (selection.start.path.length != selection.end.path.length) {
     return selection;
+  }
   for (var i = 0; i < selection.start.path.length; i++) {
     if (selection.start.path[i] != selection.end.path[i]) return selection;
   }

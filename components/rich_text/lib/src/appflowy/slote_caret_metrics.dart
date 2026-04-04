@@ -55,7 +55,7 @@ EndOfParagraphCaretMetrics? sloteCaretMetrics({
   }
   if (attrs == null || attrs.isEmpty) return null;
 
-  bool _enabled(dynamic v) {
+  bool enabled(dynamic v) {
     if (v == null) return false;
     if (v is bool) return v;
     if (v is num) return v != 0;
@@ -66,11 +66,11 @@ EndOfParagraphCaretMetrics? sloteCaretMetrics({
   final selection = editorState.selection;
   final toggled = editorState.toggledStyle;
 
-  final toggledSup = _enabled(toggled[kSloteSuperscriptAttribute]);
-  final toggledSub = _enabled(toggled[kSloteSubscriptAttribute]);
+  final toggledSup = enabled(toggled[kSloteSuperscriptAttribute]);
+  final toggledSub = enabled(toggled[kSloteSubscriptAttribute]);
 
-  var rawSup = _enabled(attrs[kSloteSuperscriptAttribute]);
-  var rawSub = _enabled(attrs[kSloteSubscriptAttribute]);
+  var rawSup = enabled(attrs[kSloteSuperscriptAttribute]);
+  var rawSub = enabled(attrs[kSloteSubscriptAttribute]);
   final sliceHadSubscript = rawSub;
 
   // [toggleAttribute] stores explicit `false` when turning script off at a
@@ -154,9 +154,9 @@ EndOfParagraphCaretMetrics? sloteCaretMetrics({
           ? m.translateY * SloteSupSubMetrics.superscriptCaretTranslateYFactor
           : pendingSubOnBodyBaseline
           ? SloteSupSubMetrics.subscriptCaretTranslateYPendingBodyBaseline(
-              context,
-              baseFontSize: baseFontSize,
-            )
+            context,
+            baseFontSize: baseFontSize,
+          )
           : m.translateY;
 
   return EndOfParagraphCaretMetrics(
