@@ -14,8 +14,14 @@ This document is the **canonical plan** for Slote’s rich-text subsystem: edito
 | ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Source of truth** | **AppFlowy Document JSON** for pixel-accurate round-trip in the app. Use Markdown (or Delta) only for **import/export or migration**, not as the live model.                                  |
 | **Editor**          | [`appflowy_editor`](https://pub.dev/packages/appflowy_editor) — compose UI (toolbars, shortcuts) against `EditorState` APIs.                                                                  |
-| **Package layout**  | **`lib/`** now exports AppFlowy helpers (`RichTextEditorController`, BIUS entry points, shortcut wiring). The **example** app composes the full editor UI and depends on `package:rich_text`. |
+| **Package layout**  | **`lib/`** exports AppFlowy helpers plus shared editor chrome: [`FormatToolbar`](../lib/src/ui/slote_default_format_toolbar.dart), [`SloteRichTextEditorScaffold`](../lib/src/ui/slote_rich_text_editor_scaffold.dart). The **example** app and **main app** (`create_note`) use the same scaffold; the example adds JSON logging only. |
 | **Legacy**          | Pre–AppFlowy Quill implementation is **archived in writing only**: [IMPLEMENTATION.md](../IMPLEMENTATION.md) (no longer the active stack).                                                    |
+
+### Development workflow
+
+- **Path dependency:** Root [`pubspec.yaml`](../../../pubspec.yaml) lists `rich_text` with `path: components/rich_text`. The main app imports **`package:rich_text`**; edits under `components/rich_text/lib/` are reflected on the next analyze, run, or hot restart — no manual “wire into Slote” step beyond using the public API.
+- **Shared chrome:** Editor shell (**[`SloteRichTextEditorScaffold`](../lib/src/ui/slote_rich_text_editor_scaffold.dart)**, **[`FormatToolbar`](../lib/src/ui/slote_default_format_toolbar.dart)**) lives in this package so **[`create_note.dart`](../../../lib/src/views/create_note.dart)** and the **[example](../example)** stay aligned. Prefer extending the package when adding toolbar, outline, or scaffold behavior.
+- **Where to run:** Use **`components/rich_text/example`** for a fast isolated loop and debounced JSON logging; use the **root Slote app** for product flows (navigation, storage, theme).
 
 ---
 
@@ -25,10 +31,10 @@ This document is the **canonical plan** for Slote’s rich-text subsystem: edito
 | ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Active spike**               | [`example/lib/main.dart`](../example/lib/main.dart) — `EditorState` from JSON, `AppFlowyEditor`, fixed **BIUS** toolbar (`toggleAttribute` + caret-aware active state). |
 | **Phase (AppFlowy checklist)** | **Phases 3–4 complete** in `package:rich_text` + example: `RichTextEditorController`, debounced JSON, shared BIUS entry points + command shortcuts.                     |
-| **Wave C (structural blocks)** | **C1–C5 delivered** (headings, lists, quote, divider, code block, callout) — see [Wave C](#wave-c--structural-blocks-split) below. **C6–C7** (tables, images): basic insert actions exist in the example toolbar, but full product/editor UX and app-boundary storage/picker story are still deferred (codec round-trip is covered by tests). |
+| **Wave C (structural blocks)** | **C1–C5 delivered** (headings, lists, quote, divider, code block, callout) — see [Wave C](#wave-c--structural-blocks-split) below. **C6–C7** (tables, images): basic insert actions exist in [`FormatToolbar`](../lib/src/ui/slote_default_format_toolbar.dart), but full product/editor UX and app-boundary storage/picker story are still deferred (codec round-trip is covered by tests). |
 | **Superscript / subscript**    | **Done (Wave B)** — Slote-only extension on AppFlowy (delta keys, `WidgetSpan` renderer, caret/EOT fork hooks, markdown). Implementation guide: [SUPERSCRIPT_SUBSCRIPT.md](SUPERSCRIPT_SUBSCRIPT.md). |
-| **Main Slote app**             | **Note body integrated** — [`lib/src/views/create_note.dart`](../../../lib/src/views/create_note.dart): `RichTextEditorController` (single `EditorState`), AppFlowy Document JSON persisted via [`lib/src/services/slote_rich_text_storage.dart`](../../../lib/src/services/slote_rich_text_storage.dart), bottom toolbar undo/redo via `sloteEditor*` + `undoRedoListenable`. Legacy/non-JSON bodies normalize or fall back to empty doc. |
-| **Outline / TOC (Wave D)**     | **Done** — [`slote_outline.dart`](../lib/src/appflowy/slote_outline.dart) (`sloteCollectOutlineEntries`); [`RichTextEditorController`](../lib/src/appflowy/appflowy_document_controller.dart) `onDebouncedDocumentChanged` (same debounce as JSON); main app: outline AppBar action, modal sheet (&lt;600dp) / `endDrawer` (≥600dp), scroll + selection jump. |
+| **Main Slote app**             | **Note body integrated** — [`lib/src/views/create_note.dart`](../../../lib/src/views/create_note.dart): [`SloteRichTextEditorScaffold`](../lib/src/ui/slote_rich_text_editor_scaffold.dart) + `RichTextEditorController`, AppFlowy Document JSON via [`lib/src/services/slote_rich_text_storage.dart`](../../../lib/src/services/slote_rich_text_storage.dart). Legacy/non-JSON bodies normalize or fall back to empty doc. |
+| **Outline / TOC (Wave D)**     | **Done** — [`slote_outline.dart`](../lib/src/appflowy/slote_outline.dart) (`sloteCollectOutlineEntries`); [`RichTextEditorController`](../lib/src/appflowy/appflowy_document_controller.dart) `onDebouncedDocumentChanged` (same debounce as JSON); outline UI lives in [`SloteRichTextEditorScaffold`](../lib/src/ui/slote_rich_text_editor_scaffold.dart) (modal sheet &lt;600dp / `endDrawer` ≥600dp, scroll + selection jump). |
 
 ## Next (Slote-focused “what’s next”)
 
@@ -39,7 +45,7 @@ This document is the **canonical plan** for Slote’s rich-text subsystem: edito
 
 ## Phased delivery (high level)
 
-Phases build on each other; run the example app and tests after each major phase.
+Phases build on each other; after each major phase run **`components/rich_text/example`**, **`flutter test`** in `components/rich_text`, and (when UI or persistence changes) the **root Slote app** — it already depends on this package via path.
 
 ### Wave A — Foundation (AppFlowy Phases 1–4)
 
@@ -57,8 +63,8 @@ Phases build on each other; run the example app and tests after each major phase
 | **Superscript / subscript** | **Done** — See [SUPERSCRIPT_SUBSCRIPT.md](SUPERSCRIPT_SUBSCRIPT.md) for architecture (attributes, toggles, `toggledStyle` sync, `WidgetSpan` layout, caret metrics, markdown). Example wires `EditorStyle.copyWith(textSpanDecorator: …, caretMetrics: …, endOfParagraphCaretHeight: …)`.                                                                                                        |
 | **Links**                   | Inline `href` with the Slote UI flow: quick tap opens the URL; long-press (or toolbar action) opens the **link format drawer** implemented as a bottom sheet (`showModalBottomSheet`) in `slote_format_drawers.dart`.                                                                                                                                                                                                                                                                                                                     |
 | **Font size, font family**  | **Implemented (Phase 1)**: selection helpers apply AppFlowy inline attributes `font_size` / `font_family` (`sloteApplyFontSize` / `sloteApplyFontFamily`). Markdown export/import supported via `<span font_size=\"...\" font_family='\"...\"'>...` wrapper from `sloteDocumentToMarkdown`.                                                                                                                                                                                                               |
-| **Text color, highlight**   | **Implemented (Phase 1, example):** color + highlight picker as a bottom sheet with preset swatches, applying attributes to the current selection (`showSloteColorFormatDrawer` in `slote_format_drawers.dart`). **Touchpoint:** [`example/lib/editor/format_toolbar.dart`](../example/lib/editor/format_toolbar.dart).                                                                                                                                                                                                                                                                                                                     |
-| **Alignment**               | **Implemented (Phase 1, example toolbar)**: block-level `align` via `blockComponentAlign` with `left` / `center` / `right` / `justify` (`justify` uses `TextAlign.justify` on text blocks in vendored `appflowy_editor`). Slote example toolbar exposes all four. Main app wiring is deferred.                                                                                                                                                                                                            |
+| **Text color, highlight**   | **Implemented (Phase 1):** color + highlight picker as a bottom sheet with preset swatches, applying attributes to the current selection (`showSloteColorFormatDrawer` in `slote_format_drawers.dart`). **Touchpoint:** [`FormatToolbar`](../lib/src/ui/slote_default_format_toolbar.dart).                                                                                                                                                                                                                                                                                                                     |
+| **Alignment**               | **Implemented (Phase 1):** block-level `align` via `blockComponentAlign` with `left` / `center` / `right` / `justify` (`justify` uses `TextAlign.justify` on text blocks in vendored `appflowy_editor`). [`FormatToolbar`](../lib/src/ui/slote_default_format_toolbar.dart) exposes all four (example + main app).                                                                                                                                                                                                            |
 | **Clear formatting**        | **Implemented (Phase 1):** single command stripping partial inline styles on selection; respects `EditorState` history.                                                                                                                                                                                                                                                                                                                                                                                                                     |
 
 <a id="sup-sub-known-limitations"></a>
@@ -83,10 +89,10 @@ These slices are **in place** today: example toolbar wiring, AppFlowy block comp
 
 | Slice | Feature | Notes |
 | ----- | ------- | ----- |
-| **C1** | **Headings H1–H5** | Block heading levels up to **H5**. APIs and menu: [`slote_heading_support.dart`](../lib/src/appflowy/slote_heading_support.dart) (`sloteToggleHeadingLevel`, `SloteHeadingStyleToolbarMenu`); example: [`format_toolbar.dart`](../example/lib/editor/format_toolbar.dart). Tests: `slote_heading_support_test.dart`, `slote_markdown_heading_levels_test.dart`. |
+| **C1** | **Headings H1–H5** | Block heading levels up to **H5**. APIs and menu: [`slote_heading_support.dart`](../lib/src/appflowy/slote_heading_support.dart) (`sloteToggleHeadingLevel`, `SloteHeadingStyleToolbarMenu`); toolbar: [`FormatToolbar`](../lib/src/ui/slote_default_format_toolbar.dart). Tests: `slote_heading_support_test.dart`, `slote_markdown_heading_levels_test.dart`. |
 | **C2** | **Bullet, numbered, checkbox lists** | Toolbar actions use AppFlowy `insertBulletedListAfterSelection` / `insertNumberedListAfterSelection` / `insertCheckboxAfterSelection` (indent/outdent, new item, split/merge follow **AppFlowy defaults**). Tests: [`slote_list_insertion_test.dart`](../test/slote_list_insertion_test.dart). |
 | **C3** | **Quote + horizontal rule** | Quote: `insertQuoteAfterSelection`. Divider: `dividerNode()` + `insertNodeAfterSelection` (see [`slote_list_insertion_test.dart`](../test/slote_list_insertion_test.dart)). |
-| **C4** | **Code blocks (plain first)** | Fenced-style plain code block via `insertCodeBlockAfterSelection` in the example toolbar. Markdown round-trip: [`slote_markdown_codec.dart`](../lib/src/appflowy/slote_markdown_codec.dart); tests: `slote_markdown_code_block_test.dart`. Optional syntax highlight is **Wave E**. |
+| **C4** | **Code blocks (plain first)** | Fenced-style plain code block via `insertCodeBlockAfterSelection` in [`FormatToolbar`](../lib/src/ui/slote_default_format_toolbar.dart). Markdown round-trip: [`slote_markdown_codec.dart`](../lib/src/appflowy/slote_markdown_codec.dart); tests: `slote_markdown_code_block_test.dart`. Optional syntax highlight is **Wave E**. |
 | **C5** | **Callouts** | Custom callout block + insert from toolbar (`insertCalloutAfterSelection`). Markdown: [`slote_callout_markdown.dart`](../lib/src/appflowy/slote_callout_markdown.dart); tests: `slote_markdown_callout_test.dart`. |
 
 #### Wave C — not yet (C6–C7)
@@ -95,15 +101,15 @@ These remain **out of scope** for the current editor/product slice: no dedicated
 
 | Slice | Feature | Notes |
 | ----- | ------- | ----- |
-| **C6** | **Tables** | Basic insert (e.g. 2×2) exists in the example toolbar, but full **editing UX** (insert chrome, complex manipulation) and any Slote-specific table behavior are deferred. Higher complexity than quote/hr/code. |
-| **C7** | **Images** | Basic insert (URL) exists in the example toolbar, but product embedding is deferred: app-boundary storage policy (paths/blobs/encryption), picker UX, and main-app wiring — not just codec round-trip. |
+| **C6** | **Tables** | Basic insert (e.g. 2×2) exists in [`FormatToolbar`](../lib/src/ui/slote_default_format_toolbar.dart), but full **editing UX** (insert chrome, complex manipulation) and any Slote-specific table behavior are deferred. Higher complexity than quote/hr/code. |
+| **C7** | **Images** | Basic insert (URL) exists in [`FormatToolbar`](../lib/src/ui/slote_default_format_toolbar.dart) (optional `onInsertImageUrl` override); product embedding is deferred: app-boundary storage policy (paths/blobs/encryption), picker UX — not just codec round-trip. |
 
 ### Wave D — Advanced content
 
 | Feature             | Notes                                                                                                                                 |
 | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
 | **Formula (LaTeX)** | Inline or block embed; renderer + editing UX.                                                                                         |
-| **Outline / TOC**   | **Done (main app)** — debounced outline refresh (`onDebouncedDocumentChanged` + [`sloteCollectOutlineEntries`](../lib/src/appflowy/slote_outline.dart)); hierarchy UI + tap-to-jump in [`create_note.dart`](../../../lib/src/views/create_note.dart). |
+| **Outline / TOC**   | **Done** — debounced outline refresh (`onDebouncedDocumentChanged` + [`sloteCollectOutlineEntries`](../lib/src/appflowy/slote_outline.dart)); hierarchy UI + tap-to-jump in [`SloteRichTextEditorScaffold`](../lib/src/ui/slote_rich_text_editor_scaffold.dart) (used by [`create_note.dart`](../../../lib/src/views/create_note.dart)). |
 
 ### Wave E — Editor polish & theming
 
@@ -140,7 +146,7 @@ Use **narrow** signals for interactive toolbars; **one debounced pipe** for expe
 
 - **AppFlowy-only API**: [`appflowy_undo_support.dart`](../lib/src/appflowy/appflowy_undo_support.dart) exports **`sloteEditorCanUndo`**, **`sloteEditorCanRedo`**, **`sloteEditorUndo`**, **`sloteEditorRedo`** — thin wrappers over **`EditorState.undoManager`** (same stack as AppFlowy’s standard undo/redo shortcuts).
 - **`RichTextEditorController`**: optional **`maxHistoryItemSize`** / **`minHistoryItemDuration`** forwarded to **`EditorState`**; **`undoRedoListenable`** (a Flutter `Listenable`) rebuilds toolbar enablement when undo/redo availability changes.
-- **Example**: undo/redo icons on [`format_toolbar.dart`](../example/lib/editor/format_toolbar.dart) merged with selection/toggled-style listenables in [`rich_text_editor_screen.dart`](../example/lib/editor/rich_text_editor_screen.dart).
+- **Toolbar + example**: undo/redo on [`FormatToolbar`](../lib/src/ui/slote_default_format_toolbar.dart); [`SloteRichTextEditorScaffold`](../lib/src/ui/slote_rich_text_editor_scaffold.dart) merges selection, toggled-style, and `undoRedoListenable`. [`rich_text_editor_screen.dart`](../example/lib/editor/rich_text_editor_screen.dart) is a thin shell + JSON log.
 
 ### Today (rest of repo)
 
@@ -157,7 +163,7 @@ Use **narrow** signals for interactive toolbars; **one debounced pipe** for expe
    - **Move** a tiny generic helper into `rich_text/lib/src/` if a non-editor widget still needs stack-based undo (unlikely for v1).
 4. **Drawing undo** remains owned by **`draw`** / stroke model until a product decision unifies stacks; not blocked on `undo_redo`.
 
-### Planned removal checklist (execute when integrating rich_text into the app)
+### Planned removal checklist (cleanup after main-app adoption of `package:rich_text`)
 
 - [x] Note body uses `EditorState` / `AppFlowyEditor` from `rich_text`.
 - [x] Undo/redo UI calls editor history, verified across BIUS + blocks.
@@ -171,8 +177,9 @@ Use **narrow** signals for interactive toolbars; **one debounced pipe** for expe
 
 | Area                     | Path                                                     |
 | ------------------------ | -------------------------------------------------------- |
-| Spike / daily dev        | [`example/`](../example)                                 |
-| Future public API        | [`lib/rich_text.dart`](../lib/rich_text.dart)            |
+| Example (isolated dev)   | [`example/`](../example) — same `package:rich_text` APIs as the app; JSON preview for debugging |
+| Main app note editor     | [`lib/src/views/create_note.dart`](../../../lib/src/views/create_note.dart) — imports **`package:rich_text`** (path-resolved) |
+| Public exports           | [`lib/rich_text.dart`](../lib/rich_text.dart)            |
 | AppFlowy phase checklist | [appflowy-editor-roadmap.md](appflowy-editor-roadmap.md) |
 | Legacy Quill record      | [IMPLEMENTATION.md](../IMPLEMENTATION.md)                |
 

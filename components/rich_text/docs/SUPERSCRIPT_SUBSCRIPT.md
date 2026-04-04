@@ -70,9 +70,9 @@ In [`slote_markdown_codec.dart`](../lib/src/appflowy/slote_markdown_codec.dart):
 
 ---
 
-## 7. Wiring in an app (example)
+## 7. Wiring in an app (example + main app)
 
-The example screen applies Slote’s stack in one place:
+**[`SloteRichTextEditorScaffold`](../lib/src/ui/slote_rich_text_editor_scaffold.dart)** applies the same `EditorStyle` hooks for both the **[example](../example)** screen and the main app’s **[`create_note.dart`](../../../lib/src/views/create_note.dart)** (path `package:rich_text`). The example also shows the pattern explicitly:
 
 ```dart
 final editorStyle =
@@ -85,7 +85,7 @@ final editorStyle =
 );
 ```
 
-Source: [`example/lib/editor/rich_text_editor_screen.dart`](../example/lib/editor/rich_text_editor_screen.dart).
+Reference: [`example/lib/editor/rich_text_editor_screen.dart`](../example/lib/editor/rich_text_editor_screen.dart) (thin wrapper around the scaffold).
 
 Use **`standardCommandShortcutsWithSloteInlineHandlers`** (or your own) so keyboard shortcuts hit the same toggle APIs as the toolbar.
 

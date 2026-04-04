@@ -1,4 +1,4 @@
-/// Slote rich text (AppFlowy-backed APIs; see `example/` for full editor UI).
+/// Slote rich text (AppFlowy-backed APIs; see `example/` for demo app).
 library;
 
 export 'src/appflowy/appflowy_document_controller.dart';
@@ -17,6 +17,8 @@ export 'src/appflowy/slote_outline.dart';
 export 'src/appflowy/slote_markdown_codec.dart';
 export 'src/appflowy/slote_sup_sub_metrics.dart';
 export 'src/appflowy/slote_text_span_decorator.dart';
+export 'src/ui/slote_default_format_toolbar.dart';
+export 'src/ui/slote_rich_text_editor_scaffold.dart';
 export 'src/ui/slote_toolbar_layout.dart';
 export 'src/ui/slote_toolbar_vertical_page_physics.dart';
 

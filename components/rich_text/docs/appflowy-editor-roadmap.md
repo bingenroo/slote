@@ -11,7 +11,7 @@ This file stays focused on **AppFlowy Editor** milestones: Document JSON, BIUS, 
 ## Execution model (divide and conquer)
 
 - **Phase 1:** Work alone on AppFlowy JSON (load, edit, export, debug). No bulk assistant implementation until Phase 1 is done.
-- **Phases 2–4:** Implement incrementally with review; after each phase, run the example app and tests before the next.
+- **Phases 2–4:** Implement incrementally with review; after each phase, run **`components/rich_text/example`**, **`flutter test`** under `components/rich_text`, and (for product regressions) the **root Slote app** before the next.
 - **Later waves:** Extended inline, blocks, media, TOC, theming — scheduled in [ROADMAP.md](ROADMAP.md).
 
 ---
@@ -30,7 +30,7 @@ This file stays focused on **AppFlowy Editor** milestones: Document JSON, BIUS, 
 
 - Build a **fixed** row (e.g. under the editor) or reuse **MobileFloatingToolbar** / desktop patterns from `appflowy_editor`. The package provides **building blocks**; you **compose** the screen ([pub.dev overview](https://pub.dev/packages/appflowy_editor)).
 - Toolbar scope: four actions only — **Bold**, **Italic**, **Underline**, **Strikethrough** (BIUS).
-- Note: `AppFlowyEditor` alone does not ship a complete toolbar; expect to wire UI to editor APIs yourself (same idea as floating-toolbar examples in the package).
+- Note: `AppFlowyEditor` alone does not ship a complete toolbar; upstream examples compose UI against editor APIs. **In Slote**, **[`SloteRichTextEditorScaffold`](../lib/src/ui/slote_rich_text_editor_scaffold.dart)** and **[`FormatToolbar`](../lib/src/ui/slote_default_format_toolbar.dart)** are that composition; the **example** and **main app** both import `package:rich_text` (path). See [ROADMAP.md](ROADMAP.md) § Development workflow.
 
 ---
 

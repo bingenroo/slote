@@ -178,11 +178,11 @@ and converted to markdown fenced blocks:
 ### Toolbar + shortcuts wiring
 
 - Toolbar Link button opens the link drawer as a bottom sheet:
-  - [format_toolbar.dart#L94-L102](example/lib/editor/format_toolbar.dart#L94-L102)
+  - [slote_default_format_toolbar.dart](lib/src/ui/slote_default_format_toolbar.dart) (toolbar groups)
 - Toolbar Highlight + Text color buttons open the combined color drawer:
-  - [format_toolbar.dart#L103-L124](example/lib/editor/format_toolbar.dart#L103-L124)
+  - [slote_default_format_toolbar.dart](lib/src/ui/slote_default_format_toolbar.dart) (extended inline actions)
 - Text color selected state now represents a uniform non-null `font_color` across the selection (instead of a single fixed hex), via:
-  - `isUniformTextColorActiveInSelection` in [format_toolbar.dart](example/lib/editor/format_toolbar.dart)
+  - Toolbar active state via [`slote_format_toolbar_state.dart`](lib/src/appflowy/slote_format_toolbar_state.dart) / [`FormatToolbar`](lib/src/ui/slote_default_format_toolbar.dart)
 - Keyboard shortcuts:
   - `toggle highlight` and Slote-added text-color chord open the combined color drawer:
     - [appflowy_editor_support.dart#L115-L129](lib/src/appflowy/appflowy_editor_support.dart#L115-L129)

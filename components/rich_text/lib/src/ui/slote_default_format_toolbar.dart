@@ -2,28 +2,43 @@ import 'dart:async';
 
 import 'package:appflowy_editor/appflowy_editor.dart';
 import 'package:flutter/material.dart';
-import 'package:rich_text/rich_text.dart';
 
-/// Fixed formatting bar: BIUS, heading/body, link, colors, clear, fonts, sup/sub.
+import '../appflowy/appflowy_editor_support.dart';
+import '../appflowy/appflowy_undo_support.dart';
+import '../appflowy/slote_alignment_support.dart';
+import '../appflowy/slote_format_drawers.dart';
+import '../appflowy/slote_format_toolbar_state.dart';
+import '../appflowy/slote_heading_support.dart';
+import '../appflowy/slote_inline_attributes.dart';
+import 'slote_toolbar_layout.dart';
+import 'slote_toolbar_vertical_page_physics.dart';
+
+/// Default Slote formatting bar: undo/redo, alignment, blocks, BIUS, link,
+/// colors, fonts, superscript/subscript.
+///
+/// When [onInsertImageUrl] is null, image insert uses a simple URL dialog.
+/// Apps can override with storage pickers or custom flows.
 class FormatToolbar extends StatelessWidget {
   const FormatToolbar({
     super.key,
     required this.editorState,
     required this.listenable,
     this.layout = SloteToolbarLayout.horizontalScroll,
+    this.onInsertImageUrl,
   });
 
   final EditorState editorState;
   final Listenable listenable;
   final SloteToolbarLayout layout;
 
-  // Keep vertical mode as a single visible bar; users swipe up/down within it.
+  /// When non-null, called instead of the built-in URL dialog for image insert.
+  final Future<String?> Function(BuildContext context)? onInsertImageUrl;
+
   static const double _kVerticalToolbarHeight = 44;
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
+    final scheme = Theme.of(context).colorScheme;
     return AnimatedBuilder(
       animation: listenable,
       builder: (context, _) {
@@ -52,10 +67,7 @@ class FormatToolbar extends StatelessWidget {
             ),
           ],
           [
-            _blockAlignmentGroup(
-              context: context,
-              enabled: hasSelection,
-            ),
+            _blockAlignmentGroup(context: context, enabled: hasSelection),
             SloteHeadingStyleToolbarMenu(
               editorState: editorState,
               enabled: sloteCanUseBlockHeadingControls(editorState),
@@ -100,10 +112,8 @@ class FormatToolbar extends StatelessWidget {
               selected: false,
               icon: Icons.horizontal_rule,
               tooltip: 'Divider',
-              onPressed: () => insertNodeAfterSelection(
-                editorState,
-                dividerNode(),
-              ),
+              onPressed:
+                  () => insertNodeAfterSelection(editorState, dividerNode()),
             ),
             _formatToggle(
               context: context,
@@ -135,38 +145,7 @@ class FormatToolbar extends StatelessWidget {
               selected: false,
               icon: Icons.image,
               tooltip: 'Image (URL)',
-              onPressed: () async {
-                final url = await showDialog<String?>(
-                  context: context,
-                  builder: (context) {
-                    final controller = TextEditingController();
-                    return AlertDialog(
-                      title: const Text('Insert image URL'),
-                      content: TextField(
-                        controller: controller,
-                        autofocus: true,
-                        decoration: const InputDecoration(
-                          hintText: 'https://… or file://… or slote://…',
-                        ),
-                      ),
-                      actions: [
-                        TextButton(
-                          onPressed: () =>
-                              Navigator.pop(context, controller.text),
-                          child: const Text('Insert'),
-                        ),
-                        TextButton(
-                          onPressed: () => Navigator.pop(context, null),
-                          child: const Text('Cancel'),
-                        ),
-                      ],
-                    );
-                  },
-                );
-                final trimmed = url?.trim();
-                if (trimmed == null || trimmed.isEmpty) return;
-                insertImageAfterSelection(editorState, url: trimmed);
-              },
+              onPressed: () => unawaited(_insertImage(context)),
             ),
           ],
           [
@@ -180,10 +159,7 @@ class FormatToolbar extends StatelessWidget {
               icon: Icons.format_bold,
               tooltip: 'Bold',
               onPressed:
-                  () => applyBiusToggle(
-                    editorState,
-                    AppFlowyRichTextKeys.bold,
-                  ),
+                  () => applyBiusToggle(editorState, AppFlowyRichTextKeys.bold),
             ),
             _formatToggle(
               context: context,
@@ -195,10 +171,8 @@ class FormatToolbar extends StatelessWidget {
               icon: Icons.format_italic,
               tooltip: 'Italic',
               onPressed:
-                  () => applyBiusToggle(
-                    editorState,
-                    AppFlowyRichTextKeys.italic,
-                  ),
+                  () =>
+                      applyBiusToggle(editorState, AppFlowyRichTextKeys.italic),
             ),
             _formatToggle(
               context: context,
@@ -239,10 +213,7 @@ class FormatToolbar extends StatelessWidget {
               icon: Icons.link,
               tooltip: 'Link',
               onPressed:
-                  () => sloteShowLinkDialog(
-                    editorState,
-                    hostContext: context,
-                  ),
+                  () => sloteShowLinkDialog(editorState, hostContext: context),
             ),
             _formatToggle(
               context: context,
@@ -279,14 +250,8 @@ class FormatToolbar extends StatelessWidget {
             ),
           ],
           [
-            _FontSizeMenu(
-              editorState: editorState,
-              enabled: rangeSelection,
-            ),
-            _FontFamilyMenu(
-              editorState: editorState,
-              enabled: hasSelection,
-            ),
+            _FontSizeMenu(editorState: editorState, enabled: rangeSelection),
+            _FontFamilyMenu(editorState: editorState, enabled: hasSelection),
             _formatToggle(
               context: context,
               enabled: hasSelection,
@@ -296,8 +261,7 @@ class FormatToolbar extends StatelessWidget {
               ),
               icon: Icons.superscript,
               tooltip: 'Superscript',
-              onPressed:
-                  () => unawaited(sloteToggleSuperscript(editorState)),
+              onPressed: () => unawaited(sloteToggleSuperscript(editorState)),
             ),
             _formatToggle(
               context: context,
@@ -308,8 +272,7 @@ class FormatToolbar extends StatelessWidget {
               ),
               icon: Icons.subscript,
               tooltip: 'Subscript',
-              onPressed:
-                  () => unawaited(sloteToggleSubscript(editorState)),
+              onPressed: () => unawaited(sloteToggleSubscript(editorState)),
             ),
           ],
         ];
@@ -330,6 +293,43 @@ class FormatToolbar extends StatelessWidget {
     );
   }
 
+  Future<void> _insertImage(BuildContext context) async {
+    final String? url;
+    if (onInsertImageUrl != null) {
+      url = await onInsertImageUrl!(context);
+    } else {
+      url = await showDialog<String?>(
+        context: context,
+        builder: (dialogContext) {
+          final controller = TextEditingController();
+          return AlertDialog(
+            title: const Text('Insert image URL'),
+            content: TextField(
+              controller: controller,
+              autofocus: true,
+              decoration: const InputDecoration(
+                hintText: 'https://… or file://… or slote://…',
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext, controller.text),
+                child: const Text('Insert'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext, null),
+                child: const Text('Cancel'),
+              ),
+            ],
+          );
+        },
+      );
+    }
+    final trimmed = url?.trim();
+    if (trimmed == null || trimmed.isEmpty) return;
+    insertImageAfterSelection(editorState, url: trimmed);
+  }
+
   Widget _buildHorizontal(List<List<Widget>> groups, ColorScheme scheme) {
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
@@ -346,8 +346,6 @@ class FormatToolbar extends StatelessWidget {
   }
 
   Widget _buildVertical(List<List<Widget>> groups, ColorScheme scheme) {
-    // One group per "page": snaps to nearest row (like iOS alarm wheel) with
-    // inertial fling + optional edge bounce.
     return SizedBox(
       height: _kVerticalToolbarHeight,
       child: ClipRect(
@@ -393,9 +391,10 @@ class FormatToolbar extends StatelessWidget {
           selected: active == SloteBlockAlignment.left,
           icon: Icons.format_align_left,
           tooltip: 'Align left',
-          onPressed: () => unawaited(
-            sloteApplyBlockAlignment(editorState, SloteBlockAlignment.left),
-          ),
+          onPressed:
+              () => unawaited(
+                sloteApplyBlockAlignment(editorState, SloteBlockAlignment.left),
+              ),
         ),
         _formatToggle(
           context: context,
@@ -403,9 +402,13 @@ class FormatToolbar extends StatelessWidget {
           selected: active == SloteBlockAlignment.center,
           icon: Icons.format_align_center,
           tooltip: 'Align center',
-          onPressed: () => unawaited(
-            sloteApplyBlockAlignment(editorState, SloteBlockAlignment.center),
-          ),
+          onPressed:
+              () => unawaited(
+                sloteApplyBlockAlignment(
+                  editorState,
+                  SloteBlockAlignment.center,
+                ),
+              ),
         ),
         _formatToggle(
           context: context,
@@ -413,9 +416,13 @@ class FormatToolbar extends StatelessWidget {
           selected: active == SloteBlockAlignment.right,
           icon: Icons.format_align_right,
           tooltip: 'Align right',
-          onPressed: () => unawaited(
-            sloteApplyBlockAlignment(editorState, SloteBlockAlignment.right),
-          ),
+          onPressed:
+              () => unawaited(
+                sloteApplyBlockAlignment(
+                  editorState,
+                  SloteBlockAlignment.right,
+                ),
+              ),
         ),
         _formatToggle(
           context: context,
@@ -423,17 +430,18 @@ class FormatToolbar extends StatelessWidget {
           selected: active == SloteBlockAlignment.justify,
           icon: Icons.format_align_justify,
           tooltip: 'Justify',
-          onPressed: () => unawaited(
-            sloteApplyBlockAlignment(editorState, SloteBlockAlignment.justify),
-          ),
+          onPressed:
+              () => unawaited(
+                sloteApplyBlockAlignment(
+                  editorState,
+                  SloteBlockAlignment.justify,
+                ),
+              ),
         ),
       ],
     );
   }
 
-  /// Separator between toolbar groups. [VerticalDivider] is often invisible
-  /// here: low contrast on [ColorScheme.surfaceContainerLow] and weak height
-  /// constraints in a horizontal [SingleChildScrollView] + [Row].
   Widget _groupDivider(ColorScheme scheme) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -453,8 +461,6 @@ class FormatToolbar extends StatelessWidget {
     );
   }
 
-  /// Single styling for all format [IconButton]s (BIUS toggles and extended
-  /// inline actions).
   Widget _formatToggle({
     required BuildContext context,
     required bool enabled,

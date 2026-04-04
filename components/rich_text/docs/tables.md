@@ -19,7 +19,7 @@ So the document is a linear sequence of characters and embeds; a table is one of
 
 ### 2.1 User action
 
-- The user opens the "More" (⋯) menu in the format toolbar and selects **"Table"** (`format_toolbar.dart`).
+- The user opens the "More" (⋯) menu in the format toolbar and selects **"Table"** ([`FormatToolbar`](../lib/src/ui/slote_default_format_toolbar.dart)).
 - A dialog (`_showTableSizeDialog`) opens: a 7×5 grid of cells; the user taps to choose columns × rows (e.g. 3×4). Tapping "Insert" returns `(selectedCols, selectedRows)`.
 
 ### 2.2 Controller: build Markdown and insert embed
@@ -177,7 +177,7 @@ So: **Markdown string → MarkdownToDelta (with EmbeddableTableSyntax + fromMdSy
 
 | File | Responsibility |
 |------|----------------|
-| **format_toolbar.dart** | "Table" menu → size dialog → `controller.insertTableWithSize(cols, rows)`. |
+| [`slote_default_format_toolbar.dart`](../lib/src/ui/slote_default_format_toolbar.dart) (`FormatToolbar`) | "Table" action → `insertTableAfterSelection` (AppFlowy path today; legacy doc below refers to Quill `insertTableWithSize`). |
 | **rich_text_controller.dart** | Insert (Markdown + embed at end of block), replace (`replaceTableEmbedAt`), Delta↔Markdown (customEmbedHandlers, EmbeddableTableSyntax, fromMdSyntax/toMdSyntax). |
 | **embed_builders.dart** | Turn one table embed into one Table widget: parse data string, static vs editable, `rowsToMarkdown` for persist. |
 | **rich_text_editor_config.dart** | Registers `TableEmbedBuilder` and wires `onReplaceTable` → `controller.replaceTableEmbedAt`. |

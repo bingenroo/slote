@@ -6,8 +6,9 @@ Slote’s **rich text editing** package. The product direction is **AppFlowy Edi
 
 | Layer | Status |
 |--------|--------|
-| **`lib/`** | **`RichTextEditorController`**, inline helpers (`applyBiusToggle`, Wave B `slote*` APIs), markdown helpers (`sloteDocumentToMarkdown` / `sloteMarkdownToDocument`), and `standardCommandShortcutsWithSloteInlineHandlers()` (see `lib/rich_text.dart`). |
-| **`example/`** | **Active development** — uses the package APIs: debounced document JSON preview, BIUS toolbar, AppFlowy editor with shared BIUS command shortcuts. |
+| **`lib/`** | **`RichTextEditorController`**, shared chrome (**`SloteRichTextEditorScaffold`**, **`FormatToolbar`**), inline helpers (`applyBiusToggle`, Wave B `slote*` APIs), markdown helpers (`sloteDocumentToMarkdown` / `sloteMarkdownToDocument`), and `standardCommandShortcutsWithSloteInlineHandlers()` (see `lib/rich_text.dart`). |
+| **`example/`** | **Isolated spike** — same scaffold and APIs as the main app, plus debounced **document JSON** logging for debugging. |
+| **Main Slote app** | **Path dependency** on this package (`pubspec.yaml`: `rich_text: path: components/rich_text`). Note body in [`lib/src/views/create_note.dart`](../../lib/src/views/create_note.dart) imports **`package:rich_text`**; edits under `components/rich_text/lib` apply on the next analyze/run — no copy-paste “wiring” step. |
 | **Legacy Quill stack** | **Not in this tree** — design and behavior are preserved in [IMPLEMENTATION.md](IMPLEMENTATION.md) for reference only (historical Quill + markdown pipeline). |
 
 ## Quick start (spike app)
@@ -17,6 +18,14 @@ cd components/rich_text/example && flutter pub get && flutter run
 ```
 
 Entry: `example/lib/main.dart`.
+
+## Development workflow
+
+1. Implement features and fix bugs in **`lib/`** (and tests under `test/`).
+2. Optionally validate in **`example/`** first (fast loop, JSON preview).
+3. Run or hot-restart the **root Slote app** — it resolves `package:rich_text` from `components/rich_text` automatically.
+
+Shared UI belongs in **`SloteRichTextEditorScaffold`** / **`FormatToolbar`** so the example and `create_note` stay aligned.
 
 ## Documentation
 
@@ -34,9 +43,9 @@ Entry: `example/lib/main.dart`.
 - **`example/`** depends on [`appflowy_editor`](https://pub.dev/packages/appflowy_editor) (see `example/pubspec.yaml`).
 - Root **`rich_text/pubspec.yaml`** depends on **`appflowy_editor`** (shared with the example).
 
-## Integration (main Slote app)
+## Main Slote app
 
-Not wired yet: the app still uses its own text path for note bodies. Use **`RichTextEditorController`** for a single `EditorState` owner, debounced `Document.toJson`, and clean `dispose`; then depend on this package from the app and persist **Document JSON** (or a versioned `.slote` envelope) per [PRD.md](../../PRD.md).
+The root app depends on this package via a **path** entry in [`pubspec.yaml`](../../pubspec.yaml). The note screen uses **`SloteRichTextEditorScaffold`**, **`RichTextEditorController`**, and AppFlowy **Document JSON** persistence (see [`lib/src/services/slote_rich_text_storage.dart`](../../lib/src/services/slote_rich_text_storage.dart) and [docs/ROADMAP.md](docs/ROADMAP.md)). Product envelope and versioning remain per [PRD.md](../../PRD.md).
 
 ## Licensing
 
