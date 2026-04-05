@@ -41,6 +41,9 @@ mixin DefaultSelectableMixin {
   Position getPositionInOffset(Offset start) =>
       forward.getPositionInOffset(start);
 
+  bool arePositionsOnSameRenderedLine(Position a, Position b) =>
+      forward.arePositionsOnSameRenderedLine(a, b);
+
   Rect? getCursorRectInPosition(
     Position position, {
     bool shiftWithBaseOffset = false,

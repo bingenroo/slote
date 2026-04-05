@@ -28,6 +28,27 @@ typedef AppFlowyTextSpanOverlayBuilder = List<Widget> Function(
   SelectableMixin delegate,
 );
 
+/// When [InlineSpan] contains [WidgetSpan], a standalone [TextPainter] cannot
+/// lay out [RenderParagraph.text] (no placeholder dimensions). For vertical
+/// move filtering, approximate "same line" by caret [dy] delta vs
+/// [RenderParagraph.getFullHeightForCaret] (public; avoids [preferredLineHeight]).
+({bool same, double dyA, double dyB, double plh}) _sloteSameLineCaretDyProbe(
+  RenderParagraph rp,
+  int oa,
+  int ob,
+) {
+  final dyA = rp.getOffsetForCaret(TextPosition(offset: oa), Rect.zero).dy;
+  final dyB = rp.getOffsetForCaret(TextPosition(offset: ob), Rect.zero).dy;
+  final hA = rp.getFullHeightForCaret(TextPosition(offset: oa));
+  final hB = rp.getFullHeightForCaret(TextPosition(offset: ob));
+  final plh = max(hA, hB);
+  if (plh <= 0) {
+    return (same: false, dyA: dyA, dyB: dyB, plh: plh);
+  }
+  final same = (dyA - dyB).abs() < plh * 0.9;
+  return (same: same, dyA: dyA, dyB: dyB, plh: plh);
+}
+
 class AppFlowyRichText extends StatefulWidget {
   const AppFlowyRichText({
     super.key,
@@ -432,6 +453,52 @@ class _AppFlowyRichTextState extends State<AppFlowyRichText>
     final baseOffset =
         _renderParagraph?.getPositionForOffset(offset).offset ?? -1;
     return Position(path: widget.node.path, offset: baseOffset);
+  }
+
+  @override
+  bool arePositionsOnSameRenderedLine(Position a, Position b) {
+    if (!a.path.equals(widget.node.path) || !b.path.equals(widget.node.path)) {
+      return false;
+    }
+    final rp = _renderParagraph;
+    if (rp == null || rp.debugNeedsLayout) {
+      return false;
+    }
+    final len = widget.node.delta?.toPlainText().length ?? 0;
+    if (len <= 0) {
+      return false;
+    }
+    final oa = a.offset.clamp(0, len);
+    final ob = b.offset.clamp(0, len);
+    if (oa == ob) {
+      return true;
+    }
+    // [RenderParagraph] does not expose [getLineBoundary]; mirror its
+    // [TextPainter] settings so superscript/subscript shares the same line
+    // range as body text on a wrapped line.
+    final painter = TextPainter(
+      text: rp.text,
+      textAlign: rp.textAlign,
+      textDirection: rp.textDirection,
+      textScaler: rp.textScaler,
+      maxLines: rp.maxLines,
+      locale: rp.locale,
+      strutStyle: rp.strutStyle,
+      textWidthBasis: rp.textWidthBasis,
+      textHeightBehavior: rp.textHeightBehavior,
+    );
+    try {
+      painter.layout(maxWidth: rp.constraints.maxWidth);
+      final ba = painter.getLineBoundary(TextPosition(offset: oa));
+      final bb = painter.getLineBoundary(TextPosition(offset: ob));
+      final same = ba.start == bb.start && ba.end == bb.end;
+      return same;
+    } catch (_) {
+      final probe = _sloteSameLineCaretDyProbe(rp, oa, ob);
+      return probe.same;
+    } finally {
+      painter.dispose();
+    }
   }
 
   @override

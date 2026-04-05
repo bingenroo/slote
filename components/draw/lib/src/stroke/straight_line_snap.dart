@@ -1,149 +1,130 @@
+import 'dart:ui' show Offset;
+
 import '../draw_tool.dart';
-import 'stroke.dart';
 
-/// Draw-and-hold straight line (Wave C): document-space thresholds.
-abstract final class StraightLineInkConfig {
-  StraightLineInkConfig._();
+/// Speed + dwell straight line: document-space constants.
+abstract final class StraightLineHoldConfig {
+  StraightLineHoldConfig._();
 
-  /// Minimum time the stroke must be held before a snap is allowed.
-  static const Duration minHold = Duration(milliseconds: 350);
+  /// Contiguous dwell required before locking a straight segment.
+  static const Duration dwellDuration = Duration(milliseconds: 700);
 
-  /// Max perpendicular distance from the **first→last** chord any sample may
-  /// have (document space). When the chord is ~zero, we fall back to
-  /// [maxHoldStillRadiusPx] (hold-still / tiny wiggle).
-  static const double maxDeviationFromChordPx = 24.0;
+  /// Max instantaneous speed (doc px/s) while the dwell timer runs.
+  static const double vMaxHoldDocPxPerSec = 140.0;
 
-  /// Used only when first and last samples are nearly coincident.
-  static const double maxHoldStillRadiusPx = 24.0;
+  /// Finger must stay within this radius (doc px) of the dwell anchor.
+  static const double holdRadiusDocPx = 28.0;
 
-  /// Squared chord length below this → treat stroke as hold-still (radius test).
-  static const double chordLengthSquaredEpsilon = 1.0;
+  /// Minimum Δt (microseconds) when computing speed to avoid division blow-ups.
+  static const int minDtMicroseconds = 800;
 }
 
-double _distanceSquaredPointToSegment(
-  double px,
-  double py,
-  double ax,
-  double ay,
-  double bx,
-  double by,
-) {
-  final abx = bx - ax;
-  final aby = by - ay;
-  final apx = px - ax;
-  final apy = py - ay;
-  final abLenSq = abx * abx + aby * aby;
-  if (abLenSq < 1e-12) {
-    return apx * apx + apy * apy;
-  }
-  var t = (apx * abx + apy * aby) / abLenSq;
-  if (t < 0.0) {
-    t = 0.0;
-  } else if (t > 1.0) {
-    t = 1.0;
-  }
-  final cx = ax + t * abx;
-  final cy = ay + t * aby;
-  final dx = px - cx;
-  final dy = py - cy;
-  return dx * dx + dy * dy;
+/// Result of one hold tick ([StraightLineHoldTracker.tickMove] / [tickStill]).
+class StraightLineHoldTickResult {
+  const StraightLineHoldTickResult({
+    required this.justLocked,
+    required this.isLocked,
+  });
+
+  /// True only on the transition frame when straight mode engages.
+  final bool justLocked;
+
+  final bool isLocked;
 }
 
-/// True if every sample stays within [maxDeviation] of [samples.first] (Euclidean).
-bool strokeSamplesWithinRadiusFromFirst(
-  List<StrokeSample> samples,
-  double maxDeviation,
-) {
-  if (samples.isEmpty) return true;
-  final fx = samples.first.x;
-  final fy = samples.first.y;
-  final maxSq = maxDeviation * maxDeviation;
-  for (final s in samples) {
-    final dx = s.x - fx;
-    final dy = s.y - fy;
-    if (dx * dx + dy * dy > maxSq) return false;
-  }
-  return true;
-}
+/// Contiguous dwell: slow movement + inside [holdRadiusDocPx] of anchor → lock.
+///
+/// Pen/highlighter only; [DrawCanvas] skips the tracker for eraser.
+class StraightLineHoldTracker {
+  StraightLineHoldTracker();
 
-/// True if every sample stays within [maxDeviation] of the segment
-/// **first → last** (perpendicular distance), or within [maxDeviation] of
-/// [samples.first] when the chord is shorter than
-/// [StraightLineInkConfig.chordLengthSquaredEpsilon].
-bool strokeSamplesWithinDeviationFromChord(
-  List<StrokeSample> samples,
-  double maxDeviation, {
-  double chordEpsSq = StraightLineInkConfig.chordLengthSquaredEpsilon,
-  double holdStillMaxRadius = StraightLineInkConfig.maxHoldStillRadiusPx,
-}) {
-  if (samples.isEmpty) return true;
-  if (samples.length < 2) {
-    return strokeSamplesWithinRadiusFromFirst(samples, holdStillMaxRadius);
+  Offset? _dwellAnchor;
+  DateTime? _dwellStartedAt;
+  bool _locked = false;
+
+  bool get isLocked => _locked;
+
+  void reset() {
+    _dwellAnchor = null;
+    _dwellStartedAt = null;
+    _locked = false;
   }
-  final a = samples.first;
-  final b = samples.last;
-  final ax = a.x;
-  final ay = a.y;
-  final bx = b.x;
-  final by = b.y;
-  final abx = bx - ax;
-  final aby = by - ay;
-  final chordLenSq = abx * abx + aby * aby;
-  if (chordLenSq < chordEpsSq) {
-    return strokeSamplesWithinRadiusFromFirst(samples, holdStillMaxRadius);
-  }
-  final maxSq = maxDeviation * maxDeviation;
-  for (final s in samples) {
-    if (_distanceSquaredPointToSegment(s.x, s.y, ax, ay, bx, by) > maxSq) {
-      return false;
+
+  /// Movement between [prevDoc] and [currentDoc]; [prevStamp]/[currentStamp]
+  /// from [PointerEvent.timeStamp] (monotonic deltas).
+  ///
+  /// [clockNow] overrides wall time for dwell duration (tests only).
+  StraightLineHoldTickResult tickMove({
+    required Offset prevDoc,
+    required Duration prevStamp,
+    required Offset currentDoc,
+    required Duration currentStamp,
+    DateTime? clockNow,
+  }) {
+    if (_locked) {
+      return const StraightLineHoldTickResult(justLocked: false, isLocked: true);
     }
+
+    var dtUs = (currentStamp - prevStamp).inMicroseconds;
+    if (dtUs <= 0) {
+      dtUs = StraightLineHoldConfig.minDtMicroseconds;
+    } else if (dtUs < StraightLineHoldConfig.minDtMicroseconds) {
+      dtUs = StraightLineHoldConfig.minDtMicroseconds;
+    }
+    final dtSec = dtUs / 1e6;
+    final dist = (currentDoc - prevDoc).distance;
+    final speed = dist / dtSec;
+
+    if (speed > StraightLineHoldConfig.vMaxHoldDocPxPerSec) {
+      _resetDwell();
+      return const StraightLineHoldTickResult(justLocked: false, isLocked: false);
+    }
+
+    return _advanceDwell(currentDoc, clockNow ?? DateTime.now());
   }
-  return true;
+
+  /// Zero-velocity tick (stationary finger / poll timer).
+  StraightLineHoldTickResult tickStill(
+    Offset currentDoc,
+    DateTime currentTime,
+  ) {
+    if (_locked) {
+      return const StraightLineHoldTickResult(justLocked: false, isLocked: true);
+    }
+    return _advanceDwell(currentDoc, currentTime);
+  }
+
+  StraightLineHoldTickResult _advanceDwell(Offset currentDoc, DateTime currentTime) {
+    final r = StraightLineHoldConfig.holdRadiusDocPx;
+
+    if (_dwellAnchor == null) {
+      _dwellAnchor = currentDoc;
+      _dwellStartedAt = currentTime;
+      return const StraightLineHoldTickResult(justLocked: false, isLocked: false);
+    }
+
+    if ((currentDoc - _dwellAnchor!).distance > r) {
+      _resetDwell();
+      _dwellAnchor = currentDoc;
+      _dwellStartedAt = currentTime;
+      return const StraightLineHoldTickResult(justLocked: false, isLocked: false);
+    }
+
+    final started = _dwellStartedAt!;
+    if (currentTime.difference(started) >= StraightLineHoldConfig.dwellDuration) {
+      _locked = true;
+      return const StraightLineHoldTickResult(justLocked: true, isLocked: true);
+    }
+
+    return const StraightLineHoldTickResult(justLocked: false, isLocked: false);
+  }
+
+  void _resetDwell() {
+    _dwellAnchor = null;
+    _dwellStartedAt = null;
+  }
 }
 
-/// Whether hold time and tight path allow replacing the stroke with first→last.
-bool isStraightLineSnapEligible({
-  required List<StrokeSample> samples,
-  required Duration elapsed,
-  Duration minHold = StraightLineInkConfig.minHold,
-  double maxDeviation = StraightLineInkConfig.maxDeviationFromChordPx,
-}) {
-  if (samples.length < 2) return false;
-  if (elapsed < minHold) return false;
-  return strokeSamplesWithinDeviationFromChord(samples, maxDeviation);
-}
-
-/// Returns `[first, last]` when eligible; otherwise a copy of [samples].
-List<StrokeSample> maybeSnapSamplesToStraightLine({
-  required List<StrokeSample> samples,
-  required Duration elapsed,
-  Duration minHold = StraightLineInkConfig.minHold,
-  double maxDeviation = StraightLineInkConfig.maxDeviationFromChordPx,
-}) {
-  if (!isStraightLineSnapEligible(
-    samples: samples,
-    elapsed: elapsed,
-    minHold: minHold,
-    maxDeviation: maxDeviation,
-  )) {
-    return List<StrokeSample>.from(samples);
-  }
-  return [samples.first, samples.last];
-}
-
-/// Applies straight-line snap for pen/highlighter commits and previews.
-List<StrokeSample> samplesWithStraightLineSnapForTool({
-  required List<StrokeSample> samples,
-  required DrawTool tool,
-  required DateTime? strokeStartedAt,
-  DateTime? referenceTime,
-}) {
-  final now = referenceTime ?? DateTime.now();
-  if (tool == DrawTool.eraser || strokeStartedAt == null) {
-    return List<StrokeSample>.from(samples);
-  }
-  return maybeSnapSamplesToStraightLine(
-    samples: samples,
-    elapsed: now.difference(strokeStartedAt),
-  );
-}
+/// True if [tool] participates in speed+dwell straight line.
+bool straightLineHoldAppliesToTool(DrawTool tool) =>
+    tool != DrawTool.eraser;

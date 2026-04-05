@@ -77,7 +77,9 @@ class StrokeRenderer {
       smoothing: 0.5,
       streamline: 0.5,
       simulatePressure: simulatePressure,
-      isComplete: !isPreview,
+      // Match committed geometry: incomplete strokes shorten the open end in
+      // perfect_freehand, which made live preview shorter than the final line.
+      isComplete: true,
     );
   }
 }

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import 'draw_controller.dart';
@@ -16,8 +18,9 @@ import 'stroke/straight_line_snap.dart';
 /// **commits** the in-progress stroke (partial) so parents can clear
 /// [isDrawingActive] and allow viewport pinch-zoom — see package roadmap.
 ///
-/// **Wave C:** Draw-and-hold straight line ([StraightLineInkConfig]) for pen /
-/// highlighter; live preview uses the same [StrokeRenderer] path.
+/// **Wave C:** Speed + dwell straight line ([StraightLineHoldConfig]): slow
+/// movement inside a hold radius for [StraightLineHoldConfig.dwellDuration]
+/// locks a fixed two-point preview; commit matches that preview.
 class DrawCanvas extends StatefulWidget {
   DrawCanvas({
     super.key,
@@ -51,8 +54,16 @@ class _DrawCanvasState extends State<DrawCanvas> {
   double? _currentStrokeWidth;
   DrawTool? _currentTool;
 
-  /// First [PointerDown] of the current in-progress stroke (Wave C straight line).
-  DateTime? _strokeStartedAt;
+  final StraightLineHoldTracker _holdTracker = StraightLineHoldTracker();
+
+  /// Last doc position and stamp for speed; updated every down/move.
+  late Offset _lastDocForHold;
+  Duration _lastPointerStamp = Duration.zero;
+
+  Timer? _holdPollTimer;
+
+  StrokeSample? _straightLockedStart;
+  StrokeSample? _straightLockedEnd;
 
   bool _captureNotified = false;
 
@@ -64,6 +75,7 @@ class _DrawCanvasState extends State<DrawCanvas> {
 
   @override
   void dispose() {
+    _cancelHoldPoll();
     widget.controller.removeListener(_onControllerChanged);
     super.dispose();
   }
@@ -84,6 +96,37 @@ class _DrawCanvasState extends State<DrawCanvas> {
     if (_captureNotified == active) return;
     _captureNotified = active;
     widget.onStrokeCaptureActiveChanged?.call(active);
+  }
+
+  void _cancelHoldPoll() {
+    _holdPollTimer?.cancel();
+    _holdPollTimer = null;
+  }
+
+  void _startHoldPoll() {
+    _cancelHoldPoll();
+    _holdPollTimer = Timer.periodic(const Duration(milliseconds: 50), (_) {
+      if (!mounted || _currentSamples == null) return;
+      final tool = _currentTool ?? widget.controller.currentTool;
+      if (!straightLineHoldAppliesToTool(tool) || _holdTracker.isLocked) return;
+      final r = _holdTracker.tickStill(_lastDocForHold, DateTime.now());
+      if (r.justLocked) {
+        _lockStraightLine(_lastDocForHold, null);
+      }
+      if (r.justLocked) setState(() {});
+    });
+  }
+
+  void _lockStraightLine(Offset endDoc, double? pressure) {
+    final s = _currentSamples;
+    if (s == null || s.isEmpty) return;
+    _straightLockedStart = s.first;
+    _straightLockedEnd = StrokeSample(endDoc.dx, endDoc.dy, pressure);
+  }
+
+  void _clearStraightLock() {
+    _straightLockedStart = null;
+    _straightLockedEnd = null;
   }
 
   Offset _localToDocument(Offset local) {
@@ -117,12 +160,16 @@ class _DrawCanvasState extends State<DrawCanvas> {
     if (hadNone && _activePointers.length == 1) {
       final doc = _localToDocument(event.localPosition);
       setState(() {
-        _strokeStartedAt = DateTime.now();
+        _holdTracker.reset();
+        _clearStraightLock();
         _currentSamples = [StrokeSample(doc.dx, doc.dy, _pressureForSample(event))];
         _currentColor = widget.controller.currentColor;
         _currentStrokeWidth = widget.controller.currentStrokeWidth;
         _currentTool = widget.controller.currentTool;
+        _lastDocForHold = doc;
+        _lastPointerStamp = event.timeStamp;
       });
+      _startHoldPoll();
       _notifyCaptureActive(true);
     }
   }
@@ -132,8 +179,27 @@ class _DrawCanvasState extends State<DrawCanvas> {
     if (_currentSamples == null) return;
 
     final doc = _localToDocument(event.localPosition);
+    final tool = _currentTool ?? widget.controller.currentTool;
+
+    if (straightLineHoldAppliesToTool(tool) && !_holdTracker.isLocked) {
+      final r = _holdTracker.tickMove(
+        prevDoc: _lastDocForHold,
+        prevStamp: _lastPointerStamp,
+        currentDoc: doc,
+        currentStamp: event.timeStamp,
+      );
+      if (r.justLocked) {
+        _lockStraightLine(doc, _pressureForSample(event));
+      }
+    }
+
+    _lastDocForHold = doc;
+    _lastPointerStamp = event.timeStamp;
+
     setState(() {
-      _currentSamples!.add(StrokeSample(doc.dx, doc.dy, _pressureForSample(event)));
+      if (!_holdTracker.isLocked) {
+        _currentSamples!.add(StrokeSample(doc.dx, doc.dy, _pressureForSample(event)));
+      }
     });
   }
 
@@ -150,6 +216,7 @@ class _DrawCanvasState extends State<DrawCanvas> {
   }
 
   void _commitAndClearInProgress() {
+    _cancelHoldPoll();
     final samples = _currentSamples;
     if (samples == null || samples.isEmpty) {
       setState(() {
@@ -157,25 +224,28 @@ class _DrawCanvasState extends State<DrawCanvas> {
         _currentColor = null;
         _currentStrokeWidth = null;
         _currentTool = null;
-        _strokeStartedAt = null;
+        _holdTracker.reset();
+        _clearStraightLock();
       });
       _notifyCaptureActive(false);
       return;
     }
 
     final tool = _currentTool ?? widget.controller.currentTool;
-    final committedSamples = samplesWithStraightLineSnapForTool(
-      samples: samples,
-      tool: tool,
-      strokeStartedAt: _strokeStartedAt,
-    );
+    final locked = _straightLockedStart != null &&
+        _straightLockedEnd != null &&
+        straightLineHoldAppliesToTool(tool);
+
+    final committedSamples = locked
+        ? <StrokeSample>[_straightLockedStart!, _straightLockedEnd!]
+        : List<StrokeSample>.from(samples);
 
     final stroke = Stroke(
       samples: committedSamples,
       color: _currentColor ?? widget.controller.currentColor,
       strokeWidth: _currentStrokeWidth ?? widget.controller.currentStrokeWidth,
       tool: tool,
-      pressureEnabled: widget.controller.pressureEnabled,
+      pressureEnabled: locked ? false : widget.controller.pressureEnabled,
     );
     widget.controller.addStroke(stroke);
     setState(() {
@@ -183,19 +253,22 @@ class _DrawCanvasState extends State<DrawCanvas> {
       _currentColor = null;
       _currentStrokeWidth = null;
       _currentTool = null;
-      _strokeStartedAt = null;
+      _holdTracker.reset();
+      _clearStraightLock();
     });
     _notifyCaptureActive(false);
   }
 
   void _discardInProgress() {
+    _cancelHoldPoll();
     if (_currentSamples == null) return;
     setState(() {
       _currentSamples = null;
       _currentColor = null;
       _currentStrokeWidth = null;
       _currentTool = null;
-      _strokeStartedAt = null;
+      _holdTracker.reset();
+      _clearStraightLock();
     });
     _notifyCaptureActive(false);
   }
@@ -204,17 +277,20 @@ class _DrawCanvasState extends State<DrawCanvas> {
     final s = _currentSamples;
     if (s == null || s.isEmpty) return null;
     final tool = _currentTool ?? widget.controller.currentTool;
-    final previewSamples = samplesWithStraightLineSnapForTool(
-      samples: s,
-      tool: tool,
-      strokeStartedAt: _strokeStartedAt,
-    );
+    final locked = _straightLockedStart != null &&
+        _straightLockedEnd != null &&
+        straightLineHoldAppliesToTool(tool);
+
+    final previewSamples = locked
+        ? <StrokeSample>[_straightLockedStart!, _straightLockedEnd!]
+        : List<StrokeSample>.from(s);
+
     return Stroke(
       samples: previewSamples,
       color: _currentColor ?? widget.controller.currentColor,
       strokeWidth: _currentStrokeWidth ?? widget.controller.currentStrokeWidth,
       tool: tool,
-      pressureEnabled: widget.controller.pressureEnabled,
+      pressureEnabled: locked ? false : widget.controller.pressureEnabled,
     );
   }
 

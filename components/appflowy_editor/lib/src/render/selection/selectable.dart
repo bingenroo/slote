@@ -43,6 +43,14 @@ mixin SelectableMixin<T extends StatefulWidget> on State<T> {
   /// [start] is the offset of the global coordination system.
   Position getPositionInOffset(Offset start);
 
+  /// Whether [a] and [b] refer to the same wrapped line in this block's text
+  /// layout (when both paths match this node).
+  ///
+  /// Used by [Position.moveVertical] to ignore hit-test results that only move
+  /// along the line (e.g. superscript/subscript vertical probes mapping to a
+  /// nearby offset on the same line).
+  bool arePositionsOnSameRenderedLine(Position a, Position b) => false;
+
   /// Returns [Rect] for the position in current widget.
   ///
   /// The return result must be an offset of the local coordinate system.

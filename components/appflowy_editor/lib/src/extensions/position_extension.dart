@@ -147,7 +147,11 @@ extension PositionExtension on Position {
 
       // If a position different from the current one is found, return it.
       if (newPosition != null && newPosition != this) {
-        return newPosition;
+        final sameLine = newPosition.path.equals(path) &&
+            nodeSelectable.arePositionsOnSameRenderedLine(this, newPosition);
+        if (!sameLine) {
+          return newPosition;
+        }
       }
     }
 
@@ -191,7 +195,11 @@ extension PositionExtension on Position {
         editorState.service.selectionService.getPositionInOffset(newOffset);
 
     if (newPosition != null && newPosition != this) {
-      return newPosition;
+      final sameLine = newPosition.path.equals(path) &&
+          nodeSelectable.arePositionsOnSameRenderedLine(this, newPosition);
+      if (!sameLine) {
+        return newPosition;
+      }
     }
 
     // If a new position has not been found, it means that the current node

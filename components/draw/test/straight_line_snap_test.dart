@@ -2,165 +2,94 @@ import 'package:draw/draw.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  final samplesTight = [
-    const StrokeSample(0, 0, null),
-    const StrokeSample(2, 1, null),
-    const StrokeSample(1, 2, null),
-  ];
-
-  final samplesWide = [
-    const StrokeSample(0, 0, null),
-    const StrokeSample(50, 0, null),
-  ];
-
-  /// Middle point is far from the chord (0,0)→(50,0).
-  final samplesCrooked = [
-    const StrokeSample(0, 0, null),
-    const StrokeSample(25, 40, null),
-    const StrokeSample(50, 0, null),
-  ];
-
-  /// Long drag nearly collinear with first→last (draw-and-hold straight line).
-  final samplesNearLine = [
-    const StrokeSample(0, 0, null),
-    const StrokeSample(80, 3, null),
-    const StrokeSample(160, 0, null),
-  ];
-
-  group('strokeSamplesWithinRadiusFromFirst', () {
-    test('allows points inside radius', () {
-      expect(
-        strokeSamplesWithinRadiusFromFirst(samplesTight, 24.0),
-        true,
+  group('StraightLineHoldTracker', () {
+    test('fast move resets dwell', () {
+      final t = StraightLineHoldTracker();
+      final t0 = DateTime.utc(2020, 1, 1, 12);
+      t.tickMove(
+        prevDoc: Offset.zero,
+        prevStamp: Duration.zero,
+        currentDoc: const Offset(5, 0),
+        currentStamp: const Duration(milliseconds: 100),
+        clockNow: t0,
       );
+      t.tickMove(
+        prevDoc: const Offset(5, 0),
+        prevStamp: const Duration(milliseconds: 100),
+        currentDoc: const Offset(200, 0),
+        currentStamp: const Duration(milliseconds: 110),
+        clockNow: t0.add(const Duration(milliseconds: 1)),
+      );
+      expect(t.isLocked, false);
+      final r = t.tickStill(const Offset(200, 0), t0.add(const Duration(seconds: 5)));
+      expect(r.justLocked, false);
     });
 
-    test('rejects when a point exceeds radius', () {
-      expect(
-        strokeSamplesWithinRadiusFromFirst(samplesWide, 24.0),
-        false,
+    test('slow moves accumulate dwell then lock', () {
+      final t = StraightLineHoldTracker();
+      final t0 = DateTime.utc(2020, 1, 1, 12);
+      t.tickMove(
+        prevDoc: Offset.zero,
+        prevStamp: Duration.zero,
+        currentDoc: const Offset(4, 0),
+        currentStamp: const Duration(milliseconds: 50),
+        clockNow: t0,
       );
+      expect(t.isLocked, false);
+      final r = t.tickMove(
+        prevDoc: const Offset(4, 0),
+        prevStamp: const Duration(milliseconds: 50),
+        currentDoc: const Offset(8, 0),
+        currentStamp: const Duration(milliseconds: 100),
+        clockNow: t0.add(const Duration(milliseconds: 800)),
+      );
+      expect(r.justLocked, true);
+      expect(t.isLocked, true);
+    });
+
+    test('tickStill reaches dwell duration', () {
+      final t = StraightLineHoldTracker();
+      var time = DateTime.utc(2020, 1, 1, 12);
+      t.tickStill(const Offset(10, 10), time);
+      time = time.add(const Duration(milliseconds: 400));
+      expect(t.tickStill(const Offset(12, 10), time).justLocked, false);
+      time = time.add(const Duration(milliseconds: 400));
+      expect(t.tickStill(const Offset(11, 11), time).justLocked, true);
+      expect(t.isLocked, true);
+    });
+
+    test('moving outside hold radius restarts dwell', () {
+      final t = StraightLineHoldTracker();
+      final t0 = DateTime.utc(2020, 1, 1, 12);
+      t.tickStill(const Offset(0, 0), t0);
+      t.tickStill(const Offset(50, 0), t0.add(const Duration(milliseconds: 500)));
+      final r = t.tickStill(
+        const Offset(51, 0),
+        t0.add(const Duration(milliseconds: 900)),
+      );
+      expect(r.justLocked, false);
+      expect(t.isLocked, false);
+    });
+
+    test('reset clears lock', () {
+      final t = StraightLineHoldTracker();
+      final t0 = DateTime.utc(2020, 1, 1, 12);
+      t.tickStill(const Offset(0, 0), t0);
+      t.tickStill(Offset.zero, t0.add(const Duration(milliseconds: 800)));
+      expect(t.isLocked, true);
+      t.reset();
+      expect(t.isLocked, false);
     });
   });
 
-  group('strokeSamplesWithinDeviationFromChord', () {
-    test('allows long near-straight stroke', () {
-      expect(strokeSamplesWithinDeviationFromChord(samplesNearLine, 24.0), true);
+  group('straightLineHoldAppliesToTool', () {
+    test('false for eraser', () {
+      expect(straightLineHoldAppliesToTool(DrawTool.eraser), false);
     });
 
-    test('rejects when a sample wanders off the chord', () {
-      expect(strokeSamplesWithinDeviationFromChord(samplesCrooked, 24.0), false);
-    });
-
-    test('long straight two-point stroke is on chord', () {
-      expect(strokeSamplesWithinDeviationFromChord(samplesWide, 24.0), true);
-    });
-  });
-
-  group('isStraightLineSnapEligible', () {
-    test('false when fewer than 2 samples', () {
-      expect(
-        isStraightLineSnapEligible(
-          samples: [samplesTight.first],
-          elapsed: const Duration(milliseconds: 500),
-        ),
-        false,
-      );
-    });
-
-    test('false when hold too short', () {
-      expect(
-        isStraightLineSnapEligible(
-          samples: samplesTight,
-          elapsed: const Duration(milliseconds: 100),
-        ),
-        false,
-      );
-    });
-
-    test('false when path wanders off chord', () {
-      expect(
-        isStraightLineSnapEligible(
-          samples: samplesCrooked,
-          elapsed: const Duration(milliseconds: 500),
-        ),
-        false,
-      );
-    });
-
-    test('true for long drag along near-straight line after hold', () {
-      expect(
-        isStraightLineSnapEligible(
-          samples: samplesNearLine,
-          elapsed: const Duration(milliseconds: 500),
-        ),
-        true,
-      );
-    });
-
-    test('true when long hold and tight path', () {
-      expect(
-        isStraightLineSnapEligible(
-          samples: samplesTight,
-          elapsed: const Duration(milliseconds: 500),
-        ),
-        true,
-      );
-    });
-  });
-
-  group('maybeSnapSamplesToStraightLine', () {
-    test('returns copy when not eligible', () {
-      final out = maybeSnapSamplesToStraightLine(
-        samples: samplesTight,
-        elapsed: const Duration(milliseconds: 50),
-      );
-      expect(out.length, samplesTight.length);
-      expect(identical(out, samplesTight), false);
-    });
-
-    test('returns first and last when eligible', () {
-      final out = maybeSnapSamplesToStraightLine(
-        samples: samplesTight,
-        elapsed: const Duration(milliseconds: 500),
-      );
-      expect(out.length, 2);
-      expect(out.first, samplesTight.first);
-      expect(out.last, samplesTight.last);
-    });
-  });
-
-  group('samplesWithStraightLineSnapForTool', () {
-    final t0 = DateTime.utc(2020, 1, 1, 12);
-
-    test('skips eraser', () {
-      final out = samplesWithStraightLineSnapForTool(
-        samples: samplesTight,
-        tool: DrawTool.eraser,
-        strokeStartedAt: t0,
-        referenceTime: t0.add(const Duration(milliseconds: 500)),
-      );
-      expect(out.length, samplesTight.length);
-    });
-
-    test('skips when no start time', () {
-      final out = samplesWithStraightLineSnapForTool(
-        samples: samplesTight,
-        tool: DrawTool.pen,
-        strokeStartedAt: null,
-        referenceTime: t0.add(const Duration(milliseconds: 500)),
-      );
-      expect(out.length, samplesTight.length);
-    });
-
-    test('snaps pen when eligible', () {
-      final out = samplesWithStraightLineSnapForTool(
-        samples: samplesTight,
-        tool: DrawTool.pen,
-        strokeStartedAt: t0,
-        referenceTime: t0.add(const Duration(milliseconds: 500)),
-      );
-      expect(out.length, 2);
+    test('true for pen and highlighter', () {
+      expect(straightLineHoldAppliesToTool(DrawTool.pen), true);
+      expect(straightLineHoldAppliesToTool(DrawTool.highlighter), true);
     });
   });
 }
