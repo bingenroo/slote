@@ -49,18 +49,13 @@ class DrawController extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Removes pen/highlighter strokes whose hit bounds intersect the eraser path
-  /// (document space). Does not add eraser strokes to the model.
-  void eraseStrokesHitByEraserPath(
-    List<StrokeSample> path,
-    double eraserStrokeWidth,
-  ) {
+  /// Removes pen/highlighter strokes when the fixed-size eraser disc (see
+  /// [kDefaultEraserDiameterDoc]) along [path] overlaps ink (document space).
+  void eraseStrokesHitByEraserPath(List<StrokeSample> path) {
     if (path.isEmpty) return;
 
     final before = _strokes.length;
-    _strokes.removeWhere(
-      (s) => strokeHitByEraserPath(s, path, eraserStrokeWidth),
-    );
+    _strokes.removeWhere((s) => strokeHitByEraserPath(s, path));
     if (_strokes.length != before) notifyListeners();
   }
 
@@ -77,7 +72,7 @@ class DrawController extends ChangeNotifier {
     _strokes.clear();
     if (json['strokes'] != null) {
       final strokesList = json['strokes'] as List;
-      // Drop legacy Wave A–C eraser “strokes” (transparent, never rendered).
+      // Drop legacy Wave A–C eraser "strokes" (transparent, never rendered).
       _strokes.addAll(
         strokesList
             .map((s) => Stroke.fromJson(s as Map<String, dynamic>))

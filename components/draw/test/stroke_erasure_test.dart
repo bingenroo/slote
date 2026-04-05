@@ -17,18 +17,23 @@ Stroke _penLine(double x0, double y0, double x1, double y1) {
 
 void main() {
   group('strokeHitByEraserPath', () {
-    test('hits pen stroke when eraser sample is inside inflated bounds', () {
+    test('hits when eraser disc overlaps stroke polyline', () {
       final stroke = _penLine(0, 0, 100, 0);
-      const eraserW = 20.0;
       final path = [const StrokeSample(50, 0, null)];
-      expect(strokeHitByEraserPath(stroke, path, eraserW), true);
+      expect(strokeHitByEraserPath(stroke, path), true);
+    });
+
+    test('misses when path is far from polyline (not just bbox)', () {
+      final stroke = _penLine(0, 0, 100, 0);
+      // Horizontal line y=0; 24px disc radius 12 + ink half 2 => reach 14
+      final path = [const StrokeSample(50, 20, null)];
+      expect(strokeHitByEraserPath(stroke, path), false);
     });
 
     test('misses when eraser path is far away', () {
       final stroke = _penLine(0, 0, 100, 0);
-      const eraserW = 2.0;
       final path = [const StrokeSample(50, 80, null)];
-      expect(strokeHitByEraserPath(stroke, path, eraserW), false);
+      expect(strokeHitByEraserPath(stroke, path), false);
     });
 
     test('ignores shape tool', () {
@@ -40,7 +45,7 @@ void main() {
         pressureEnabled: false,
       );
       final path = [const StrokeSample(5, 0, null)];
-      expect(strokeHitByEraserPath(stroke, path, 40), false);
+      expect(strokeHitByEraserPath(stroke, path), false);
     });
   });
 
@@ -50,10 +55,7 @@ void main() {
       c.addStroke(_penLine(0, 0, 50, 0));
       c.addStroke(_penLine(200, 0, 250, 0));
 
-      c.eraseStrokesHitByEraserPath(
-        [const StrokeSample(25, 0, null)],
-        20,
-      );
+      c.eraseStrokesHitByEraserPath([const StrokeSample(25, 0, null)]);
 
       expect(c.strokes.length, 1);
       expect(c.strokes.first.samples.first.x, 200);
@@ -65,7 +67,7 @@ void main() {
       var notifications = 0;
       c.addListener(() => notifications++);
 
-      c.eraseStrokesHitByEraserPath([], 10);
+      c.eraseStrokesHitByEraserPath([]);
 
       expect(c.strokes.length, 1);
       expect(notifications, 0);

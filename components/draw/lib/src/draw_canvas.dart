@@ -7,6 +7,7 @@ import 'draw_tool.dart';
 import 'stroke/stroke.dart';
 import 'stroke/stroke_renderer.dart';
 import 'stroke/straight_line_snap.dart';
+import 'stroke/stroke_eraser_visual.dart';
 
 /// Canvas widget for drawing.
 ///
@@ -22,8 +23,10 @@ import 'stroke/straight_line_snap.dart';
 /// movement inside a hold radius for [StraightLineHoldConfig.dwellDuration]
 /// locks a fixed two-point preview; commit matches that preview.
 ///
-/// **Wave D:** [DrawTool.eraser] removes pen/highlighter strokes along the path
-/// (live on drag); eraser gestures are not stored as strokes.
+/// **Wave D:** [DrawTool.eraser] removes pen/highlighter strokes when the
+/// fixed eraser disc overlaps ink (`kDefaultEraserDiameterDoc` in
+/// `stroke_hit_geometry.dart`); preview is one “show touches” disc at the
+/// pointer; gestures are not stored as strokes.
 class DrawCanvas extends StatefulWidget {
   DrawCanvas({
     super.key,
@@ -210,7 +213,6 @@ class _DrawCanvasState extends State<DrawCanvas> {
       if (path != null && path.isNotEmpty) {
         widget.controller.eraseStrokesHitByEraserPath(
           List<StrokeSample>.from(path),
-          _currentStrokeWidth ?? widget.controller.currentStrokeWidth,
         );
       }
     }
@@ -256,7 +258,6 @@ class _DrawCanvasState extends State<DrawCanvas> {
     if (tool == DrawTool.eraser) {
       widget.controller.eraseStrokesHitByEraserPath(
         committedSamples,
-        _currentStrokeWidth ?? widget.controller.currentStrokeWidth,
       );
       setState(() {
         _currentSamples = null;
@@ -363,7 +364,11 @@ class DrawPainter extends CustomPainter {
       StrokeRenderer.render(canvas, stroke);
     }
     if (currentStroke != null) {
-      StrokeRenderer.render(canvas, currentStroke!, isPreview: true);
+      if (currentStroke!.tool == DrawTool.eraser) {
+        paintEraserTouchVisual(canvas, currentStroke!.samples);
+      } else {
+        StrokeRenderer.render(canvas, currentStroke!, isPreview: true);
+      }
     }
     canvas.restore();
   }

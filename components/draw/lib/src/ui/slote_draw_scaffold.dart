@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../draw_canvas.dart';
 import '../draw_controller.dart';
 import '../draw_tool.dart';
+import '../stroke/stroke_hit_geometry.dart';
 
 /// Shared drawing chrome: tools, palette, stroke width, canvas, and status bar.
 ///
@@ -181,7 +182,11 @@ class _SloteDrawScaffoldState extends State<SloteDrawScaffold> {
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           child: Row(
             children: [
-              const Text('Stroke width: '),
+              Text(
+                widget.controller.currentTool == DrawTool.eraser
+                    ? 'Eraser: '
+                    : 'Stroke width: ',
+              ),
               Expanded(
                 child: Slider(
                   value: _strokeWidth,
@@ -189,13 +194,19 @@ class _SloteDrawScaffoldState extends State<SloteDrawScaffold> {
                   max: 20.0,
                   divisions: 19,
                   label: _strokeWidth.toStringAsFixed(1),
-                  onChanged: (value) {
-                    setState(() => _strokeWidth = value);
-                    widget.controller.setStrokeWidth(value);
-                  },
+                  onChanged: widget.controller.currentTool == DrawTool.eraser
+                      ? null
+                      : (value) {
+                          setState(() => _strokeWidth = value);
+                          widget.controller.setStrokeWidth(value);
+                        },
                 ),
               ),
-              Text('${_strokeWidth.toStringAsFixed(1)}px'),
+              Text(
+                widget.controller.currentTool == DrawTool.eraser
+                    ? '${kDefaultEraserDiameterDoc.toStringAsFixed(0)}px (fixed)'
+                    : '${_strokeWidth.toStringAsFixed(1)}px',
+              ),
             ],
           ),
         ),
