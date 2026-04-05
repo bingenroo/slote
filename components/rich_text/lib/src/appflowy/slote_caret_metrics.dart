@@ -1,6 +1,7 @@
 import 'package:appflowy_editor/appflowy_editor.dart';
 import 'package:flutter/material.dart';
 
+import 'slote_block_component_builders.dart';
 import 'slote_inline_attributes.dart';
 import 'slote_sup_sub_metrics.dart';
 
@@ -9,7 +10,45 @@ const _kSloteScriptCaretTextHeight = TextHeightBehavior(
   applyHeightToLastDescent: false,
 );
 
+/// Tight caret box for headings: matches trailing-edge [RenderParagraph] caret
+/// height (cap→baseline) instead of full-line metrics when the line has descenders.
+EndOfParagraphCaretMetrics? _sloteHeadingTightCaretMetrics({
+  required BuildContext context,
+  required EditorState editorState,
+  required Node node,
+  required TextStyleConfiguration textStyleConfiguration,
+  required Map<String, dynamic> sliceAttrs,
+}) {
+  if (node.type != HeadingBlockKeys.type) return null;
+
+  // Inline font size (or other strong layout overrides): keep [RenderParagraph]
+  // metrics so the caret tracks mixed runs.
+  if (sliceAttrs[AppFlowyRichTextKeys.fontSize] != null) return null;
+
+  final rawLevel = node.attributes[HeadingBlockKeys.level];
+  final level =
+      rawLevel is int
+          ? rawLevel.clamp(1, 6)
+          : int.tryParse('$rawLevel')?.clamp(1, 6) ?? 1;
+
+  final cfg = textStyleConfiguration;
+  final merged = cfg.text.merge(sloteHeadingTextStyleForLevel(level));
+
+  final painter = TextPainter(
+    text: TextSpan(text: 'M', style: merged),
+    textDirection: Directionality.maybeOf(context) ?? TextDirection.ltr,
+    textScaler: TextScaler.linear(editorState.editorStyle.textScaleFactor),
+    textHeightBehavior: _kSloteScriptCaretTextHeight,
+  )..layout(maxWidth: double.infinity);
+
+  return EndOfParagraphCaretMetrics(height: painter.height, dy: 0);
+}
+
 /// General caret metrics override for Slote superscript/subscript runs.
+///
+/// Also tightens **heading** carets for plain deltas (e.g. JSON-seeded blocks
+/// with no per-character attributes), so mid-line carets match the end-of-line
+/// height instead of expanding to the full line box around descenders.
 ///
 /// This prevents Flutter from using full-line caret metrics when lines include
 /// inline script [WidgetSpan]s, and ensures the caret height matches the script
@@ -53,7 +92,9 @@ EndOfParagraphCaretMetrics? sloteCaretMetrics({
   } catch (_) {
     attrs = null;
   }
-  if (attrs == null || attrs.isEmpty) return null;
+  // Do not bail on empty attrs: plain inserts (e.g. seeded heading JSON) have
+  // no per-run map, but we still need heading / toggled-script caret overrides.
+  final sliceAttrs = attrs ?? <String, dynamic>{};
 
   bool enabled(dynamic v) {
     if (v == null) return false;
@@ -69,8 +110,8 @@ EndOfParagraphCaretMetrics? sloteCaretMetrics({
   final toggledSup = enabled(toggled[kSloteSuperscriptAttribute]);
   final toggledSub = enabled(toggled[kSloteSubscriptAttribute]);
 
-  var rawSup = enabled(attrs[kSloteSuperscriptAttribute]);
-  var rawSub = enabled(attrs[kSloteSubscriptAttribute]);
+  var rawSup = enabled(sliceAttrs[kSloteSuperscriptAttribute]);
+  var rawSub = enabled(sliceAttrs[kSloteSubscriptAttribute]);
   final sliceHadSubscript = rawSub;
 
   // [toggleAttribute] stores explicit `false` when turning script off at a
@@ -104,14 +145,13 @@ EndOfParagraphCaretMetrics? sloteCaretMetrics({
   final isSuperscript = rawSup && !rawSub;
   final isSubscript = rawSub && !rawSup;
   if (!isSuperscript && !isSubscript) {
-    // if (kDebugMode) {
-    //   debugPrint(
-    //     'DBG-SLOTE-CARET-METRICS skip offset=$clampedOffset sliceProbe=$sliceProbe '
-    //     'plainLen=$plainTextLength keys=${attrs.keys.toList()} '
-    //     'rawSup=$rawSup rawSub=$rawSub',
-    //   );
-    // }
-    return null;
+    return _sloteHeadingTightCaretMetrics(
+      context: context,
+      editorState: editorState,
+      node: node,
+      textStyleConfiguration: textStyleConfiguration,
+      sliceAttrs: sliceAttrs,
+    );
   }
 
   final cfg = textStyleConfiguration;

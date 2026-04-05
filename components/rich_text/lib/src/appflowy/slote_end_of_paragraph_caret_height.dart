@@ -165,15 +165,6 @@ EndOfParagraphCaretMetrics? sloteEndOfParagraphCaretMetrics({
   // caret on headings. Delegate to RenderParagraph when we are not fixing
   // superscript/subscript or pending-body-after-script EOT behavior.
   if (!pendingBodyAfterScriptOff && !isSuperscript && !isSubscript) {
-    assert(() {
-      if (node.type == HeadingBlockKeys.type) {
-        debugPrint(
-          'SLOTE EOT caret: skip custom metrics (use paragraph caret height); '
-          'plainLen=$plainLen',
-        );
-      }
-      return true;
-    }());
     return null;
   }
 

@@ -4,11 +4,20 @@ import 'draw_controller.dart';
 import 'draw_tool.dart';
 import 'stroke/stroke.dart';
 import 'stroke/stroke_renderer.dart';
+import 'stroke/straight_line_snap.dart';
 
 /// Canvas widget for drawing.
 ///
 /// Strokes are stored in **document space**. [documentTransform] maps document
 /// coordinates to this widget's local coordinates (paint uses the same matrix).
+///
+/// **Wave B:** Uses a [Listener] and **active pointer count** — samples are
+/// added only while exactly **one** pointer is down. A **second** pointer
+/// **commits** the in-progress stroke (partial) so parents can clear
+/// [isDrawingActive] and allow viewport pinch-zoom — see package roadmap.
+///
+/// **Wave C:** Draw-and-hold straight line ([StraightLineInkConfig]) for pen /
+/// highlighter; live preview uses the same [StrokeRenderer] path.
 class DrawCanvas extends StatefulWidget {
   DrawCanvas({
     super.key,
@@ -16,6 +25,7 @@ class DrawCanvas extends StatefulWidget {
     this.isDrawingMode = false,
     this.isDrawingActive = false,
     Matrix4? documentTransform,
+    this.onStrokeCaptureActiveChanged,
   }) : documentTransform = documentTransform ?? Matrix4.identity();
 
   final DrawController controller;
@@ -25,15 +35,26 @@ class DrawCanvas extends StatefulWidget {
   /// Document → local; identity when the canvas is not inside a zoom/pan shell.
   final Matrix4 documentTransform;
 
+  /// Called when in-progress stroke capture starts or ends (commit, partial
+  /// commit on second finger, cancel, or [isDrawingMode] turned off).
+  final ValueChanged<bool>? onStrokeCaptureActiveChanged;
+
   @override
   State<DrawCanvas> createState() => _DrawCanvasState();
 }
 
 class _DrawCanvasState extends State<DrawCanvas> {
+  final Set<int> _activePointers = <int>{};
+
   List<StrokeSample>? _currentSamples;
   Color? _currentColor;
   double? _currentStrokeWidth;
   DrawTool? _currentTool;
+
+  /// First [PointerDown] of the current in-progress stroke (Wave C straight line).
+  DateTime? _strokeStartedAt;
+
+  bool _captureNotified = false;
 
   @override
   void initState() {
@@ -47,8 +68,22 @@ class _DrawCanvasState extends State<DrawCanvas> {
     super.dispose();
   }
 
+  @override
+  void didUpdateWidget(DrawCanvas oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!widget.isDrawingMode && oldWidget.isDrawingMode) {
+      _discardInProgress();
+    }
+  }
+
   void _onControllerChanged() {
     setState(() {});
+  }
+
+  void _notifyCaptureActive(bool active) {
+    if (_captureNotified == active) return;
+    _captureNotified = active;
+    widget.onStrokeCaptureActiveChanged?.call(active);
   }
 
   Offset _localToDocument(Offset local) {
@@ -58,33 +93,88 @@ class _DrawCanvasState extends State<DrawCanvas> {
     return MatrixUtils.transformPoint(inv, local);
   }
 
-  void _onPanStart(DragStartDetails details) {
-    if (!widget.isDrawingMode) return;
-
-    final doc = _localToDocument(details.localPosition);
-    _currentSamples = [StrokeSample(doc.dx, doc.dy, null)];
-    _currentColor = widget.controller.currentColor;
-    _currentStrokeWidth = widget.controller.currentStrokeWidth;
-    _currentTool = widget.controller.currentTool;
+  double? _pressureForSample(PointerEvent event) {
+    if (!widget.controller.pressureEnabled) return null;
+    final min = event.pressureMin;
+    final max = event.pressureMax;
+    if (max > min) {
+      return ((event.pressure - min) / (max - min)).clamp(0.0, 1.0);
+    }
+    return event.pressure.clamp(0.0, 1.0);
   }
 
-  void _onPanUpdate(DragUpdateDetails details) {
-    if (!widget.isDrawingMode || _currentSamples == null) return;
+  void _handlePointerDown(PointerDownEvent event) {
+    final hadNone = _activePointers.isEmpty;
+    _activePointers.add(event.pointer);
 
-    final doc = _localToDocument(details.localPosition);
+    if (!widget.isDrawingMode) return;
+
+    if (_currentSamples != null && _activePointers.length == 2) {
+      _commitAndClearInProgress();
+      return;
+    }
+
+    if (hadNone && _activePointers.length == 1) {
+      final doc = _localToDocument(event.localPosition);
+      setState(() {
+        _strokeStartedAt = DateTime.now();
+        _currentSamples = [StrokeSample(doc.dx, doc.dy, _pressureForSample(event))];
+        _currentColor = widget.controller.currentColor;
+        _currentStrokeWidth = widget.controller.currentStrokeWidth;
+        _currentTool = widget.controller.currentTool;
+      });
+      _notifyCaptureActive(true);
+    }
+  }
+
+  void _handlePointerMove(PointerMoveEvent event) {
+    if (!widget.isDrawingMode || _activePointers.length != 1) return;
+    if (_currentSamples == null) return;
+
+    final doc = _localToDocument(event.localPosition);
     setState(() {
-      _currentSamples!.add(StrokeSample(doc.dx, doc.dy, null));
+      _currentSamples!.add(StrokeSample(doc.dx, doc.dy, _pressureForSample(event)));
     });
   }
 
-  void _onPanEnd(DragEndDetails details) {
-    if (!widget.isDrawingMode || _currentSamples == null) return;
+  void _handlePointerUp(PointerUpEvent event) {
+    _activePointers.remove(event.pointer);
+    if (_currentSamples != null) {
+      _commitAndClearInProgress();
+    }
+  }
+
+  void _handlePointerCancel(PointerCancelEvent event) {
+    _activePointers.remove(event.pointer);
+    _discardInProgress();
+  }
+
+  void _commitAndClearInProgress() {
+    final samples = _currentSamples;
+    if (samples == null || samples.isEmpty) {
+      setState(() {
+        _currentSamples = null;
+        _currentColor = null;
+        _currentStrokeWidth = null;
+        _currentTool = null;
+        _strokeStartedAt = null;
+      });
+      _notifyCaptureActive(false);
+      return;
+    }
+
+    final tool = _currentTool ?? widget.controller.currentTool;
+    final committedSamples = samplesWithStraightLineSnapForTool(
+      samples: samples,
+      tool: tool,
+      strokeStartedAt: _strokeStartedAt,
+    );
 
     final stroke = Stroke(
-      samples: List<StrokeSample>.from(_currentSamples!),
+      samples: committedSamples,
       color: _currentColor ?? widget.controller.currentColor,
       strokeWidth: _currentStrokeWidth ?? widget.controller.currentStrokeWidth,
-      tool: _currentTool ?? widget.controller.currentTool,
+      tool: tool,
       pressureEnabled: widget.controller.pressureEnabled,
     );
     widget.controller.addStroke(stroke);
@@ -93,34 +183,56 @@ class _DrawCanvasState extends State<DrawCanvas> {
       _currentColor = null;
       _currentStrokeWidth = null;
       _currentTool = null;
+      _strokeStartedAt = null;
     });
+    _notifyCaptureActive(false);
+  }
+
+  void _discardInProgress() {
+    if (_currentSamples == null) return;
+    setState(() {
+      _currentSamples = null;
+      _currentColor = null;
+      _currentStrokeWidth = null;
+      _currentTool = null;
+      _strokeStartedAt = null;
+    });
+    _notifyCaptureActive(false);
   }
 
   Stroke? get _previewStroke {
     final s = _currentSamples;
     if (s == null || s.isEmpty) return null;
+    final tool = _currentTool ?? widget.controller.currentTool;
+    final previewSamples = samplesWithStraightLineSnapForTool(
+      samples: s,
+      tool: tool,
+      strokeStartedAt: _strokeStartedAt,
+    );
     return Stroke(
-      samples: List<StrokeSample>.from(s),
+      samples: previewSamples,
       color: _currentColor ?? widget.controller.currentColor,
       strokeWidth: _currentStrokeWidth ?? widget.controller.currentStrokeWidth,
-      tool: _currentTool ?? widget.controller.currentTool,
+      tool: tool,
       pressureEnabled: widget.controller.pressureEnabled,
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onPanStart: _onPanStart,
-      onPanUpdate: _onPanUpdate,
-      onPanEnd: _onPanEnd,
+    return Listener(
+      behavior: HitTestBehavior.opaque,
+      onPointerDown: _handlePointerDown,
+      onPointerMove: _handlePointerMove,
+      onPointerUp: _handlePointerUp,
+      onPointerCancel: _handlePointerCancel,
       child: CustomPaint(
         painter: DrawPainter(
           strokes: widget.controller.strokes,
           currentStroke: _previewStroke,
           documentTransform: widget.documentTransform,
         ),
-        child: Container(),
+        child: const SizedBox.expand(),
       ),
     );
   }

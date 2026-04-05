@@ -97,16 +97,9 @@ class _SloteDrawScaffoldState extends State<SloteDrawScaffold> {
     setState(() {});
   }
 
-  void _onPanStart() {
-    if (widget.isDrawingMode) {
-      setState(() => _isDrawingActive = true);
-    }
-  }
-
-  void _onPanEnd() {
-    if (widget.isDrawingMode) {
-      setState(() => _isDrawingActive = false);
-    }
+  void _onStrokeCaptureActiveChanged(bool active) {
+    if (_isDrawingActive == active) return;
+    setState(() => _isDrawingActive = active);
   }
 
   @override
@@ -206,6 +199,26 @@ class _SloteDrawScaffoldState extends State<SloteDrawScaffold> {
             ],
           ),
         ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Pressure',
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
+              ),
+              Switch(
+                value: widget.controller.pressureEnabled,
+                onChanged: (value) {
+                  widget.controller.setPressureEnabled(value);
+                  setState(() {});
+                },
+              ),
+            ],
+          ),
+        ),
         const Divider(height: 1),
         Expanded(
           child: Padding(
@@ -217,15 +230,12 @@ class _SloteDrawScaffoldState extends State<SloteDrawScaffold> {
               ),
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(8),
-                child: Listener(
-                  onPointerDown: (_) => _onPanStart(),
-                  onPointerUp: (_) => _onPanEnd(),
-                  child: DrawCanvas(
-                    controller: widget.controller,
-                    isDrawingMode: widget.isDrawingMode,
-                    isDrawingActive: _isDrawingActive,
-                    documentTransform: widget.documentTransform,
-                  ),
+                child: DrawCanvas(
+                  controller: widget.controller,
+                  isDrawingMode: widget.isDrawingMode,
+                  isDrawingActive: _isDrawingActive,
+                  documentTransform: widget.documentTransform,
+                  onStrokeCaptureActiveChanged: _onStrokeCaptureActiveChanged,
                 ),
               ),
             ),

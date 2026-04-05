@@ -431,6 +431,91 @@ void main() {
   );
 
   testWidgets(
+    'sloteCaretMetrics returns tight metrics for plain heading mid-line (seeded delta)',
+    (tester) async {
+      late BuildContext ctx;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Builder(
+            builder: (context) {
+              ctx = context;
+              return const SizedBox.shrink();
+            },
+          ),
+        ),
+      );
+
+      final es = EditorState(
+        document: Document.fromJson({
+          'document': {
+            'type': 'page',
+            'children': [
+              {
+                'type': 'heading',
+                'data': {
+                  'delta': [
+                    {'insert': 'Hello AppFlowy!!'},
+                  ],
+                  'level': 1,
+                },
+              },
+            ],
+          },
+        }),
+      );
+      es.editorStyle = const EditorStyle.mobile();
+
+      final node = es.getNodeAtPath([0]);
+      expect(node, isNotNull);
+
+      final cfg = TextStyleConfiguration(
+        text: const TextStyle(fontSize: 16),
+        lineHeight: 1.5,
+      );
+
+      final m = sloteCaretMetrics(
+        context: ctx,
+        editorState: es,
+        node: node!,
+        position: Position(path: [0], offset: 8),
+        textStyleConfiguration: cfg,
+      );
+
+      expect(m, isNotNull);
+      expect(m!.dy, 0.0);
+
+      final merged = cfg.text.merge(sloteHeadingTextStyleForLevel(1));
+      final expectedPainter = TextPainter(
+        text: TextSpan(text: 'M', style: merged),
+        textDirection: TextDirection.ltr,
+        textScaler: TextScaler.linear(es.editorStyle.textScaleFactor),
+        textHeightBehavior: const TextHeightBehavior(
+          applyHeightToFirstAscent: false,
+          applyHeightToLastDescent: false,
+        ),
+      )..layout(maxWidth: double.infinity);
+
+      expect(m.height, expectedPainter.height);
+
+      final looseLinePainter = TextPainter(
+        text: TextSpan(
+          text: 'M',
+          style: cfg.text.copyWith(
+            fontSize: sloteHeadingTextStyleForLevel(1).fontSize,
+            fontWeight: sloteHeadingTextStyleForLevel(1).fontWeight,
+            height: cfg.lineHeight,
+          ),
+        ),
+        textDirection: TextDirection.ltr,
+        textScaler: TextScaler.linear(es.editorStyle.textScaleFactor),
+      )..layout(maxWidth: double.infinity);
+
+      expect(m.height, lessThan(looseLinePainter.height));
+    },
+  );
+
+  testWidgets(
     'sloteEndOfParagraphCaretMetrics returns null at EOT for plain heading (no script)',
     (tester) async {
       late BuildContext ctx;

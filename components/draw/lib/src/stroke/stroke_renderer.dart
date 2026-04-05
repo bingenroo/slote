@@ -3,6 +3,7 @@ import 'package:perfect_freehand/perfect_freehand.dart';
 
 import '../draw_tool.dart';
 import 'stroke.dart';
+import 'stroke_pressure_policy.dart';
 
 /// Renders strokes using [getStroke] outlines (filled paths).
 ///
@@ -53,8 +54,7 @@ class StrokeRenderer {
           .map((s) => PointVector(s.x, s.y, 0.5))
           .toList();
     }
-    final allNull = stroke.samples.every((s) => s.pressure == null);
-    if (allNull) {
+    if (strokeShouldSimulatePressure(stroke)) {
       return stroke.samples.map((s) => PointVector(s.x, s.y)).toList();
     }
     return stroke.samples
@@ -64,7 +64,7 @@ class StrokeRenderer {
 
   static StrokeOptions _optionsFor(Stroke stroke, {required bool isPreview}) {
     final simulatePressure = stroke.pressureEnabled &&
-        stroke.samples.every((s) => s.pressure == null);
+        strokeShouldSimulatePressure(stroke);
 
     final widthFactor = stroke.tool == DrawTool.highlighter ? 3.25 : 2.0;
     final size = (stroke.strokeWidth * widthFactor).clamp(1.0, 256.0);

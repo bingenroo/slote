@@ -108,7 +108,6 @@ class _AppFlowyRichTextState extends State<AppFlowyRichText>
   final textKey = GlobalKey();
   final placeholderTextKey = GlobalKey();
 
-  // Debug-only caret logging (throttled to avoid spam).
   RenderParagraph? get _renderParagraph =>
       textKey.currentContext?.findRenderObject() as RenderParagraph?;
 
@@ -234,8 +233,12 @@ class _AppFlowyRichTextState extends State<AppFlowyRichText>
 
     var usedCaretMetricsResolver = false;
     // Optional general caret metrics resolver (for any caret position).
-    // Keep end-of-paragraph resolvers as higher precedence.
-    if (!isAtEnd) {
+    // Heading blocks: also run at EOT so caret height/vertical anchor matches
+    // in-word carets (otherwise EOT stays on [RenderParagraph] only). Script /
+    // EOT-specific resolvers below still override when they return non-null.
+    final runCaretMetrics =
+        !isAtEnd || widget.node.type == HeadingBlockKeys.type;
+    if (runCaretMetrics) {
       final caretMetricsResolver = widget.editorState.editorStyle.caretMetrics;
       if (caretMetricsResolver != null) {
         final resolved = caretMetricsResolver(
@@ -246,8 +249,22 @@ class _AppFlowyRichTextState extends State<AppFlowyRichText>
           textStyleConfiguration: textStyleConfiguration,
         );
         if (resolved != null) {
+          // [getOffsetForCaret] top-Y targets the full [getFullHeightForCaret] box.
+          // A shorter resolved height must be bottom-aligned in that slot
+          // (translate down by full slack), not top-aligned or half-centered —
+          // otherwise the caret reads shifted up vs glyphs / vs trailing edge.
+          final rpFullHeight = cursorHeight;
           cursorHeight = resolved.height;
-          cursorOffset = cursorOffset.translate(0, resolved.dy);
+          var dy = resolved.dy;
+          var bottomSlack = 0.0;
+          const dyEpsilon = 1e-6;
+          if (resolved.dy.abs() < dyEpsilon &&
+              rpFullHeight != null &&
+              resolved.height < rpFullHeight - 0.5) {
+            bottomSlack = rpFullHeight - resolved.height;
+            dy += bottomSlack;
+          }
+          cursorOffset = cursorOffset.translate(0, dy);
           usedCaretMetricsResolver = true;
         }
       }
@@ -367,6 +384,25 @@ class _AppFlowyRichTextState extends State<AppFlowyRichText>
         !eotIgnoresPreviousCaretAnchor &&
         (usedEndOfParagraphResolver || usedCaretMetricsResolver)) {
       cursorHeight = min(cursorHeight, previousCaretHeight);
+    }
+
+    // Paragraph EOT without custom resolvers: [getFullHeightForCaret] at the
+    // trailing offset is often taller than at the last code unit (boundary
+    // metrics). Cap height to the last in-text caret only — keep
+    // [getOffsetForCaret]'s top-Y. (Bottom slack via translate matches heading +
+    // [caretMetrics] but pushed plain paragraph EOT carets too low.)
+    if (isAtEnd &&
+        widget.node.type == ParagraphBlockKeys.type &&
+        previousCaretHeight != null &&
+        cursorHeight != null &&
+        !eotIgnoresPreviousCaretAnchor &&
+        !usedCaretMetricsResolver &&
+        !usedEndOfParagraphResolver) {
+      final curH = cursorHeight;
+      final prevH = previousCaretHeight;
+      if (curH > prevH + 0.5) {
+        cursorHeight = min(curH, prevH);
+      }
     }
 
     if (delta?.isEmpty == true) {

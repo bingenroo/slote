@@ -14,7 +14,7 @@ This document is the **canonical plan** for Slote’s drawing subsystem: stroke 
 | **Gesture layer** | **`Listener`** / low-level **pointer** events — track **active pointer count** for **stroke capture**. The parent **viewport** (see below) also uses **`Listener`** for pan, pinch, and scroll — the two layers must agree on who owns motion when (**drawing on** vs **navigating**). Read **`PointerDownEvent.pressure`** / **`pressureMax`** where available. Avoid competing **`GestureDetector`** recognizers on the same pointers. |
 | **Coordinates** | Store strokes in **document space**. On paint and hit-test, apply the live **`Matrix4`** from the viewport (**`onTransformChanged`** on [`ZoomPanSurface`](../../viewport/lib/src/zoom_pan/zoom_pan_surface.dart), or an equivalent single source of truth) so zoom/pan/scroll **never** mutate stored geometry. |
 | **Pressure sensitivity toggle** | At sample time: if enabled, use device pressure; if disabled, use a **constant** pressure (e.g. `0.5`) so width stays uniform — **no** duplicate stroke types in the model. |
-| **Draw-and-hold → straight line** | On stroke end: if **elapsed time** and **path length** pass thresholds (e.g. long hold + small travel), replace the stroke with a **straight segment** from first to last point. Optional: update **preview** once the hold threshold is crossed. |
+| **Draw-and-hold → straight line** | On stroke end: if **elapsed time** passes a hold threshold and samples stay within tolerance of the **first→last** chord (perpendicular distance; **hold-still** uses a small radius from the first point), replace the stroke with a **straight segment** from first to last. **Live preview** uses the same rule while the stroke is in progress (after the hold threshold). |
 | **Erasure** | **First:** **stroke erasure** — hit-test stroke bounds (or tighter geometry later) and **remove whole** `Stroke` objects. **Later (optional):** **pixel erasure** — split point lists along the eraser path, or move to raster / **`BlendMode.clear`** if needed for performance. |
 | **Pan / zoom / scroll** | **Slote-standard surface:** **[`package:viewport`](../../viewport)** — **`ViewportSurface`** / **`ZoomPanSurface`** — for pinch zoom, **1-finger pan** (when not in drawing-navigation mode), **wheel / trackpad** scroll, boundary clamping, and **`TransformAwareScrollbar`**. **`InteractiveViewer`** is a useful mental model only; **do not** assume it is the long-term note shell. Product wiring is **[Wave G](#wave-g--note-shell-viewport--editor--ink)**. |
 | **Transform source of truth** | Authoritative **`Matrix4`** for the note document subtree: **`ZoomPanSurface.onTransformChanged`**. Scrollbar drags apply via **`ZoomPanController.applyTransform`** (same matrix after **`BoundaryManager`**). Draw consumes this matrix for paint and screen ↔ document mapping — **not** a second unsynchronized `TransformationController` unless you deliberately bridge them. |
@@ -71,18 +71,20 @@ flowchart TB
 | **Stroke rendering** | [`StrokeRenderer`](../lib/src/stroke/stroke_renderer.dart) uses **`perfect_freehand`** **`getStroke`** (filled paths). Pen / highlighter; eraser commits are not drawn until **Wave D**. |
 | **Stroke model** | [`Stroke`](../lib/src/stroke/stroke.dart): immutable **`StrokeSample`** (`x`, `y`, optional `pressure`), **`pressureEnabled`**; [`DrawController`](../lib/src/draw_controller.dart): **`schemaVersion`** in JSON, legacy `points` decode. |
 | **Undo / redo (ink)** | **Not implemented** — `DrawController` appends strokes and `clear()` only; no history stack. |
-| **Gestures** | **`GestureDetector`** pan sampling; **no** dedicated **1-finger / 2-finger** pointer router (**Wave B**). |
+| **Gestures** | [`DrawCanvas`](../lib/src/draw_canvas.dart): **`Listener`** + **pointer-count** router (**Wave B**): sample only when **`activePointers == 1`**; second finger **commits partial** stroke (see Wave B). |
+| **Wave B — Gesture router** | **Complete** — same as phased [Wave B](#wave-b--gesture-router-1-draw--2-pan); [`slote_draw_scaffold.dart`](../lib/src/ui/slote_draw_scaffold.dart) **`isDrawingActive`** from **`onStrokeCaptureActiveChanged`**. |
+| **Wave A foundation** | **Complete** — `perfect_freehand`, document-space samples + **`Matrix4`**, [`StrokeRenderer`](../lib/src/stroke/stroke_renderer.dart) **`getStroke`**. |
+| **Wave C — Pen UX** | **Complete** — pressure **`Switch`** in [`SloteDrawScaffold`](../lib/src/ui/slote_draw_scaffold.dart); draw-and-hold straight line (**350 ms** hold, **24 px** max perpendicular deviation from **first→last** chord in **document space**, or **24 px** radius from first when the chord is ~zero) in [`straight_line_snap.dart`](../lib/src/stroke/straight_line_snap.dart) + [`draw_canvas.dart`](../lib/src/draw_canvas.dart); live preview uses **`StrokeRenderer`**. |
 | **Editor alignment** | Main app uses **`SloteDrawScaffold`** in a **fixed-height footer** below the editor — **no** shared live **`Matrix4`** with the editor yet (optional transform defaults to identity). **Wave G** composes **`package:viewport`**. |
 | **Viewport in product** | Root **`pubspec.yaml`** already lists **`viewport`**, but [`create_note.dart`](../../../lib/src/views/create_note.dart) does not import **`package:viewport`** yet. Pan/zoom/scroll for the note page is **Wave G**, not shipped. |
 | **Persistence** | **`Note.drawingData`** JSON via `DrawController.toJson` / `fromJson` in [`create_note.dart`](../../../lib/src/views/create_note.dart); **`schemaVersion: 1`** for new saves, legacy payloads still load. |
 
 ## Next (Slote-focused)
 
-1. **Wave B:** Pointer-count routing aligned with **`ZoomPanSurface`**; optional real pressure from **`PointerEvent`** when not using pan-only sampling.
-2. **Wave C–D:** Pressure toggle, straight-line hold, stroke eraser (then optional pixel eraser).
-3. **Wave E:** Ink undo/redo inside `draw` + optional note-level unified history later.
-4. **Wave F:** JSON migration, APIs for transform + flags consumed by the note shell.
-5. **Wave G:** End-to-end **viewport + editor + ink** in `create_note` (see table below).
+1. **Wave D:** Stroke eraser (then optional pixel eraser).
+2. **Wave E:** Ink undo/redo inside `draw` + optional note-level unified history later.
+3. **Wave F:** JSON migration, APIs for transform + flags consumed by the note shell.
+4. **Wave G:** End-to-end **viewport + editor + ink** in `create_note` (see table below).
 
 ---
 
@@ -99,13 +101,17 @@ Waves build on each other. After each major wave, run **`components/draw/example
 | **A3 — Document space + transform** | API for the parent to supply **`Matrix4`** — primary hook: **`ZoomPanSurface.onTransformChanged`** (see [Viewport package](#viewport-package-componentsviewport)). **Store** points in **untransformed** document space; **transform only for painting** (and screen → document hit-testing). |
 | **A4 — Render path** | Replace or wrap [`StrokeRenderer`](../lib/src/stroke/stroke_renderer.dart) to build outlines via **`getStroke`** (filled path from polygon), including **`simulatePressure`** when useful for devices without stylus. |
 
+**Status: complete** (A1–A4 implemented in [`pubspec.yaml`](../pubspec.yaml), [`stroke.dart`](../lib/src/stroke/stroke.dart), [`draw_controller.dart`](../lib/src/draw_controller.dart), [`draw_canvas.dart`](../lib/src/draw_canvas.dart), [`stroke_renderer.dart`](../lib/src/stroke/stroke_renderer.dart)).
+
 ### Wave B — Gesture router (1 draw / 2 pan)
 
 | Step | Scope |
 | ---- | ----- |
 | **B1 — Pointer counting** | On down/up/cancel, maintain **`activePointers`**. On move: **only** continue stroke when **`activePointers == 1`**. |
-| **B2 — Parent contract** | Document behavior when a second finger lands mid-stroke (e.g. cancel vs commit partial) — **must match** [`ZoomPanSurface`](../../viewport/lib/src/zoom_pan/zoom_pan_surface.dart) / [`gesture_handler.dart`](../../viewport/lib/src/zoom_pan/gesture_handler.dart) expectations and **`isDrawingActive`**. |
+| **B2 — Parent contract** | **Second finger mid-stroke:** **`PointerDown`** when **`activePointers` becomes 2** while a stroke is in progress → **commit partial** (same as a normal stroke end), clear in-progress capture, **`onStrokeCaptureActiveChanged(false)`** so **`isDrawingActive`** is false and [`ZoomPanSurface`](../../viewport/lib/src/zoom_pan/zoom_pan_surface.dart) may apply **2-finger pinch** (`pointerCount == 2 && !isDrawingActive`). **`PointerCancel`** on the drawing pointer → **discard** in-progress ink (no commit). Aligns with [`gesture_handler.dart`](../../viewport/lib/src/zoom_pan/gesture_handler.dart) pointer counting. |
 | **B3 — Pressure at source** | Pipe **`PointerEvent.pressure`** into the sample stream when pressure mode is on. |
+
+**Status: complete** — [`DrawCanvas`](../lib/src/draw_canvas.dart) (`Listener`, **`onStrokeCaptureActiveChanged`**); [`SloteDrawScaffold`](../lib/src/ui/slote_draw_scaffold.dart) wires **`isDrawingActive`** from that callback.
 
 ### Wave C — Pen UX
 
@@ -114,6 +120,8 @@ Waves build on each other. After each major wave, run **`components/draw/example
 | **Pressure toggle** | UI + controller: when off, pass **constant** pressure into `perfect_freehand` inputs. |
 | **Straight line (draw-and-hold)** | Thresholds on duration + distance; snap on pointer up; optional live preview after threshold. |
 | **Live preview** | In-progress stroke uses the **same** pipeline as committed strokes. |
+
+**Status: complete** — [`SloteDrawScaffold`](../lib/src/ui/slote_draw_scaffold.dart) pressure toggle; [`straight_line_snap.dart`](../lib/src/stroke/straight_line_snap.dart) (**350 ms**, **24 px** max deviation from **first→last** chord, hold-still radius fallback) + [`draw_canvas.dart`](../lib/src/draw_canvas.dart) commit + straight preview.
 
 ### Wave D — Erasure
 
