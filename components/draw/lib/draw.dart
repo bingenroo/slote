@@ -9,6 +9,7 @@ export 'src/tools/eraser_tool.dart';
 export 'src/tools/highlighter_tool.dart';
 export 'src/tools/shape_tool.dart';
 export 'src/stroke/stroke.dart';
+export 'src/stroke/stroke_hit_geometry.dart';
 export 'src/stroke/stroke_renderer.dart';
 export 'src/stroke/stroke_pressure_policy.dart';
 export 'src/stroke/straight_line_snap.dart';

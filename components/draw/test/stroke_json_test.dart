@@ -52,5 +52,35 @@ void main() {
       expect(c2.strokes.first.samples.length, 2);
       expect(c2.strokes.first.pressureEnabled, true);
     });
+
+    test('fromJson drops legacy eraser strokes', () {
+      final c = DrawController();
+      c.fromJson({
+        'strokes': [
+          {
+            'samples': [
+              {'x': 0.0, 'y': 0.0},
+              {'x': 10.0, 'y': 0.0},
+            ],
+            'color': 0xff000000,
+            'strokeWidth': 4.0,
+            'tool': 'pen',
+            'pressureEnabled': true,
+          },
+          {
+            'samples': [
+              {'x': 5.0, 'y': 0.0},
+            ],
+            'color': 0x00000000,
+            'strokeWidth': 8.0,
+            'tool': 'eraser',
+            'pressureEnabled': true,
+          },
+        ],
+      });
+
+      expect(c.strokes.length, 1);
+      expect(c.strokes.first.tool, DrawTool.pen);
+    });
   });
 }

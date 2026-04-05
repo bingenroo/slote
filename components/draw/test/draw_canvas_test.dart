@@ -109,4 +109,45 @@ void main() {
 
     expect(controller.strokes, isEmpty);
   });
+
+  testWidgets('eraser removes pen stroke along path', (tester) async {
+    final controller = DrawController();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: Center(
+            child: SizedBox(
+              width: 300,
+              height: 300,
+              child: DrawCanvas(
+                controller: controller,
+                isDrawingMode: true,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    final canvasCenter = tester.getCenter(find.byType(DrawCanvas));
+    final pen = await tester.startGesture(canvasCenter);
+    await tester.pump();
+    await pen.moveBy(const Offset(100, 0));
+    await pen.up();
+    await tester.pump();
+
+    expect(controller.strokes.length, 1);
+
+    controller.setTool(DrawTool.eraser);
+    await tester.pump();
+
+    final eraser = await tester.startGesture(canvasCenter + const Offset(50, 0));
+    await tester.pump();
+    await eraser.moveBy(const Offset(40, 0));
+    await eraser.up();
+    await tester.pump();
+
+    expect(controller.strokes, isEmpty);
+  });
 }

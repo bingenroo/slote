@@ -3,11 +3,12 @@ import 'package:perfect_freehand/perfect_freehand.dart';
 
 import '../draw_tool.dart';
 import 'stroke.dart';
+import 'stroke_hit_geometry.dart';
 import 'stroke_pressure_policy.dart';
 
 /// Renders strokes using [getStroke] outlines (filled paths).
 ///
-/// [DrawTool.eraser] strokes are not drawn; real erasure is Wave D.
+/// [DrawTool.eraser] strokes are not drawn; erasure mutates the stroke list (Wave D).
 class StrokeRenderer {
   /// Opaque (or nearly opaque) highlighter strokes get this ink alpha at draw time.
   /// Strokes that already bake in low alpha (legacy) are left unchanged.
@@ -66,8 +67,7 @@ class StrokeRenderer {
     final simulatePressure = stroke.pressureEnabled &&
         strokeShouldSimulatePressure(stroke);
 
-    final widthFactor = stroke.tool == DrawTool.highlighter ? 3.25 : 2.0;
-    final size = (stroke.strokeWidth * widthFactor).clamp(1.0, 256.0);
+    final size = strokeInkSize(stroke);
 
     final thinning = stroke.tool == DrawTool.highlighter ? 0.0 : 0.5;
 

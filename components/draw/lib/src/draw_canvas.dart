@@ -21,6 +21,9 @@ import 'stroke/straight_line_snap.dart';
 /// **Wave C:** Speed + dwell straight line ([StraightLineHoldConfig]): slow
 /// movement inside a hold radius for [StraightLineHoldConfig.dwellDuration]
 /// locks a fixed two-point preview; commit matches that preview.
+///
+/// **Wave D:** [DrawTool.eraser] removes pen/highlighter strokes along the path
+/// (live on drag); eraser gestures are not stored as strokes.
 class DrawCanvas extends StatefulWidget {
   DrawCanvas({
     super.key,
@@ -201,6 +204,16 @@ class _DrawCanvasState extends State<DrawCanvas> {
         _currentSamples!.add(StrokeSample(doc.dx, doc.dy, _pressureForSample(event)));
       }
     });
+
+    if (tool == DrawTool.eraser) {
+      final path = _currentSamples;
+      if (path != null && path.isNotEmpty) {
+        widget.controller.eraseStrokesHitByEraserPath(
+          List<StrokeSample>.from(path),
+          _currentStrokeWidth ?? widget.controller.currentStrokeWidth,
+        );
+      }
+    }
   }
 
   void _handlePointerUp(PointerUpEvent event) {
@@ -239,6 +252,23 @@ class _DrawCanvasState extends State<DrawCanvas> {
     final committedSamples = locked
         ? <StrokeSample>[_straightLockedStart!, _straightLockedEnd!]
         : List<StrokeSample>.from(samples);
+
+    if (tool == DrawTool.eraser) {
+      widget.controller.eraseStrokesHitByEraserPath(
+        committedSamples,
+        _currentStrokeWidth ?? widget.controller.currentStrokeWidth,
+      );
+      setState(() {
+        _currentSamples = null;
+        _currentColor = null;
+        _currentStrokeWidth = null;
+        _currentTool = null;
+        _holdTracker.reset();
+        _clearStraightLock();
+      });
+      _notifyCaptureActive(false);
+      return;
+    }
 
     final stroke = Stroke(
       samples: committedSamples,

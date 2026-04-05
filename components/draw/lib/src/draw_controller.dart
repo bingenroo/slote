@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'draw_tool.dart';
 import 'stroke/stroke.dart';
+import 'stroke/stroke_hit_geometry.dart';
 
 /// Controller for drawing operations
 class DrawController extends ChangeNotifier {
@@ -48,6 +49,21 @@ class DrawController extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Removes pen/highlighter strokes whose hit bounds intersect the eraser path
+  /// (document space). Does not add eraser strokes to the model.
+  void eraseStrokesHitByEraserPath(
+    List<StrokeSample> path,
+    double eraserStrokeWidth,
+  ) {
+    if (path.isEmpty) return;
+
+    final before = _strokes.length;
+    _strokes.removeWhere(
+      (s) => strokeHitByEraserPath(s, path, eraserStrokeWidth),
+    );
+    if (_strokes.length != before) notifyListeners();
+  }
+
   static const int _currentSchemaVersion = 1;
 
   Map<String, dynamic> toJson() {
@@ -61,8 +77,11 @@ class DrawController extends ChangeNotifier {
     _strokes.clear();
     if (json['strokes'] != null) {
       final strokesList = json['strokes'] as List;
+      // Drop legacy Wave A–C eraser “strokes” (transparent, never rendered).
       _strokes.addAll(
-        strokesList.map((s) => Stroke.fromJson(s as Map<String, dynamic>)),
+        strokesList
+            .map((s) => Stroke.fromJson(s as Map<String, dynamic>))
+            .where((s) => s.tool != DrawTool.eraser),
       );
     }
     notifyListeners();
