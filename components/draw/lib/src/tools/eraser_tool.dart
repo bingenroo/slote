@@ -8,8 +8,8 @@ import '../stroke/stroke_hit_geometry.dart';
 ///
 /// Product erasure is applied in [DrawCanvas] via
 /// [DrawController.eraseStrokesHitByEraserPath]: a fixed disc
-/// ([kDefaultEraserDiameterDoc]) must overlap ink; preview is a single touch
-/// indicator matching hit-testing.
+/// ([kDefaultEraserDiameterDoc]) cuts the stroke **centerline** (vector split,
+/// Wave D2); preview is a single touch indicator matching hit-testing.
 /// The [createStroke] helper remains for tests; the canvas does not commit eraser
 /// strokes to the model.
 class EraserTool {

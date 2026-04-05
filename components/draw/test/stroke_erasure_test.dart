@@ -50,15 +50,31 @@ void main() {
   });
 
   group('DrawController.eraseStrokesHitByEraserPath', () {
-    test('removes intersecting strokes only', () {
+    test('splits hit stroke into fragments; leaves others untouched', () {
       final c = DrawController();
       c.addStroke(_penLine(0, 0, 50, 0));
       c.addStroke(_penLine(200, 0, 250, 0));
 
       c.eraseStrokesHitByEraserPath([const StrokeSample(25, 0, null)]);
 
-      expect(c.strokes.length, 1);
-      expect(c.strokes.first.samples.first.x, 200);
+      // Reach ~14px: first line becomes left + right fragments; second line intact.
+      expect(c.strokes.length, 3);
+      final xs = c.strokes.map((s) => s.samples.first.x).toList()..sort();
+      expect(xs.any((x) => (x - 200).abs() < 0.01), true);
+      final firstLineFrags =
+          c.strokes.where((s) => s.samples.last.x <= 55).toList();
+      expect(firstLineFrags.length, 2);
+    });
+
+    test('full pass removes entire pen stroke', () {
+      final c = DrawController();
+      c.addStroke(_penLine(0, 0, 100, 0));
+      // Dense samples along the line inside reach of the 24px eraser.
+      final path = <StrokeSample>[
+        for (var x = 0.0; x <= 100; x += 8) StrokeSample(x, 0, null),
+      ];
+      c.eraseStrokesHitByEraserPath(path);
+      expect(c.strokes, isEmpty);
     });
 
     test('empty path is a no-op and does not notify', () {

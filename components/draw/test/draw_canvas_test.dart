@@ -142,9 +142,14 @@ void main() {
     controller.setTool(DrawTool.eraser);
     await tester.pump();
 
-    final eraser = await tester.startGesture(canvasCenter + const Offset(50, 0));
+    // Dense samples along the line — a single moveBy can leave gaps between
+    // eraser discs (Wave D2 uses discrete path points).
+    final eraser = await tester.startGesture(canvasCenter);
     await tester.pump();
-    await eraser.moveBy(const Offset(40, 0));
+    for (var i = 0; i < 10; i++) {
+      await eraser.moveBy(const Offset(10, 0));
+      await tester.pump();
+    }
     await eraser.up();
     await tester.pump();
 

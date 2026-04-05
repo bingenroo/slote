@@ -68,22 +68,21 @@ flowchart TB
 
 | Item | State |
 | ---- | ----- |
-| **Stroke rendering** | [`StrokeRenderer`](../lib/src/stroke/stroke_renderer.dart) uses **`perfect_freehand`** **`getStroke`** (filled paths). Pen / highlighter only; eraser does not add visible strokes — **Wave D** removes ink via [`eraseStrokesHitByEraserPath`](../lib/src/draw_controller.dart) + [`stroke_hit_geometry`](../lib/src/stroke/stroke_hit_geometry.dart). |
+| **Stroke rendering** | [`StrokeRenderer`](../lib/src/stroke/stroke_renderer.dart) uses **`perfect_freehand`** **`getStroke`** (filled paths). Pen / highlighter only; eraser does not add visible strokes — **Wave D** removes ink via [`eraseStrokesHitByEraserPath`](../lib/src/draw_controller.dart), [`stroke_hit_geometry`](../lib/src/stroke/stroke_hit_geometry.dart), and **D2** split [`stroke_eraser_split`](../lib/src/stroke/stroke_eraser_split.dart). |
 | **Stroke model** | [`Stroke`](../lib/src/stroke/stroke.dart): immutable **`StrokeSample`** (`x`, `y`, optional `pressure`), **`pressureEnabled`**; [`DrawController`](../lib/src/draw_controller.dart): **`schemaVersion`** in JSON, legacy `points` decode. |
 | **Undo / redo (ink)** | **Not implemented** — `DrawController` appends strokes and `clear()` only; no history stack. |
 | **Gestures** | [`DrawCanvas`](../lib/src/draw_canvas.dart): **`Listener`** + **pointer-count** router (**Wave B**): sample only when **`activePointers == 1`**; second finger **commits partial** stroke (see Wave B). |
 | **Wave B — Gesture router** | **Complete** — same as phased [Wave B](#wave-b--gesture-router-1-draw--2-pan); [`slote_draw_scaffold.dart`](../lib/src/ui/slote_draw_scaffold.dart) **`isDrawingActive`** from **`onStrokeCaptureActiveChanged`**. |
 | **Wave A foundation** | **Complete** — `perfect_freehand`, document-space samples + **`Matrix4`**, [`StrokeRenderer`](../lib/src/stroke/stroke_renderer.dart) **`getStroke`**. |
 | **Wave C — Pen UX** | **Complete** — pressure **`Switch`** in [`SloteDrawScaffold`](../lib/src/ui/slote_draw_scaffold.dart); straight line via **speed + dwell** (**700 ms** contiguous, **~140 px/s** max speed, **28 px** hold radius, doc space) in [`straight_line_snap.dart`](../lib/src/stroke/straight_line_snap.dart) + [`draw_canvas.dart`](../lib/src/draw_canvas.dart); fixed chord preview after lock; **`StrokeRenderer`** for preview and commit. |
-| **Wave D — Stroke eraser** | **D1 complete** — bounds hit-test (aligned with stroke ink width) removes whole pen/highlighter strokes on eraser drag + commit; **`fromJson`** drops legacy eraser entries. **D2** (pixel eraser) **deferred**. |
+| **Wave D — Stroke eraser** | **Complete** — polyline distance + fixed disc ([`kDefaultEraserDiameterDoc`](../lib/src/stroke/stroke_hit_geometry.dart)); **D2** splits strokes along the eraser footprint ([`stroke_eraser_split.dart`](../lib/src/stroke/stroke_eraser_split.dart)); **`fromJson`** drops legacy eraser entries. |
 | **Editor alignment** | Main app uses **`SloteDrawScaffold`** in a **fixed-height footer** below the editor — **no** shared live **`Matrix4`** with the editor yet (optional transform defaults to identity). **Wave G** composes **`package:viewport`**. |
 | **Viewport in product** | Root **`pubspec.yaml`** already lists **`viewport`**, but [`create_note.dart`](../../../lib/src/views/create_note.dart) does not import **`package:viewport`** yet. Pan/zoom/scroll for the note page is **Wave G**, not shipped. |
 | **Persistence** | **`Note.drawingData`** JSON via `DrawController.toJson` / `fromJson` in [`create_note.dart`](../../../lib/src/views/create_note.dart); **`schemaVersion: 1`** for new saves, legacy payloads still load; **`fromJson`** strips saved **`eraser`** tool strokes (pre–Wave D cruft). |
 
 ## Next (Slote-focused)
 
-1. **Wave D2 (optional):** Pixel / vector-split eraser when D1 UX needs it.
-2. **Wave E:** Ink undo/redo inside `draw` + optional note-level unified history later.
+1. **Wave E:** Ink undo/redo inside `draw` + optional note-level unified history later.
 3. **Wave F:** JSON migration, APIs for transform + flags consumed by the note shell.
 4. **Wave G:** End-to-end **viewport + editor + ink** in `create_note` (see table below).
 
@@ -128,10 +127,10 @@ Waves build on each other. After each major wave, run **`components/draw/example
 
 | Slice | Notes |
 | ----- | ----- |
-| **D1 — Stroke eraser** | Hit-test **stroke bounds** (then refine if needed); remove entire strokes. Fast, predictable UX. |
-| **D2 — Pixel eraser (optional)** | Split stroke polylines along eraser path, or rasterize + **`BlendMode.clear`** if vector splitting is too heavy. Defer until D1 is stable. |
+| **D1 — Stroke eraser** | Eraser path in doc space + fixed disc; hit-test distance from disc centers to **stroke polyline** (aligned with rendered ink width). Live erase on drag; **`fromJson`** strips legacy eraser tool entries. |
+| **D2 — Vector / “pixel” eraser** | Split stroke centerlines along the discrete eraser-disc union (same footprint as hit-test); optional future: denser eraser sampling or raster **`BlendMode.clear`** if needed. |
 
-**Status: D1 complete** — [`stroke_hit_geometry.dart`](../lib/src/stroke/stroke_hit_geometry.dart), [`draw_controller.dart`](../lib/src/draw_controller.dart) (`eraseStrokesHitByEraserPath`), [`draw_canvas.dart`](../lib/src/draw_canvas.dart) (eraser path). **D2** not started.
+**Status: complete** — [`stroke_hit_geometry.dart`](../lib/src/stroke/stroke_hit_geometry.dart) (`eraserReachForStroke`, `pointInsideEraserFootprint`, `strokeHitByEraserPath`), [`stroke_eraser_split.dart`](../lib/src/stroke/stroke_eraser_split.dart) (`splitStrokeByEraserPath`), [`draw_controller.dart`](../lib/src/draw_controller.dart) (`eraseStrokesHitByEraserPath`), [`draw_canvas.dart`](../lib/src/draw_canvas.dart) (eraser path + preview).
 
 ### Wave E — Undo / redo (ink)
 

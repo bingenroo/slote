@@ -9,6 +9,27 @@ const double kDefaultEraserDiameterDoc = 24.0;
 
 double get _eraserRadiusDoc => kDefaultEraserDiameterDoc / 2;
 
+/// Eraser radius plus half ink width — same value used for hit-test, split, and UX.
+double eraserReachForStroke(Stroke stroke) =>
+    _eraserRadiusDoc + strokeInkHalfWidth(stroke);
+
+/// True if [p] lies inside any eraser disc of radius [reachRadius] centered on
+/// [eraserPath] samples (doc space). [reachRadius] is typically
+/// [eraserReachForStroke] for the stroke being edited.
+bool pointInsideEraserFootprint(
+  Offset p,
+  List<StrokeSample> eraserPath,
+  double reachRadius,
+) {
+  final r2 = reachRadius * reachRadius;
+  for (final s in eraserPath) {
+    final dx = p.dx - s.x;
+    final dy = p.dy - s.y;
+    if (dx * dx + dy * dy <= r2) return true;
+  }
+  return false;
+}
+
 /// Hit-testing geometry aligned with [StrokeRenderer] / perfect_freehand `size`.
 ///
 /// Keep [strokeInkSize] in sync with stroke outline width (see `StrokeRenderer`).
@@ -85,8 +106,7 @@ bool strokeHitByEraserPath(Stroke stroke, List<StrokeSample> path) {
   }
   if (stroke.samples.isEmpty) return false;
 
-  final inkHalf = strokeInkHalfWidth(stroke);
-  final reach = _eraserRadiusDoc + inkHalf;
+  final reach = eraserReachForStroke(stroke);
 
   for (final s in path) {
     final p = Offset(s.x, s.y);

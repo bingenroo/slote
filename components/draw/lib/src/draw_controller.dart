@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'draw_tool.dart';
 import 'stroke/stroke.dart';
+import 'stroke/stroke_eraser_split.dart';
 import 'stroke/stroke_hit_geometry.dart';
 
 /// Controller for drawing operations
@@ -49,14 +50,38 @@ class DrawController extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Removes pen/highlighter strokes when the fixed-size eraser disc (see
-  /// [kDefaultEraserDiameterDoc]) along [path] overlaps ink (document space).
+  /// Erases ink along [path]: pen/highlighter strokes are **split** where the
+  /// eraser footprint (see [kDefaultEraserDiameterDoc] + ink half-width) cuts
+  /// the centerline (Wave D2). Other tools are unchanged.
   void eraseStrokesHitByEraserPath(List<StrokeSample> path) {
     if (path.isEmpty) return;
 
-    final before = _strokes.length;
-    _strokes.removeWhere((s) => strokeHitByEraserPath(s, path));
-    if (_strokes.length != before) notifyListeners();
+    var hit = false;
+    for (final s in _strokes) {
+      if (strokeHitByEraserPath(s, path)) {
+        hit = true;
+        break;
+      }
+    }
+    if (!hit) return;
+
+    final out = <Stroke>[];
+    for (final s in _strokes) {
+      if (s.tool != DrawTool.pen && s.tool != DrawTool.highlighter) {
+        out.add(s);
+        continue;
+      }
+      if (!strokeHitByEraserPath(s, path)) {
+        out.add(s);
+        continue;
+      }
+      out.addAll(splitStrokeByEraserPath(s, path));
+    }
+
+    _strokes
+      ..clear()
+      ..addAll(out);
+    notifyListeners();
   }
 
   static const int _currentSchemaVersion = 1;

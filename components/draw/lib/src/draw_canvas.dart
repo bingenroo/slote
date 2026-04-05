@@ -23,10 +23,10 @@ import 'stroke/stroke_eraser_visual.dart';
 /// movement inside a hold radius for [StraightLineHoldConfig.dwellDuration]
 /// locks a fixed two-point preview; commit matches that preview.
 ///
-/// **Wave D:** [DrawTool.eraser] removes pen/highlighter strokes when the
-/// fixed eraser disc overlaps ink (`kDefaultEraserDiameterDoc` in
-/// `stroke_hit_geometry.dart`); preview is one “show touches” disc at the
-/// pointer; gestures are not stored as strokes.
+/// **Wave D:** [DrawTool.eraser] splits pen/highlighter strokes where the fixed
+/// eraser disc overlaps ink (`kDefaultEraserDiameterDoc` in
+/// `stroke_hit_geometry.dart`, `stroke_eraser_split.dart`); preview is one
+/// “show touches” disc at the pointer; gestures are not stored as strokes.
 class DrawCanvas extends StatefulWidget {
   DrawCanvas({
     super.key,
