@@ -130,7 +130,7 @@ Waves build on each other. After each major wave, run **`components/draw/example
 | **D1 — Stroke eraser** | Eraser path in doc space + fixed disc; hit-test distance from disc centers to **stroke polyline** (aligned with rendered ink width). Live erase on drag; **`fromJson`** strips legacy eraser tool entries. |
 | **D2 — Vector / “pixel” eraser** | Split stroke centerlines along the discrete eraser-disc union (same footprint as hit-test); optional future: denser eraser sampling or raster **`BlendMode.clear`** if needed. |
 
-**Status: complete** — [`stroke_hit_geometry.dart`](../lib/src/stroke/stroke_hit_geometry.dart) (`eraserReachForStroke`, `pointInsideEraserFootprint`, `strokeHitByEraserPath`), [`stroke_eraser_split.dart`](../lib/src/stroke/stroke_eraser_split.dart) (`splitStrokeByEraserPath`), [`draw_controller.dart`](../lib/src/draw_controller.dart) (`eraseStrokesHitByEraserPath`), [`draw_canvas.dart`](../lib/src/draw_canvas.dart) (eraser path + preview).
+**Status: complete** — [`stroke_hit_geometry.dart`](../lib/src/stroke/stroke_hit_geometry.dart) (`eraserReachForStroke`, `pointInsideEraserFootprint`, `strokeHitByEraserPath`), [`stroke_eraser_split.dart`](../lib/src/stroke/stroke_eraser_split.dart) (`splitStrokeByEraserPath`), [`draw_controller.dart`](../lib/src/draw_controller.dart) (`eraseStrokesHitByEraserPath`, [`EraserMode`](../lib/src/eraser_mode.dart) **stroke** vs **pixel**), [`slote_draw_scaffold.dart`](../lib/src/ui/slote_draw_scaffold.dart) (erase mode segmented control when eraser is selected), [`draw_canvas.dart`](../lib/src/draw_canvas.dart) (eraser path + preview). Drawing JSON includes optional **`eraserMode`** for persistence.
 
 ### Wave E — Undo / redo (ink)
 

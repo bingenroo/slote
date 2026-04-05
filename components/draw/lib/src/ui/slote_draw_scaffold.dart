@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../draw_canvas.dart';
 import '../draw_controller.dart';
 import '../draw_tool.dart';
+import '../eraser_mode.dart';
 import '../stroke/stroke_hit_geometry.dart';
 
 /// Shared drawing chrome: tools, palette, stroke width, canvas, and status bar.
@@ -210,6 +211,41 @@ class _SloteDrawScaffoldState extends State<SloteDrawScaffold> {
             ],
           ),
         ),
+        if (widget.controller.currentTool == DrawTool.eraser)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+            child: Row(
+              children: [
+                Text(
+                  'Erase mode',
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: SegmentedButton<EraserMode>(
+                    segments: const [
+                      ButtonSegment<EraserMode>(
+                        value: EraserMode.stroke,
+                        label: Text('Stroke'),
+                        tooltip: 'Remove whole stroke when touched',
+                      ),
+                      ButtonSegment<EraserMode>(
+                        value: EraserMode.pixel,
+                        label: Text('Pixel'),
+                        tooltip: 'Erase along path (split stroke)',
+                      ),
+                    ],
+                    selected: {widget.controller.eraserMode},
+                    onSelectionChanged: (next) {
+                      if (next.isEmpty) return;
+                      widget.controller.setEraserMode(next.first);
+                      setState(() {});
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
           child: Row(

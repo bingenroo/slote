@@ -50,8 +50,21 @@ void main() {
   });
 
   group('DrawController.eraseStrokesHitByEraserPath', () {
+    test('stroke mode removes whole stroke when hit', () {
+      final c = DrawController();
+      c.setEraserMode(EraserMode.stroke);
+      c.addStroke(_penLine(0, 0, 50, 0));
+      c.addStroke(_penLine(200, 0, 250, 0));
+
+      c.eraseStrokesHitByEraserPath([const StrokeSample(25, 0, null)]);
+
+      expect(c.strokes.length, 1);
+      expect(c.strokes.first.samples.first.x, 200);
+    });
+
     test('splits hit stroke into fragments; leaves others untouched', () {
       final c = DrawController();
+      c.setEraserMode(EraserMode.pixel);
       c.addStroke(_penLine(0, 0, 50, 0));
       c.addStroke(_penLine(200, 0, 250, 0));
 
@@ -68,6 +81,7 @@ void main() {
 
     test('full pass removes entire pen stroke', () {
       final c = DrawController();
+      c.setEraserMode(EraserMode.pixel);
       c.addStroke(_penLine(0, 0, 100, 0));
       // Dense samples along the line inside reach of the 24px eraser.
       final path = <StrokeSample>[

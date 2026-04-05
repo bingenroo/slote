@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'draw_tool.dart';
+import 'eraser_mode.dart';
 import 'stroke/stroke.dart';
 import 'stroke/stroke_eraser_split.dart';
 import 'stroke/stroke_hit_geometry.dart';
@@ -12,12 +13,16 @@ class DrawController extends ChangeNotifier {
   double _currentStrokeWidth = 2.0;
   DrawTool _currentTool = DrawTool.pen;
   bool _pressureEnabled = true;
+  EraserMode _eraserMode = EraserMode.pixel;
 
   List<Stroke> get strokes => List.unmodifiable(_strokes);
   Color get currentColor => _currentColor;
   double get currentStrokeWidth => _currentStrokeWidth;
   DrawTool get currentTool => _currentTool;
   bool get pressureEnabled => _pressureEnabled;
+
+  /// Whole-stroke vs polyline-split erasure (see [eraseStrokesHitByEraserPath]).
+  EraserMode get eraserMode => _eraserMode;
 
   void setColor(Color color) {
     _currentColor = color;
@@ -40,6 +45,12 @@ class DrawController extends ChangeNotifier {
     notifyListeners();
   }
 
+  void setEraserMode(EraserMode mode) {
+    if (_eraserMode == mode) return;
+    _eraserMode = mode;
+    notifyListeners();
+  }
+
   void addStroke(Stroke stroke) {
     _strokes.add(stroke);
     notifyListeners();
@@ -50,11 +61,19 @@ class DrawController extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Erases ink along [path]: pen/highlighter strokes are **split** where the
-  /// eraser footprint (see [kDefaultEraserDiameterDoc] + ink half-width) cuts
-  /// the centerline (Wave D2). Other tools are unchanged.
+  /// Erases ink along [path] using [eraserMode]: [EraserMode.stroke] removes
+  /// whole pen/highlighter strokes when hit; [EraserMode.pixel] splits the
+  /// centerline (Wave D2). Footprint: [kDefaultEraserDiameterDoc] + ink
+  /// half-width. Other tools are unchanged.
   void eraseStrokesHitByEraserPath(List<StrokeSample> path) {
     if (path.isEmpty) return;
+
+    if (_eraserMode == EraserMode.stroke) {
+      final before = _strokes.length;
+      _strokes.removeWhere((s) => strokeHitByEraserPath(s, path));
+      if (_strokes.length != before) notifyListeners();
+      return;
+    }
 
     var hit = false;
     for (final s in _strokes) {
@@ -90,6 +109,7 @@ class DrawController extends ChangeNotifier {
     return {
       'schemaVersion': _currentSchemaVersion,
       'strokes': _strokes.map((s) => s.toJson()).toList(),
+      'eraserMode': _eraserMode.name,
     };
   }
 
@@ -103,6 +123,14 @@ class DrawController extends ChangeNotifier {
             .map((s) => Stroke.fromJson(s as Map<String, dynamic>))
             .where((s) => s.tool != DrawTool.eraser),
       );
+    }
+    final modeName = json['eraserMode'] as String?;
+    if (modeName != null) {
+      _eraserMode = switch (modeName) {
+        'stroke' => EraserMode.stroke,
+        'pixel' => EraserMode.pixel,
+        _ => EraserMode.pixel,
+      };
     }
     notifyListeners();
   }

@@ -43,6 +43,7 @@ void main() {
 
       final json = c.toJson();
       expect(json['schemaVersion'], 1);
+      expect(json['eraserMode'], 'pixel');
 
       final c2 = DrawController();
       c2.fromJson(json);
@@ -51,6 +52,14 @@ void main() {
       expect(c2.strokes.first.tool, DrawTool.highlighter);
       expect(c2.strokes.first.samples.length, 2);
       expect(c2.strokes.first.pressureEnabled, true);
+      expect(c2.eraserMode, EraserMode.pixel);
+    });
+
+    test('eraserMode round-trips', () {
+      final c = DrawController();
+      c.setEraserMode(EraserMode.stroke);
+      final c2 = DrawController()..fromJson(c.toJson());
+      expect(c2.eraserMode, EraserMode.stroke);
     });
 
     test('fromJson drops legacy eraser strokes', () {

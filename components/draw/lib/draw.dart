@@ -3,6 +3,7 @@ library;
 
 export 'src/draw_controller.dart';
 export 'src/draw_tool.dart';
+export 'src/eraser_mode.dart';
 export 'src/draw_canvas.dart';
 export 'src/tools/pen_tool.dart';
 export 'src/tools/eraser_tool.dart';
