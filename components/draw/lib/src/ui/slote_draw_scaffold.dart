@@ -130,6 +130,30 @@ class _SloteDrawScaffoldState extends State<SloteDrawScaffold> {
                 tool: DrawTool.eraser,
                 label: 'Eraser',
               ),
+              ListenableBuilder(
+                listenable: widget.controller.undoRedoListenable,
+                builder: (context, _) {
+                  return Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.undo),
+                        onPressed: widget.controller.canUndo
+                            ? widget.controller.undo
+                            : null,
+                        tooltip: 'Undo ink',
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.redo),
+                        onPressed: widget.controller.canRedo
+                            ? widget.controller.redo
+                            : null,
+                        tooltip: 'Redo ink',
+                      ),
+                    ],
+                  );
+                },
+              ),
               IconButton(
                 icon: const Icon(Icons.clear),
                 onPressed: () => widget.controller.clear(),

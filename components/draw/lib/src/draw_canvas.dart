@@ -27,6 +27,9 @@ import 'stroke/stroke_eraser_visual.dart';
 /// eraser disc overlaps ink (`kDefaultEraserDiameterDoc` in
 /// `stroke_hit_geometry.dart`, `stroke_eraser_split.dart`); preview is one
 /// “show touches” disc at the pointer; gestures are not stored as strokes.
+///
+/// **Wave E:** Eraser drags call [DrawController.beginInkUndoGroup] /
+/// [DrawController.endInkUndoGroup] so live erase steps form **one** undo step.
 class DrawCanvas extends StatefulWidget {
   DrawCanvas({
     super.key,
@@ -73,6 +76,9 @@ class _DrawCanvasState extends State<DrawCanvas> {
 
   bool _captureNotified = false;
 
+  /// True after eraser pointer-down opened an ink undo group (Wave E).
+  bool _eraserInkUndoGroupOpen = false;
+
   @override
   void initState() {
     super.initState();
@@ -82,6 +88,10 @@ class _DrawCanvasState extends State<DrawCanvas> {
   @override
   void dispose() {
     _cancelHoldPoll();
+    if (_eraserInkUndoGroupOpen) {
+      widget.controller.endInkUndoGroup();
+      _eraserInkUndoGroupOpen = false;
+    }
     widget.controller.removeListener(_onControllerChanged);
     super.dispose();
   }
@@ -102,6 +112,12 @@ class _DrawCanvasState extends State<DrawCanvas> {
     if (_captureNotified == active) return;
     _captureNotified = active;
     widget.onStrokeCaptureActiveChanged?.call(active);
+  }
+
+  void _endEraserInkUndoGroupIfOpen() {
+    if (!_eraserInkUndoGroupOpen) return;
+    widget.controller.endInkUndoGroup();
+    _eraserInkUndoGroupOpen = false;
   }
 
   void _cancelHoldPoll() {
@@ -165,6 +181,7 @@ class _DrawCanvasState extends State<DrawCanvas> {
 
     if (hadNone && _activePointers.length == 1) {
       final doc = _localToDocument(event.localPosition);
+      final isEraser = widget.controller.currentTool == DrawTool.eraser;
       setState(() {
         _holdTracker.reset();
         _clearStraightLock();
@@ -175,6 +192,10 @@ class _DrawCanvasState extends State<DrawCanvas> {
         _lastDocForHold = doc;
         _lastPointerStamp = event.timeStamp;
       });
+      if (isEraser) {
+        widget.controller.beginInkUndoGroup();
+        _eraserInkUndoGroupOpen = true;
+      }
       _startHoldPoll();
       _notifyCaptureActive(true);
     }
@@ -259,6 +280,7 @@ class _DrawCanvasState extends State<DrawCanvas> {
       widget.controller.eraseStrokesHitByEraserPath(
         committedSamples,
       );
+      _endEraserInkUndoGroupIfOpen();
       setState(() {
         _currentSamples = null;
         _currentColor = null;
@@ -293,6 +315,7 @@ class _DrawCanvasState extends State<DrawCanvas> {
   void _discardInProgress() {
     _cancelHoldPoll();
     if (_currentSamples == null) return;
+    _endEraserInkUndoGroupIfOpen();
     setState(() {
       _currentSamples = null;
       _currentColor = null;

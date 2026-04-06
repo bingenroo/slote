@@ -70,21 +70,22 @@ flowchart TB
 | ---- | ----- |
 | **Stroke rendering** | [`StrokeRenderer`](../lib/src/stroke/stroke_renderer.dart) uses **`perfect_freehand`** **`getStroke`** (filled paths). Pen / highlighter only; eraser does not add visible strokes — **Wave D** removes ink via [`eraseStrokesHitByEraserPath`](../lib/src/draw_controller.dart), [`stroke_hit_geometry`](../lib/src/stroke/stroke_hit_geometry.dart), and **D2** split [`stroke_eraser_split`](../lib/src/stroke/stroke_eraser_split.dart). |
 | **Stroke model** | [`Stroke`](../lib/src/stroke/stroke.dart): immutable **`StrokeSample`** (`x`, `y`, optional `pressure`), **`pressureEnabled`**; [`DrawController`](../lib/src/draw_controller.dart): **`schemaVersion`** in JSON, legacy `points` decode. |
-| **Undo / redo (ink)** | **Not implemented** — `DrawController` appends strokes and `clear()` only; no history stack. |
+| **Undo / redo (ink)** | **Wave E** — snapshot stacks on [`DrawController`](../lib/src/draw_controller.dart) (`undo` / `redo`, **`undoRedoListenable`**, **`beginInkUndoGroup`** / **`endInkUndoGroup`** for batched eraser drags); undo/redo buttons in [`SloteDrawScaffold`](../lib/src/ui/slote_draw_scaffold.dart). History is **not** persisted in JSON. |
 | **Gestures** | [`DrawCanvas`](../lib/src/draw_canvas.dart): **`Listener`** + **pointer-count** router (**Wave B**): sample only when **`activePointers == 1`**; second finger **commits partial** stroke (see Wave B). |
 | **Wave B — Gesture router** | **Complete** — same as phased [Wave B](#wave-b--gesture-router-1-draw--2-pan); [`slote_draw_scaffold.dart`](../lib/src/ui/slote_draw_scaffold.dart) **`isDrawingActive`** from **`onStrokeCaptureActiveChanged`**. |
 | **Wave A foundation** | **Complete** — `perfect_freehand`, document-space samples + **`Matrix4`**, [`StrokeRenderer`](../lib/src/stroke/stroke_renderer.dart) **`getStroke`**. |
 | **Wave C — Pen UX** | **Complete** — pressure **`Switch`** in [`SloteDrawScaffold`](../lib/src/ui/slote_draw_scaffold.dart); straight line via **speed + dwell** (**700 ms** contiguous, **~140 px/s** max speed, **28 px** hold radius, doc space) in [`straight_line_snap.dart`](../lib/src/stroke/straight_line_snap.dart) + [`draw_canvas.dart`](../lib/src/draw_canvas.dart); fixed chord preview after lock; **`StrokeRenderer`** for preview and commit. |
 | **Wave D — Stroke eraser** | **Complete** — polyline distance + fixed disc ([`kDefaultEraserDiameterDoc`](../lib/src/stroke/stroke_hit_geometry.dart)); **D2** splits strokes along the eraser footprint ([`stroke_eraser_split.dart`](../lib/src/stroke/stroke_eraser_split.dart)); **`fromJson`** drops legacy eraser entries. |
+| **Wave E — Ink undo/redo** | **Complete** — snapshots + eraser gesture grouping ([`draw_controller.dart`](../lib/src/draw_controller.dart), [`draw_canvas.dart`](../lib/src/draw_canvas.dart)); scaffold **`undoRedoListenable`** UI ([`slote_draw_scaffold.dart`](../lib/src/ui/slote_draw_scaffold.dart)); tests in [`draw_ink_undo_test.dart`](../test/draw_ink_undo_test.dart). |
 | **Editor alignment** | Main app uses **`SloteDrawScaffold`** in a **fixed-height footer** below the editor — **no** shared live **`Matrix4`** with the editor yet (optional transform defaults to identity). **Wave G** composes **`package:viewport`**. |
 | **Viewport in product** | Root **`pubspec.yaml`** already lists **`viewport`**, but [`create_note.dart`](../../../lib/src/views/create_note.dart) does not import **`package:viewport`** yet. Pan/zoom/scroll for the note page is **Wave G**, not shipped. |
 | **Persistence** | **`Note.drawingData`** JSON via `DrawController.toJson` / `fromJson` in [`create_note.dart`](../../../lib/src/views/create_note.dart); **`schemaVersion: 1`** for new saves, legacy payloads still load; **`fromJson`** strips saved **`eraser`** tool strokes (pre–Wave D cruft). |
 
 ## Next (Slote-focused)
 
-1. **Wave E:** Ink undo/redo inside `draw` + optional note-level unified history later.
-3. **Wave F:** JSON migration, APIs for transform + flags consumed by the note shell.
-4. **Wave G:** End-to-end **viewport + editor + ink** in `create_note` (see table below).
+1. **Wave F:** JSON migration, APIs for transform + flags consumed by the note shell.
+2. **Wave G:** End-to-end **viewport + editor + ink** in `create_note` (see table below).
+3. **Optional later:** note-level unified undo (chronological typing + ink) — not **Wave E**; requires orchestrator or stroke-in-document model (see [Undo/redo (ink vs editor)](#undoredo-ink-vs-editor)).
 
 ---
 
@@ -140,13 +141,15 @@ Waves build on each other. After each major wave, run **`components/draw/example
 | **E2 — UI hooks** | Expose something like **`Listenable`** for can-undo / can-redo (mirror the ergonomics of **`RichTextEditorController.undoRedoListenable`** in [`package:rich_text`](../../rich_text/lib/src/appflowy/appflowy_document_controller.dart)) so [`SloteDrawScaffold`](../lib/src/ui/slote_draw_scaffold.dart) or the app bar can enable/disable buttons. |
 | **E3 — Non-goal** | Do **not** assume ink can call **`EditorState.undoManager.undo()`** without either **embedding** strokes in the document transaction model or a **note-level orchestrator** (see below). |
 
+**Status: complete** — [`draw_controller.dart`](../lib/src/draw_controller.dart) (snapshot undo/redo, optional **`maxUndoLevels`**, **`undoRedoListenable`**); [`draw_canvas.dart`](../lib/src/draw_canvas.dart) (eraser **`beginInkUndoGroup`** / **`endInkUndoGroup`** pairing); [`slote_draw_scaffold.dart`](../lib/src/ui/slote_draw_scaffold.dart) (undo/redo **`IconButton`**s); [`draw_ink_undo_test.dart`](../test/draw_ink_undo_test.dart).
+
 ### Wave F — Integration & persistence
 
 | Item | Notes |
 | ---- | ----- |
 | **F1 — Transform parity** | With Wave G: drawing layer and editor sit under the **same** **`ZoomPanSurface`** **`Transform`**; ink uses the same **`Matrix4`** as blocks. |
 | **F2 — JSON / migration** | Evolve `DrawController.toJson` / `fromJson` with the new stroke sample shape; keep **backward compatibility** for existing `drawingData` in the wild. |
-| **F3 — Product wiring** | [`create_note.dart`](../../../lib/src/views/create_note.dart) already wires **`DrawController`**, **`SloteDrawScaffold`**, and **`drawingData`** — extend for undo, transform injection, and viewport flags. |
+| **F3 — Product wiring** | [`create_note.dart`](../../../lib/src/views/create_note.dart) already wires **`DrawController`**, **`SloteDrawScaffold`**, and **`drawingData`** — extend for transform injection and viewport flags (ink undo/redo ships in **`SloteDrawScaffold`** from Wave E; app bar mirroring is optional). |
 
 ### Wave G — Note shell: viewport + editor + ink
 
@@ -174,12 +177,12 @@ _When verifying Wave G, re-read [`zoom_pan_surface.dart`](../../viewport/lib/src
 
 ### In `package:draw`
 
-- **Ink history** should live **inside** `draw` (minimal undo stack or commands). The removed standalone **`components/undo_redo`** package is **not** required for this; reintroducing a generic package is optional only if multiple subsystems need the same abstraction.
-- **Erasure** and other tools should define whether they push **undoable** operations; the roadmap stays **agnostic** between snapshot vs command-list implementations.
+- **Ink history** lives in **`DrawController`** (snapshot stacks; eraser drags batched via **`beginInkUndoGroup`** / **`endInkUndoGroup`**). The removed standalone **`components/undo_redo`** package is **not** required; reintroducing a generic package is optional only if multiple subsystems need the same abstraction.
+- **Erasure** during a pointer gesture is **one** undo step; **`addStroke`**, **`clear`**, and standalone **`eraseStrokesHitByEraserPath`** each record history when not inside a group.
 
 ### Rest of repo / product
 
-- **Two independent stacks today:** text history (AppFlowy) and drawing (none until Wave E).
+- **Two independent stacks today:** text history (AppFlowy) and drawing (**Wave E** ink undo in `draw`).
 - **Future (optional):** a **note-level facade** could merge **chronological** undo (one Cmd+Z ordering across typing and ink). That is **explicitly deferred** until product requires it — it is **not** “wiring drawing into AppFlowy undo” without either **stroke-as-document-embed** or a coordinator.
 
 ---
