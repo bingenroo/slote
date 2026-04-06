@@ -11,6 +11,11 @@ import '../stroke/stroke_hit_geometry.dart';
 /// The [controller] is owned by the parent (lifecycle, persistence).
 /// [isDrawingMode] controls whether input applies strokes (e.g. toggle from an
 /// [AppBar] action in the parent).
+///
+/// [onStrokeCaptureActiveChanged] fires when the user starts or ends an in-progress
+/// stroke (or eraser drag). The note shell can forward this to the viewport
+/// **isDrawingActive** flag (see `package:viewport` zoom/pan surface) so pinch-zoom
+/// does not fight ink.
 class SloteDrawScaffold extends StatefulWidget {
   const SloteDrawScaffold({
     super.key,
@@ -18,6 +23,7 @@ class SloteDrawScaffold extends StatefulWidget {
     required this.isDrawingMode,
     this.palette,
     this.onStrokesChanged,
+    this.onStrokeCaptureActiveChanged,
     this.selectedColorBorderColor,
     this.selectedToolColor,
     this.canvasMargin = const EdgeInsets.all(16),
@@ -33,6 +39,9 @@ class SloteDrawScaffold extends StatefulWidget {
 
   /// Called after the stroke list changes (add stroke or clear).
   final VoidCallback? onStrokesChanged;
+
+  /// See [DrawCanvas.onStrokeCaptureActiveChanged] — for viewport **isDrawingActive**.
+  final ValueChanged<bool>? onStrokeCaptureActiveChanged;
 
   final Color? selectedColorBorderColor;
   final Color? selectedToolColor;
@@ -102,6 +111,7 @@ class _SloteDrawScaffoldState extends State<SloteDrawScaffold> {
   void _onStrokeCaptureActiveChanged(bool active) {
     if (_isDrawingActive == active) return;
     setState(() => _isDrawingActive = active);
+    widget.onStrokeCaptureActiveChanged?.call(active);
   }
 
   @override

@@ -10,7 +10,12 @@ class _InkUndoRedoListenable extends ChangeNotifier {
   void notifyHistoryChanged() => notifyListeners();
 }
 
-/// Controller for drawing operations
+/// Controller for drawing operations.
+///
+/// **Persistence:** [toJson] / [fromJson] include a top-level `schemaVersion`.
+/// Bump the emitted `schemaVersion` when the envelope shape changes and add a branch
+/// in [fromJson] to migrate older maps. Stroke-level legacy (`points` vs
+/// `samples`, tool strings, etc.) stays tolerant inside [Stroke.fromJson].
 class DrawController extends ChangeNotifier {
   DrawController({this.maxUndoLevels = 50}) : assert(maxUndoLevels >= 1);
 
@@ -272,8 +277,16 @@ class DrawController extends ChangeNotifier {
   void fromJson(Map<String, dynamic> json) {
     _clearInkHistory();
     _strokes.clear();
-    if (json['strokes'] != null) {
-      final strokesList = json['strokes'] as List;
+
+    final schemaVersion = (json['schemaVersion'] as num?)?.toInt() ?? 1;
+    final Map<String, dynamic> payload = switch (schemaVersion) {
+      1 => json,
+      // case 2: return _migrateDrawingJsonV2(json); …
+      _ => json, // Unknown / future: best-effort if shape matches v1.
+    };
+
+    if (payload['strokes'] != null) {
+      final strokesList = payload['strokes'] as List;
       // Drop legacy Wave A–C eraser "strokes" (transparent, never rendered).
       _strokes.addAll(
         strokesList
@@ -281,7 +294,7 @@ class DrawController extends ChangeNotifier {
             .where((s) => s.tool != DrawTool.eraser),
       );
     }
-    final modeName = json['eraserMode'] as String?;
+    final modeName = payload['eraserMode'] as String?;
     if (modeName != null) {
       _eraserMode = switch (modeName) {
         'stroke' => EraserMode.stroke,

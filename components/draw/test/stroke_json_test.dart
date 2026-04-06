@@ -26,6 +26,47 @@ void main() {
       expect(c.strokes.first.samples.first.x, 1.0);
     });
 
+    test('explicit schemaVersion 1 decodes like default', () {
+      final c = DrawController();
+      c.fromJson({
+        'schemaVersion': 1,
+        'strokes': [
+          {
+            'samples': [
+              {'x': 0.0, 'y': 0.0},
+              {'x': 1.0, 'y': 2.0},
+            ],
+            'color': 0xff000000,
+            'strokeWidth': 2.0,
+            'tool': 'pen',
+            'pressureEnabled': true,
+          },
+        ],
+      });
+      expect(c.strokes.length, 1);
+      expect(c.strokes.first.samples.length, 2);
+    });
+
+    test('unknown high schemaVersion still decodes v1-shaped payload', () {
+      final c = DrawController();
+      c.fromJson({
+        'schemaVersion': 999,
+        'strokes': [
+          {
+            'samples': [
+              {'x': 0.0, 'y': 0.0},
+            ],
+            'color': 0xff000000,
+            'strokeWidth': 2.0,
+            'tool': 'pen',
+            'pressureEnabled': true,
+          },
+        ],
+      });
+      expect(c.strokes.length, 1);
+      expect(c.strokes.first.samples.first.x, 0.0);
+    });
+
     test('schema v1 round-trip', () {
       final c = DrawController();
       c.addStroke(

@@ -77,15 +77,15 @@ flowchart TB
 | **Wave C — Pen UX** | **Complete** — pressure **`Switch`** in [`SloteDrawScaffold`](../lib/src/ui/slote_draw_scaffold.dart); straight line via **speed + dwell** (**700 ms** contiguous, **~140 px/s** max speed, **28 px** hold radius, doc space) in [`straight_line_snap.dart`](../lib/src/stroke/straight_line_snap.dart) + [`draw_canvas.dart`](../lib/src/draw_canvas.dart); fixed chord preview after lock; **`StrokeRenderer`** for preview and commit. |
 | **Wave D — Stroke eraser** | **Complete** — polyline distance + fixed disc ([`kDefaultEraserDiameterDoc`](../lib/src/stroke/stroke_hit_geometry.dart)); **D2** splits strokes along the eraser footprint ([`stroke_eraser_split.dart`](../lib/src/stroke/stroke_eraser_split.dart)); **`fromJson`** drops legacy eraser entries. |
 | **Wave E — Ink undo/redo** | **Complete** — snapshots + eraser gesture grouping ([`draw_controller.dart`](../lib/src/draw_controller.dart), [`draw_canvas.dart`](../lib/src/draw_canvas.dart)); scaffold **`undoRedoListenable`** UI ([`slote_draw_scaffold.dart`](../lib/src/ui/slote_draw_scaffold.dart)); tests in [`draw_ink_undo_test.dart`](../test/draw_ink_undo_test.dart). |
-| **Editor alignment** | Main app uses **`SloteDrawScaffold`** in a **fixed-height footer** below the editor — **no** shared live **`Matrix4`** with the editor yet (optional transform defaults to identity). **Wave G** composes **`package:viewport`**. |
+| **Wave F — Integration hooks + JSON** | **Complete** — [`create_note.dart`](../../../lib/src/views/create_note.dart) passes **`documentTransform`** (identity until G) and optional **`onStrokeCaptureActiveChanged`** for viewport **`isDrawingActive`**; [`SloteDrawScaffold`](../lib/src/ui/slote_draw_scaffold.dart) bubbles that callback; [`draw_controller.dart`](../lib/src/draw_controller.dart) **`fromJson`** reads **`schemaVersion`** with forward-compatible default branch; tests in [`stroke_json_test.dart`](../test/stroke_json_test.dart). |
+| **Editor alignment** | Main app uses **`SloteDrawScaffold`** in a **fixed-height footer** below the editor — **`Matrix4`** is wired from state (**identity** today). **Same transform as the editor** under **`ZoomPanSurface`** is **Wave G**. |
 | **Viewport in product** | Root **`pubspec.yaml`** already lists **`viewport`**, but [`create_note.dart`](../../../lib/src/views/create_note.dart) does not import **`package:viewport`** yet. Pan/zoom/scroll for the note page is **Wave G**, not shipped. |
-| **Persistence** | **`Note.drawingData`** JSON via `DrawController.toJson` / `fromJson` in [`create_note.dart`](../../../lib/src/views/create_note.dart); **`schemaVersion: 1`** for new saves, legacy payloads still load; **`fromJson`** strips saved **`eraser`** tool strokes (pre–Wave D cruft). |
+| **Persistence** | **`Note.drawingData`** JSON via `DrawController.toJson` / `fromJson` in [`create_note.dart`](../../../lib/src/views/create_note.dart); **`schemaVersion: 1`** for new saves; **`fromJson`** honors optional **`schemaVersion`** (defaults to 1, unknown versions best-effort decode); legacy **`points`** strokes and stripping saved **`eraser`** tool strokes remain in [`Stroke.fromJson`](../lib/src/stroke/stroke.dart) / controller. |
 
 ## Next (Slote-focused)
 
-1. **Wave F:** JSON migration, APIs for transform + flags consumed by the note shell.
-2. **Wave G:** End-to-end **viewport + editor + ink** in `create_note` (see table below).
-3. **Optional later:** note-level unified undo (chronological typing + ink) — not **Wave E**; requires orchestrator or stroke-in-document model (see [Undo/redo (ink vs editor)](#undoredo-ink-vs-editor)).
+1. **Wave G:** End-to-end **viewport + editor + ink** in `create_note` (see table below).
+2. **Optional later:** note-level unified undo (chronological typing + ink) — not **Wave E**; requires orchestrator or stroke-in-document model (see [Undo/redo (ink vs editor)](#undoredo-ink-vs-editor)).
 
 ---
 
@@ -150,6 +150,10 @@ Waves build on each other. After each major wave, run **`components/draw/example
 | **F1 — Transform parity** | With Wave G: drawing layer and editor sit under the **same** **`ZoomPanSurface`** **`Transform`**; ink uses the same **`Matrix4`** as blocks. |
 | **F2 — JSON / migration** | Evolve `DrawController.toJson` / `fromJson` with the new stroke sample shape; keep **backward compatibility** for existing `drawingData` in the wild. |
 | **F3 — Product wiring** | [`create_note.dart`](../../../lib/src/views/create_note.dart) already wires **`DrawController`**, **`SloteDrawScaffold`**, and **`drawingData`** — extend for transform injection and viewport flags (ink undo/redo ships in **`SloteDrawScaffold`** from Wave E; app bar mirroring is optional). |
+
+**Status: complete (F2, F3)** — [`draw_controller.dart`](../lib/src/draw_controller.dart) (version-aware **`fromJson`**, doc policy); [`slote_draw_scaffold.dart`](../lib/src/ui/slote_draw_scaffold.dart) (**`onStrokeCaptureActiveChanged`** for parents); [`create_note.dart`](../../../lib/src/views/create_note.dart) (**`documentTransform`** + capture callback); [`stroke_json_test.dart`](../test/stroke_json_test.dart).
+
+**F1 — Transform parity:** **API ready** — ink already consumes **`documentTransform`** on [`DrawCanvas`](../lib/src/draw_canvas.dart). **Same live `Matrix4` as the editor** under one **`ZoomPanSurface`** **`Transform`** ships in **Wave G** (see [Wave G](#wave-g--note-shell-viewport--editor--ink)).
 
 ### Wave G — Note shell: viewport + editor + ink
 
