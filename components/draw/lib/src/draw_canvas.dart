@@ -11,13 +11,26 @@ import 'stroke/stroke_eraser_visual.dart';
 
 /// Canvas widget for drawing.
 ///
-/// Strokes are stored in **document space**. [documentTransform] maps document
-/// coordinates to this widget's local coordinates (paint uses the same matrix).
+/// Strokes are stored in **document space**.
 ///
-/// **Wave B:** Uses a [Listener] and **active pointer count** — samples are
-/// added only while exactly **one** pointer is down. A **second** pointer
-/// **commits** the in-progress stroke (partial) so parents can clear
-/// [isDrawingActive] and allow viewport pinch-zoom — see package roadmap.
+/// [documentTransform] is a **document → this widget’s local** mapping used for
+/// both sampling (local → document via inverse) and painting (document → local
+/// via canvas transform).
+///
+/// **Integration note (important):**
+///
+/// - If this `DrawCanvas` is placed **inside the same `Transform`** as the
+///   document/editor (e.g. under `ViewportSurface` / `ZoomPanSurface`), keep
+///   [documentTransform] as **identity** (omit it). The viewport’s transform
+///   will already apply to both ink and text.
+/// - If this `DrawCanvas` is an **overlay outside** that `Transform` (painted in
+///   viewport coordinates), pass the live viewport matrix so ink stays “stuck to
+///   paper” while zooming and panning.
+///
+/// **Wave B:** Uses a [Listener] and **active pointer count** — ink (preview and
+/// commit) happens **only while exactly one** pointer is down. A second (or
+/// further) pointer **discards** the in-progress stroke without committing or
+/// adding an undo step, so multi-touch is free for pinch/zoom/pan.
 ///
 /// **Wave C:** Speed + dwell straight line ([StraightLineHoldConfig]): slow
 /// movement inside a hold radius for [StraightLineHoldConfig.dwellDuration]
@@ -47,8 +60,8 @@ class DrawCanvas extends StatefulWidget {
   /// Document → local; identity when the canvas is not inside a zoom/pan shell.
   final Matrix4 documentTransform;
 
-  /// Called when in-progress stroke capture starts or ends (commit, partial
-  /// commit on second finger, cancel, or [isDrawingMode] turned off).
+  /// Called when in-progress stroke capture starts or ends (commit, multi-touch
+  /// discard, cancel, or [isDrawingMode] turned off).
   final ValueChanged<bool>? onStrokeCaptureActiveChanged;
 
   @override
@@ -78,6 +91,9 @@ class _DrawCanvasState extends State<DrawCanvas> {
 
   /// True after eraser pointer-down opened an ink undo group (Wave E).
   bool _eraserInkUndoGroupOpen = false;
+
+  /// Pointer id that owns the current in-progress stroke; commit only on its up.
+  int? _drawingPointerId;
 
   @override
   void initState() {
@@ -169,43 +185,42 @@ class _DrawCanvasState extends State<DrawCanvas> {
   }
 
   void _handlePointerDown(PointerDownEvent event) {
-    final hadNone = _activePointers.isEmpty;
     _activePointers.add(event.pointer);
 
     if (!widget.isDrawingMode) return;
 
-    if (_currentSamples != null && _activePointers.length == 2) {
-      _commitAndClearInProgress();
+    if (_activePointers.length != 1) {
+      _discardInProgress();
       return;
     }
 
-    if (hadNone && _activePointers.length == 1) {
-      final doc = _localToDocument(event.localPosition);
-      final isEraser = widget.controller.currentTool == DrawTool.eraser;
-      setState(() {
-        _holdTracker.reset();
-        _clearStraightLock();
-        _currentSamples = [
-          StrokeSample(doc.dx, doc.dy, _pressureForSample(event)),
-        ];
-        _currentColor = widget.controller.currentColor;
-        _currentStrokeWidth = widget.controller.currentStrokeWidth;
-        _currentTool = widget.controller.currentTool;
-        _lastDocForHold = doc;
-        _lastPointerStamp = event.timeStamp;
-      });
-      if (isEraser) {
-        widget.controller.beginInkUndoGroup();
-        _eraserInkUndoGroupOpen = true;
-      }
-      _startHoldPoll();
-      _notifyCaptureActive(true);
+    final doc = _localToDocument(event.localPosition);
+    final isEraser = widget.controller.currentTool == DrawTool.eraser;
+    _drawingPointerId = event.pointer;
+    setState(() {
+      _holdTracker.reset();
+      _clearStraightLock();
+      _currentSamples = [
+        StrokeSample(doc.dx, doc.dy, _pressureForSample(event)),
+      ];
+      _currentColor = widget.controller.currentColor;
+      _currentStrokeWidth = widget.controller.currentStrokeWidth;
+      _currentTool = widget.controller.currentTool;
+      _lastDocForHold = doc;
+      _lastPointerStamp = event.timeStamp;
+    });
+    if (isEraser) {
+      widget.controller.beginInkUndoGroup();
+      _eraserInkUndoGroupOpen = true;
     }
+    _startHoldPoll();
+    _notifyCaptureActive(true);
   }
 
   void _handlePointerMove(PointerMoveEvent event) {
     if (!widget.isDrawingMode || _activePointers.length != 1) return;
     if (_currentSamples == null) return;
+    if (event.pointer != _drawingPointerId) return;
 
     final doc = _localToDocument(event.localPosition);
     final tool = _currentTool ?? widget.controller.currentTool;
@@ -244,15 +259,19 @@ class _DrawCanvasState extends State<DrawCanvas> {
   }
 
   void _handlePointerUp(PointerUpEvent event) {
+    final shouldCommit =
+        _drawingPointerId == event.pointer && _currentSamples != null;
     _activePointers.remove(event.pointer);
-    if (_currentSamples != null) {
+    if (shouldCommit) {
       _commitAndClearInProgress();
     }
   }
 
   void _handlePointerCancel(PointerCancelEvent event) {
     _activePointers.remove(event.pointer);
-    _discardInProgress();
+    if (event.pointer == _drawingPointerId) {
+      _discardInProgress();
+    }
   }
 
   void _commitAndClearInProgress() {
@@ -260,6 +279,7 @@ class _DrawCanvasState extends State<DrawCanvas> {
     final samples = _currentSamples;
     if (samples == null || samples.isEmpty) {
       setState(() {
+        _drawingPointerId = null;
         _currentSamples = null;
         _currentColor = null;
         _currentStrokeWidth = null;
@@ -286,6 +306,7 @@ class _DrawCanvasState extends State<DrawCanvas> {
       widget.controller.eraseStrokesHitByEraserPath(committedSamples);
       _endEraserInkUndoGroupIfOpen();
       setState(() {
+        _drawingPointerId = null;
         _currentSamples = null;
         _currentColor = null;
         _currentStrokeWidth = null;
@@ -306,6 +327,7 @@ class _DrawCanvasState extends State<DrawCanvas> {
     );
     widget.controller.addStroke(stroke);
     setState(() {
+      _drawingPointerId = null;
       _currentSamples = null;
       _currentColor = null;
       _currentStrokeWidth = null;
@@ -318,6 +340,7 @@ class _DrawCanvasState extends State<DrawCanvas> {
 
   void _discardInProgress() {
     _cancelHoldPoll();
+    _drawingPointerId = null;
     if (_currentSamples == null) return;
     _endEraserInkUndoGroupIfOpen();
     setState(() {

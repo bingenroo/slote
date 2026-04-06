@@ -38,7 +38,8 @@ void main() {
     expect(controller.strokes.first.samples.length, greaterThan(1));
   });
 
-  testWidgets('second pointer commits partial and clears capture active', (tester) async {
+  testWidgets('second pointer discards in-progress stroke; no commit; no undo debt',
+      (tester) async {
     final controller = DrawController();
     final captureStates = <bool>[];
 
@@ -70,13 +71,14 @@ void main() {
     final g2 = await tester.startGesture(center + const Offset(80, 0), pointer: 2);
     await tester.pump();
 
-    expect(controller.strokes.length, 1);
+    expect(controller.strokes, isEmpty);
     expect(captureStates.last, false);
+    expect(controller.canUndo, false);
 
     await g1.up();
     await g2.up();
     await tester.pump();
-    expect(controller.strokes.length, 1);
+    expect(controller.strokes, isEmpty);
   });
 
   testWidgets('PointerCancel discards in-progress stroke', (tester) async {

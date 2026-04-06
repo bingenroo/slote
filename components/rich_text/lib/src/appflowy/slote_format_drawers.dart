@@ -181,9 +181,10 @@ class _SloteLinkSheetBodyState extends State<_SloteLinkSheetBody> {
   }
 }
 
-/// Preset colors for the example format drawer (hex without alpha, AppFlowy style).
-const List<Color> kSloteTextColorSwatches = [
-  Color(0xFF000000),
+/// Preset text colors for **light** mode (first swatch matches readable body on
+/// light surfaces; avoids trapping users with near-black in dark mode).
+const List<Color> kSloteTextColorSwatchesLight = [
+  Color(0xFF212121),
   Color(0xFF424242),
   Color(0xFFB71C1C),
   Color(0xFFE65100),
@@ -193,7 +194,22 @@ const List<Color> kSloteTextColorSwatches = [
   Color(0xFF6A1B9A),
 ];
 
-const List<Color> kSloteHighlightSwatches = [
+/// Preset text colors for **dark** mode (no near-black; first is theme-aligned).
+List<Color> kSloteTextColorSwatchesDark(ColorScheme scheme) => [
+      scheme.onSurface,
+      const Color(0xFFB0BEC5),
+      const Color(0xFFEF9A9A),
+      const Color(0xFFFFAB40),
+      const Color(0xFFFFF59D),
+      const Color(0xFFA5D6A7),
+      const Color(0xFF90CAF9),
+      const Color(0xFFCE93D8),
+    ];
+
+/// Kept for backward compatibility; prefer [kSloteTextColorSwatchesLight].
+const List<Color> kSloteTextColorSwatches = kSloteTextColorSwatchesLight;
+
+const List<Color> kSloteHighlightSwatchesLight = [
   Color(0xFFFFE082),
   Color(0xFFFFAB91),
   Color(0xFF80CBC4),
@@ -201,6 +217,31 @@ const List<Color> kSloteHighlightSwatches = [
   Color(0xFFF48FB1),
   Color(0xFFBCAAA4),
 ];
+
+/// Slightly stronger tints for dark surfaces.
+const List<Color> kSloteHighlightSwatchesDark = [
+  Color(0xFFFFD54F),
+  Color(0xFFFF8A65),
+  Color(0xFF4DB6AC),
+  Color(0xFF7986CB),
+  Color(0xFFF06292),
+  Color(0xFFA1887F),
+];
+
+/// Kept for backward compatibility; prefer [kSloteHighlightSwatchesLight].
+const List<Color> kSloteHighlightSwatches = kSloteHighlightSwatchesLight;
+
+List<Color> sloteTextColorSwatchesForTheme(ColorScheme scheme) {
+  return scheme.brightness == Brightness.dark
+      ? kSloteTextColorSwatchesDark(scheme)
+      : kSloteTextColorSwatchesLight;
+}
+
+List<Color> sloteHighlightSwatchesForTheme(ColorScheme scheme) {
+  return scheme.brightness == Brightness.dark
+      ? kSloteHighlightSwatchesDark
+      : kSloteHighlightSwatchesLight;
+}
 
 /// Text + highlight swatches in one format drawer.
 void showSloteColorFormatDrawer(
@@ -249,6 +290,9 @@ class _SloteColorSheetContent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final textSwatches = sloteTextColorSwatchesForTheme(scheme);
+    final highlightSwatches = sloteHighlightSwatchesForTheme(scheme);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -268,7 +312,7 @@ class _SloteColorSheetContent extends StatelessWidget {
                 if (context.mounted) Navigator.of(context).pop();
               },
             ),
-            ...kSloteTextColorSwatches.map(
+            ...textSwatches.map(
               (c) => _ColorDot(
                 color: c,
                 onTap: () async {
@@ -296,7 +340,7 @@ class _SloteColorSheetContent extends StatelessWidget {
                 if (context.mounted) Navigator.of(context).pop();
               },
             ),
-            ...kSloteHighlightSwatches.map(
+            ...highlightSwatches.map(
               (c) => _ColorDot(
                 color: c,
                 onTap: () async {
@@ -321,6 +365,14 @@ class _ColorDot extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final surface = scheme.surface;
+    final dotL = Color.alphaBlend(color, surface).computeLuminance();
+    final surfaceL = surface.computeLuminance();
+    final similar = (dotL - surfaceL).abs() < 0.12;
+    final borderColor = scheme.outline.withValues(alpha: similar ? 0.9 : 0.45);
+    final borderWidth = similar ? 2.0 : 1.0;
+
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -333,7 +385,8 @@ class _ColorDot extends StatelessWidget {
             color: color,
             shape: BoxShape.circle,
             border: Border.all(
-              color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.4),
+              color: borderColor,
+              width: borderWidth,
             ),
           ),
         ),

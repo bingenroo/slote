@@ -48,10 +48,6 @@ class _CreateNoteViewState extends State<CreateNoteView> {
   bool _isDrawingMode = false;
   bool _isDrawDrawerOpen = false;
 
-  /// Document → canvas local for ink. Wave G: mutate in place or copy from
-  /// `ZoomPanSurface.onTransformChanged` (and rebuild).
-  final Matrix4 _drawingDocumentTransform = Matrix4.identity();
-
   /// In-progress stroke or eraser drag. Wave G: pass to viewport `isDrawingActive`.
   // ignore: unused_field
   bool _isDrawingActive = false;
@@ -327,9 +323,6 @@ class _CreateNoteViewState extends State<CreateNoteView> {
               contentHeight: 4000,
               isDrawingMode: _isDrawingMode,
               isDrawingActive: _isDrawingActive,
-              onTransformChanged: (m) {
-                setState(() => _drawingDocumentTransform.setFrom(m));
-              },
               child: SizedBox(
                 width: constraints.maxWidth,
                 height: constraints.maxHeight,
@@ -347,7 +340,6 @@ class _CreateNoteViewState extends State<CreateNoteView> {
                         child: SloteDrawScaffold(
                           controller: _drawController,
                           isDrawingMode: _isDrawingMode,
-                          documentTransform: _drawingDocumentTransform,
                           onStrokeCaptureActiveChanged: (active) {
                             if (_isDrawingActive == active) return;
                             setState(() => _isDrawingActive = active);

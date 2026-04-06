@@ -154,7 +154,7 @@ void main() {
           Selection.single(path: [0], startOffset: 2, endOffset: 2).normalized;
       es.selection = caret;
 
-      final hex = kSloteDefaultHighlightColor.toHex();
+      final hex = sloteDefaultHighlightHex(const ColorScheme.light());
       await sloteApplyHighlightColor(es, caret, hex);
       expect(es.toggledStyle[AppFlowyRichTextKeys.backgroundColor], hex);
     });

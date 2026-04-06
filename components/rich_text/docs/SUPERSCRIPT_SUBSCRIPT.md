@@ -2,7 +2,7 @@
 
 AppFlowy Editor does **not** ship first-class superscript/subscript for rich text. Slote adds them as **custom delta attributes**, **custom rendering** (via the editor’s text-span decorator hook), **caret helpers** on a small **fork** of `appflowy_editor`, and **markdown import/export** in `package:rich_text`.
 
-For product planning and waves, see [ROADMAP.md](ROADMAP.md). For fork-level caret/EOT behavior, see [appflowy-editor-roadmap.md](appflowy-editor-roadmap.md) § “Slote fork: caret height at EOT & sup/sub layout”.
+For product planning and waves, see [ROADMAP.md](ROADMAP.md) (rolling **sup/sub caret** status). For fork-level caret/EOT behavior, see [appflowy-editor-roadmap.md](appflowy-editor-roadmap.md) § “Slote fork: caret height at EOT & sup/sub layout”.
 
 ---
 
@@ -14,7 +14,7 @@ For product planning and waves, see [ROADMAP.md](ROADMAP.md). For fork-level car
 | **Slote-only keys** | `slote_superscript` and `slote_subscript` (see [`slote_inline_attributes.dart`](../lib/src/appflowy/slote_inline_attributes.dart)). Value is **`true`** when on, **absent** / cleared when off. The two are **mutually exclusive**; if both appear, **superscript wins**. |
 | **Typing style** | AppFlowy merges **paragraph slice attributes** with **`EditorState.toggledStyle`** on each insert. Slote registers its keys on `AppFlowyRichTextKeys.supportToggled` / `supportSliced` so IME/debug paths accept them. |
 | **Rendering** | Not plain `TextStyle.baselineShift` (unreliable in the Flutter version this was built against). Slote uses **`WidgetSpan`** + **`PlaceholderAlignment.aboveBaseline` / `belowBaseline`** + scaled font + padding. |
-| **Caret** | **`EditorStyle.caretMetrics`** (`sloteCaretMetrics`) aligns the caret with script-sized text; **`endOfParagraphCaretHeight` / `endOfParagraphCaretMetrics`** fix tall/small cursors at paragraph end when the next insertion might be body vs script. |
+| **Caret** | **`EditorStyle.caretMetrics`** (`sloteCaretMetrics`) aligns the caret with script-sized text; **`endOfParagraphCaretHeight` / `endOfParagraphCaretMetrics`** align paragraph-end height with **incoming** body vs script (EOT path; much improved Apr 2026). **Subscript in-run** (moving back from body into a sub run; typing new subscript) can still mismatch height or clip — see §8. |
 
 ---
 
@@ -54,7 +54,8 @@ Defined in [`slote_text_span_decorator.dart`](../lib/src/appflowy/slote_text_spa
 ## 5. Caret metrics
 
 - **General positions:** [`slote_caret_metrics.dart`](../lib/src/appflowy/slote_caret_metrics.dart) — script-sized caret height, padding, and **y** nudges tuned for sup vs sub and for toggled vs slice state.
-- **End of paragraph:** [`slote_end_of_paragraph_caret_height.dart`](../lib/src/appflowy/slote_end_of_paragraph_caret_height.dart) — coordinates with **`EditorState.toggledStyle`** and paragraph tail attributes so the EOT caret height matches **what the next typed character will be** (body vs superscript vs subscript).
+- **End of paragraph:** [`slote_end_of_paragraph_caret_height.dart`](../lib/src/appflowy/slote_end_of_paragraph_caret_height.dart) — coordinates with **`EditorState.toggledStyle`** and paragraph tail attributes so the EOT caret height matches **what the next typed character will be** (body vs superscript vs subscript). This addressed the “caret after last char bigger than in-run” class of bugs (Apr 2026).
+- **Debug:** rich_text example can log `DBG-CARET … height=… rect=…` lines to compare **in-run** vs **EOT** rects when diagnosing subscript.
 
 Unit coverage: `slote_caret_metrics_test.dart`, `slote_sup_sub_metrics_test.dart`, `appflowy_editor_support_test.dart`.
 
@@ -95,7 +96,7 @@ Use **`standardCommandShortcutsWithSloteInlineHandlers`** (or your own) so keybo
 
 1. **No nested script** — You cannot stack superscript on superscript, subscript on subscript, or mix sup inside sub in the model/UI.
 2. **Link + script** — Multi-character hyperlink runs with script use **one** `WidgetSpan`; fine-grained caret behavior may differ from **plain** script runs (by design).
-3. **Residual edge cases** — Mixed line layouts, platform IMEs, and placeholder merging can still surface minor glitches; fork hooks above exist specifically to mitigate the worst caret-height issues at EOT.
+3. **Residual edge cases** — Mixed line layouts, platform IMEs, and placeholder merging can still surface glitches. **EOT:** paragraph-end vs in-line height is largely handled by the fork hooks above. **Subscript (known open):** caret may render **too tall** relative to subscript glyphs when **navigating back** from body into an existing sub run; caret may appear **clipped** while **typing** new subscript (different code path than EOT). Reproduce with the example app and `DBG-CARET` output.
 
 ---
 

@@ -2,9 +2,9 @@
 
 ## Slote - Cross-Platform Note-Taking Application
 
-### Version: 2.2
+### Version: 2.3
 
-### Last Updated: April 4, 2026
+### Last Updated: April 7, 2026
 
 ---
 
@@ -98,7 +98,7 @@ Rich text editing for Slote on **AppFlowy Editor** with **Document JSON** as the
 | ---- | ----------- |
 | **`lib/`** | **Active** — exports `RichTextEditorController`, **`SloteRichTextEditorScaffold`**, **`FormatToolbar`** (shared with the main app), AppFlowy helpers, markdown codec, **`sloteEditorUndo` / `sloteEditorRedo`** wrappers, `undoRedoListenable`, outline collection (`sloteCollectOutlineEntries`). Root **`dependency_overrides`** point **`appflowy_editor`** at **[components/appflowy_editor](components/appflowy_editor)** (fork). |
 | **`example/`** | **Spike / sandbox** — same public APIs as the app plus JSON logging; used for editor experiments. |
-| **Roadmap** | **[components/rich_text/docs/ROADMAP.md](components/rich_text/docs/ROADMAP.md)** — rolling status: foundation (Phases 1–4) and **Wave B** inline work largely **shipped** (sup/sub, links drawer, font size/family, text color/highlight, alignment, clear formatting). **Wave C1–C5** **delivered** (headings through **H5**, bulleted/numbered/checkbox lists, quote, divider, plain code block, callout). **Wave D — outline/TOC** **delivered** in scaffold + `create_note`. **C6–C7** (tables, images): basic toolbar insert exists; full editing UX and app-level storage/picker are **deferred**. **Wave E** (theming bridge, mobile/desktop polish, performance) and formula/LaTeX remain **next**. |
+| **Roadmap** | **[components/rich_text/docs/ROADMAP.md](components/rich_text/docs/ROADMAP.md)** — rolling status: foundation (Phases 1–4) and **Wave B** inline work largely **shipped** (sup/sub, links drawer, font size/family, text color/highlight, alignment, clear formatting). **Sup/sub caret:** end-of-paragraph height vs body text largely **addressed** (Apr 2026); **subscript** still has **in-run** polish items (caret too tall when moving back from body into a sub run; clipping while typing). **Wave C1–C5** **delivered** (headings through **H5**, bulleted/numbered/checkbox lists, quote, divider, plain code block, callout). **Wave D — outline/TOC** **delivered** in scaffold + `create_note`. **C6–C7** (tables, images): basic toolbar insert exists; full editing UX and app-level storage/picker are **deferred**. **Wave E** (theming bridge, mobile/desktop polish, performance) and formula/LaTeX remain **next**. |
 | **AppFlowy checklist** | **[components/rich_text/docs/appflowy-editor-roadmap.md](components/rich_text/docs/appflowy-editor-roadmap.md)** — historical milestone list; prefer the main rich_text ROADMAP for current status. |
 | **Legacy** | Former **Quill + markdown** design is **archived in prose** only: [components/rich_text/IMPLEMENTATION.md](components/rich_text/IMPLEMENTATION.md). |
 
@@ -329,9 +329,9 @@ The following sections align with the **Cleaned Up Feature List** and roadmap ph
 
 **Engineering direction:** **`components/rich_text`** on **AppFlowy Editor** (vendored **`appflowy_editor`** fork), **Document JSON** as canonical storage; phased delivery in [components/rich_text/docs/ROADMAP.md](components/rich_text/docs/ROADMAP.md).
 
-**Shipped in codebase (high level):** BIUS, headings through **H5**, lists (bulleted, numbered, checkbox), quote, divider, plain code block, callout, links (with format drawer), font size/family, text color and highlight, alignment, clear formatting, superscript/subscript (with documented limitations), **outline/TOC** in the editor scaffold, editor undo/redo via AppFlowy history.
+**Shipped in codebase (high level):** BIUS, headings through **H5**, lists (bulleted, numbered, checkbox), quote, divider, plain code block, callout, links (with format drawer), font size/family, text color and highlight, alignment, clear formatting, superscript/subscript (Slote fork **caret metrics** + **end-of-paragraph** helpers; **EOT vs in-line** sizing largely fixed Apr 2026 — see [components/rich_text/docs/ROADMAP.md](components/rich_text/docs/ROADMAP.md)), **outline/TOC** in the editor scaffold, editor undo/redo via AppFlowy history.
 
-**MVP (product) gaps vs. vision:** In-note **Find (Ctrl+F)** and full **table** editing UX are not product-complete in the root app yet; tables/images have partial toolbar hooks — see ROADMAP **C6–C7**.
+**MVP (product) gaps vs. vision:** In-note **Find (Ctrl+F)** and full **table** editing UX are not product-complete in the root app yet; tables/images have partial toolbar hooks — see ROADMAP **C6–C7**. **Sup/sub engineering:** subscript may still show a **taller-than-run** caret when **moving the caret back** from body into an existing sub run, or a **clipped** caret while **typing** new subscript — ongoing Wave B polish in `package:rich_text` (debug via `DBG-CARET` in example runs).
 
 **v1.1:** Find and Replace (Ctrl+H). TOC “scroll hover preview” may evolve with Wave E polish.
 
@@ -802,7 +802,7 @@ _(Plain **code blocks** are in place ([rich_text ROADMAP](components/rich_text/d
 | Feature                                                   | Phase                           | Notes                                            |
 | --------------------------------------------------------- | ------------------------------- | ------------------------------------------------ |
 | Draw + Type (pen, eraser, colors, layer separation)       | MVP                             | **In app:** `package:draw` footer + persistence; **roadmap:** `perfect_freehand`, **`package:viewport`** shell (**[Wave G](components/draw/docs/ROADMAP.md#wave-g--note-shell-viewport--editor--ink)**), ink undo ([draw ROADMAP](components/draw/docs/ROADMAP.md)) |
-| Rich text (bold, italic, headings, lists, highlight)      | MVP                             | **Largely in** `rich_text` + note screen; see [rich_text ROADMAP](components/rich_text/docs/ROADMAP.md) |
+| Rich text (bold, italic, headings, lists, highlight)      | MVP                             | **Largely in** `rich_text` + note screen; see [rich_text ROADMAP](components/rich_text/docs/ROADMAP.md). **Sup/sub:** feature shipped; **subscript** caret polish (re-entry from body, typing clip) still in flight (Apr 2026). |
 | Doc elements (dividers, code blocks, blockquotes, tables) | MVP                             | **C1–C5** blocks shipped; **tables** = partial (insert vs full UX per ROADMAP C6) |
 | Find (Ctrl+F)                                             | MVP                             | **Not in root app yet**; Replace in v1.1         |
 | Folder hierarchy (Finder/Explorer model)                  | MVP                             | **Not in root app yet**; table stakes for product |

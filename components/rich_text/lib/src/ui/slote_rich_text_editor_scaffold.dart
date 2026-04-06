@@ -163,18 +163,57 @@ class SloteRichTextEditorScaffoldState extends State<SloteRichTextEditorScaffold
     );
   }
 
+  /// [AppFlowyEditor] default styles come from [EditorStyle.desktop]/[.mobile]
+  /// (black text). Map cursor, selection, and base text from [Theme] so light /
+  /// dark mode matches the host app.
+  EditorStyle _editorStyleForTheme(BuildContext context, {required bool desktop}) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final selectionTheme = theme.textSelectionTheme;
+    final base = desktop ? EditorStyle.desktop() : EditorStyle.mobile();
+    final body = theme.textTheme.bodyLarge ?? const TextStyle(fontSize: 16);
+    final baseTextStyle = base.textStyleConfiguration.text.merge(
+      body.copyWith(
+        color: body.color ?? scheme.onSurface,
+        fontSize: body.fontSize ?? 16,
+      ),
+    );
+    final cursor = selectionTheme.cursorColor ??
+        selectionTheme.selectionHandleColor ??
+        scheme.primary;
+    final selectionColor =
+        selectionTheme.selectionColor ??
+        scheme.primary.withValues(alpha: 0.35);
+    return base.copyWith(
+      cursorColor: cursor,
+      dragHandleColor: cursor,
+      selectionColor: selectionColor,
+      textStyleConfiguration: base.textStyleConfiguration.copyWith(
+        text: baseTextStyle,
+        href: base.textStyleConfiguration.href.copyWith(
+          color: scheme.primary,
+        ),
+        code: base.textStyleConfiguration.code.copyWith(
+          color: scheme.onSurface,
+          backgroundColor: scheme.surfaceContainerHighest.withValues(alpha: 0.65),
+        ),
+        autoComplete: base.textStyleConfiguration.autoComplete.copyWith(
+          color: scheme.onSurfaceVariant,
+        ),
+      ),
+      textSpanDecorator: sloteTextSpanDecoratorForAttribute,
+      caretMetrics: sloteCaretMetrics,
+      endOfParagraphCaretHeight: sloteEndOfParagraphCaretHeight,
+      endOfParagraphCaretMetrics: sloteEndOfParagraphCaretMetrics,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final es = widget.controller.editorState;
     final wideChrome =
         MediaQuery.sizeOf(context).width >= widget.editorStyleBreakpoint;
-    final editorStyle =
-        (wideChrome ? EditorStyle.desktop() : EditorStyle.mobile()).copyWith(
-          textSpanDecorator: sloteTextSpanDecoratorForAttribute,
-          caretMetrics: sloteCaretMetrics,
-          endOfParagraphCaretHeight: sloteEndOfParagraphCaretHeight,
-          endOfParagraphCaretMetrics: sloteEndOfParagraphCaretMetrics,
-        );
+    final editorStyle = _editorStyleForTheme(context, desktop: wideChrome);
 
     final wideOutline =
         MediaQuery.sizeOf(context).width >= widget.outlineWideBreakpoint;

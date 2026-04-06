@@ -33,7 +33,6 @@ class _DrawExampleScreenState extends State<_DrawExampleScreen> {
   late DrawController _drawController;
   bool _isDrawingMode = true;
   bool _isDrawingActive = false;
-  final Matrix4 _documentTransform = Matrix4.identity();
 
   @override
   void initState() {
@@ -52,6 +51,11 @@ class _DrawExampleScreenState extends State<_DrawExampleScreen> {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    const pagePadding = EdgeInsets.symmetric(
+      horizontal: 24,
+      vertical: 16,
+    );
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Draw Example'),
@@ -67,47 +71,62 @@ class _DrawExampleScreenState extends State<_DrawExampleScreen> {
       ),
       body: LayoutBuilder(
         builder: (context, constraints) {
-          return ViewportSurface(
-            viewportHeight: constraints.maxHeight,
-            contentHeight: 2400,
-            isDrawingMode: _isDrawingMode,
-            isDrawingActive: _isDrawingActive,
-            onTransformChanged: (m) {
-              setState(() => _documentTransform.setFrom(m));
-            },
-            child: Stack(
-              children: [
-                DecoratedBox(
-                  decoration: BoxDecoration(
-                    color: scheme.surface,
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 24,
-                      vertical: 16,
-                    ),
-                    child: _FakeDocument(
-                      isDrawingMode: _isDrawingMode,
-                    ),
-                  ),
+          return Column(
+            children: [
+              if (_isDrawingMode) ...[
+                SloteDrawAppDrawerContent(
+                  controller: _drawController,
+                  selectedToolColor: scheme.primary,
+                  selectedColorBorderColor: scheme.primary,
                 ),
-                Positioned.fill(
-                  child: SloteDrawScaffold(
-                    controller: _drawController,
-                    isDrawingMode: _isDrawingMode,
-                    documentTransform: _documentTransform,
-                    onStrokeCaptureActiveChanged: (active) {
-                      if (_isDrawingActive == active) return;
-                      setState(() => _isDrawingActive = active);
-                    },
-                    selectedToolColor: scheme.primary,
-                    selectedColorBorderColor: scheme.primary,
-                    canvasMargin: const EdgeInsets.all(16),
-                    showStatusBar: true,
-                  ),
-                ),
+                const Divider(height: 1),
               ],
-            ),
+              Expanded(
+                child: ViewportSurface(
+                  viewportHeight: constraints.maxHeight,
+                  contentHeight: 2400,
+                  isDrawingMode: _isDrawingMode,
+                  isDrawingActive: _isDrawingActive,
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: scheme.surface,
+                        border: Border.all(color: scheme.outlineVariant),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: Stack(
+                          children: [
+                            Padding(
+                              padding: pagePadding,
+                              child: _FakeDocument(isDrawingMode: _isDrawingMode),
+                            ),
+                            Positioned.fill(
+                              child: SloteDrawScaffold(
+                                controller: _drawController,
+                                isDrawingMode: _isDrawingMode,
+                                onStrokeCaptureActiveChanged: (active) {
+                                  if (_isDrawingActive == active) return;
+                                  setState(() => _isDrawingActive = active);
+                                },
+                                selectedToolColor: scheme.primary,
+                                selectedColorBorderColor: scheme.primary,
+                                canvasMargin: EdgeInsets.zero,
+                                showCanvasBorder: false,
+                                showStatusBar: true,
+                                showInlineControls: false,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
           );
         },
       ),

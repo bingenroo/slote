@@ -15,10 +15,37 @@ import 'slote_inline_attributes.dart';
 import 'slote_delta_format.dart';
 import 'slote_format_drawers.dart';
 
-// --- Spike colors (swap for Theme-driven values in the app later) ------------
+// --- Theme-aligned defaults + spike text color (tests / toggle helper) ------
 
-/// Default highlight tint (matches AppFlowy [ToggleColorsStyle]).
-const Color kSloteDefaultHighlightColor = Color(0x60FFCE00);
+/// Resolved from the mounted editor context when available; otherwise
+/// [ColorScheme.light] (e.g. headless unit tests or no [WidgetsBinding] yet).
+///
+/// Avoids reading [GlobalKey.currentContext] when the binding is not initialized
+/// (throws in plain `flutter_test` / pure Dart tests).
+ColorScheme sloteColorSchemeForEditor(EditorState editorState) {
+  try {
+    final sel = editorState.selection;
+    if (sel == null) return const ColorScheme.light();
+    final ctx = editorState.getNodeAtPath(sel.end.path)?.key.currentContext;
+    if (ctx == null || !ctx.mounted) return const ColorScheme.light();
+    return Theme.of(ctx).colorScheme;
+  } catch (_) {
+    return const ColorScheme.light();
+  }
+}
+
+/// Default highlight tint derived from [ColorScheme] (readable on [surface]).
+Color sloteDefaultHighlightColor(ColorScheme scheme) {
+  return Color.alphaBlend(
+    scheme.primaryContainer.withValues(alpha: 0.72),
+    scheme.surface,
+  );
+}
+
+/// Hex for AppFlowy delta `backgroundColor` (includes alpha; see [Color.toHex]).
+String sloteDefaultHighlightHex(ColorScheme scheme) {
+  return sloteDefaultHighlightColor(scheme).toHex();
+}
 
 /// Fixed text color used by [sloteToggleTextColor] and legacy toolbar checks.
 const Color kSloteSpikeTextColor = Color(0xFF1565C0);
@@ -57,7 +84,8 @@ Future<void> sloteToggleHighlight(EditorState editorState) async {
   if (selection == null) return;
 
   final bg = AppFlowyRichTextKeys.backgroundColor;
-  final defaultHex = kSloteDefaultHighlightColor.toHex();
+  final scheme = sloteColorSchemeForEditor(editorState);
+  final defaultHex = sloteDefaultHighlightHex(scheme);
 
   if (selection.isCollapsed) {
     final toggled = editorState.toggledStyle;
@@ -88,7 +116,7 @@ Future<void> sloteToggleHighlight(EditorState editorState) async {
   await sloteApplyHighlightColor(
     editorState,
     selection,
-    isHighlighted ? null : kSloteDefaultHighlightColor.toHex(),
+    isHighlighted ? null : defaultHex,
   );
 }
 
