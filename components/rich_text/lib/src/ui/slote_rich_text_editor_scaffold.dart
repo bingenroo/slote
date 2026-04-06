@@ -31,10 +31,13 @@ class SloteRichTextEditorScaffold extends StatefulWidget {
     this.editorStyleBreakpoint = 600,
     this.toolbarLayout = SloteToolbarLayout.verticalScroll,
     this.onInsertImageUrl,
+    this.bottomBar,
+    this.isEditorInteractive = true,
     this.outlineTitleTextStyle,
     this.outlineEmptyTextStyle,
     this.outlineEntryTextStyle,
     this.blockComponentBuilders,
+    this.bodyBuilder,
     this.bodyFooter,
   });
 
@@ -52,11 +55,26 @@ class SloteRichTextEditorScaffold extends StatefulWidget {
 
   final Future<String?> Function(BuildContext context)? onInsertImageUrl;
 
+  /// Optional override for the scaffold bottom bar (defaults to [FormatToolbar]).
+  final Widget? bottomBar;
+
+  /// When false, disables user interactions with the editor (caret/selection).
+  ///
+  /// Useful for modes like drawing where the editor should not steal gestures.
+  final bool isEditorInteractive;
+
   final TextStyle? outlineTitleTextStyle;
   final TextStyle? outlineEmptyTextStyle;
   final TextStyle? outlineEntryTextStyle;
 
   final Map<String, BlockComponentBuilder>? blockComponentBuilders;
+
+  /// Optional override for the entire scaffold body.
+  ///
+  /// The callback receives the default editor widget so note screens can wrap the
+  /// editor (e.g. overlay a drawing layer, or mount a viewport) without
+  /// re-implementing editor style/builder wiring.
+  final Widget Function(BuildContext context, Widget editor)? bodyBuilder;
 
   /// Optional panel below the editor (e.g. drawing). Kept above the format toolbar.
   final Widget? bodyFooter;
@@ -163,6 +181,20 @@ class SloteRichTextEditorScaffoldState extends State<SloteRichTextEditorScaffold
     final builders =
         widget.blockComponentBuilders ?? sloteRichTextBlockComponentBuilders;
 
+    final editor = AppFlowyEditor(
+      editorState: es,
+      editorStyle: editorStyle,
+      blockComponentBuilders: builders,
+      commandShortcutEvents: standardCommandShortcutsWithSloteInlineHandlers(),
+    );
+
+    final interactiveEditor = widget.isEditorInteractive
+        ? editor
+        : AbsorbPointer(
+            absorbing: true,
+            child: editor,
+          );
+
     return Scaffold(
       key: widget.scaffoldKey,
       endDrawer: wideOutline
@@ -200,39 +232,37 @@ class SloteRichTextEditorScaffoldState extends State<SloteRichTextEditorScaffold
           : null,
       appBar: widget.appBar,
       body: SafeArea(
-        child: widget.bodyFooter == null
-            ? AppFlowyEditor(
-                editorState: es,
-                editorStyle: editorStyle,
-                blockComponentBuilders: builders,
-                commandShortcutEvents:
-                    standardCommandShortcutsWithSloteInlineHandlers(),
-              )
-            : Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Expanded(
-                    child: AppFlowyEditor(
-                      editorState: es,
-                      editorStyle: editorStyle,
-                      blockComponentBuilders: builders,
-                      commandShortcutEvents:
-                          standardCommandShortcutsWithSloteInlineHandlers(),
-                    ),
-                  ),
-                  widget.bodyFooter!,
-                ],
-              ),
+        child: _buildBody(
+          context,
+          interactiveEditor,
+        ),
       ),
       bottomNavigationBar: SafeArea(
         top: false,
-        child: FormatToolbar(
-          editorState: es,
-          listenable: _formatBarListenable,
-          layout: widget.toolbarLayout,
-          onInsertImageUrl: widget.onInsertImageUrl,
-        ),
+        child: widget.bottomBar ??
+            FormatToolbar(
+              editorState: es,
+              listenable: _formatBarListenable,
+              layout: widget.toolbarLayout,
+              onInsertImageUrl: widget.onInsertImageUrl,
+            ),
       ),
+    );
+  }
+
+  Widget _buildBody(BuildContext context, Widget editor) {
+    final builder = widget.bodyBuilder;
+    if (builder != null) return builder(context, editor);
+
+    final footer = widget.bodyFooter;
+    if (footer == null) return editor;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Expanded(child: editor),
+        footer,
+      ],
     );
   }
 }

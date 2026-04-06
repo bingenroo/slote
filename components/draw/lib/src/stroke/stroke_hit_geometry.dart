@@ -7,11 +7,13 @@ import 'stroke.dart';
 /// hit-testing use the same value so the disc must overlap ink to erase.
 const double kDefaultEraserDiameterDoc = 24.0;
 
-double get _eraserRadiusDoc => kDefaultEraserDiameterDoc / 2;
+double _eraserRadiusDocFor(double eraserDiameterDoc) => eraserDiameterDoc / 2;
 
 /// Eraser radius plus half ink width — same value used for hit-test, split, and UX.
-double eraserReachForStroke(Stroke stroke) =>
-    _eraserRadiusDoc + strokeInkHalfWidth(stroke);
+double eraserReachForStroke(
+  Stroke stroke, {
+  double eraserDiameterDoc = kDefaultEraserDiameterDoc,
+}) => _eraserRadiusDocFor(eraserDiameterDoc) + strokeInkHalfWidth(stroke);
 
 /// True if [p] lies inside any eraser disc of radius [reachRadius] centered on
 /// [eraserPath] samples (doc space). [reachRadius] is typically
@@ -99,14 +101,21 @@ double distancePointToStrokePolyline(Offset p, List<StrokeSample> samples) {
 
 /// True when the eraser disc (fixed [kDefaultEraserDiameterDoc]) at any path
 /// sample overlaps the ink tube around [stroke]'s centerline polyline.
-bool strokeHitByEraserPath(Stroke stroke, List<StrokeSample> path) {
+bool strokeHitByEraserPath(
+  Stroke stroke,
+  List<StrokeSample> path, {
+  double eraserDiameterDoc = kDefaultEraserDiameterDoc,
+}) {
   if (path.isEmpty) return false;
   if (stroke.tool != DrawTool.pen && stroke.tool != DrawTool.highlighter) {
     return false;
   }
   if (stroke.samples.isEmpty) return false;
 
-  final reach = eraserReachForStroke(stroke);
+  final reach = eraserReachForStroke(
+    stroke,
+    eraserDiameterDoc: eraserDiameterDoc,
+  );
 
   for (final s in path) {
     final p = Offset(s.x, s.y);

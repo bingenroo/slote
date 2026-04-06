@@ -16,4 +16,5 @@ export 'src/stroke/stroke_pressure_policy.dart';
 export 'src/stroke/straight_line_snap.dart';
 export 'src/stylus/stylus_detector.dart';
 export 'src/stylus/pressure_handler.dart';
+export 'src/ui/draw_mode_bar.dart';
 export 'src/ui/slote_draw_scaffold.dart';

@@ -11,7 +11,11 @@ const double _kPosEpsSq = 1e-10;
 /// Splits [stroke] into zero or more strokes by removing portions of the
 /// centerline inside the union of eraser discs (same footprint as
 /// [strokeHitByEraserPath]).
-List<Stroke> splitStrokeByEraserPath(Stroke stroke, List<StrokeSample> eraserPath) {
+List<Stroke> splitStrokeByEraserPath(
+  Stroke stroke,
+  List<StrokeSample> eraserPath, {
+  double eraserDiameterDoc = kDefaultEraserDiameterDoc,
+}) {
   if (eraserPath.isEmpty) return [stroke];
   if (stroke.tool != DrawTool.pen && stroke.tool != DrawTool.highlighter) {
     return [stroke];
@@ -19,7 +23,10 @@ List<Stroke> splitStrokeByEraserPath(Stroke stroke, List<StrokeSample> eraserPat
   final samples = stroke.samples;
   if (samples.isEmpty) return [stroke];
 
-  final reach = eraserReachForStroke(stroke);
+  final reach = eraserReachForStroke(
+    stroke,
+    eraserDiameterDoc: eraserDiameterDoc,
+  );
 
   if (samples.length == 1) {
     final p = Offset(samples.single.x, samples.single.y);

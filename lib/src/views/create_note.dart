@@ -12,6 +12,7 @@ import 'package:slote/src/services/local_db.dart';
 import 'package:slote/src/model/note.dart';
 import 'package:slote/src/services/slote_rich_text_storage.dart';
 import 'package:theme/theme.dart';
+import 'package:viewport/viewport.dart';
 
 class CreateNoteView extends StatefulWidget {
   const CreateNoteView({super.key, this.note});
@@ -42,7 +43,10 @@ class _CreateNoteViewState extends State<CreateNoteView> {
   Timer? _titleSaveDebounceTimer;
 
   late final DrawController _drawController;
-  bool _isDrawingMode = true;
+  /// When false, the note is in read/text-first mode; tap the pen in the app bar
+  /// to show drawing tools and enable ink on the canvas.
+  bool _isDrawingMode = false;
+  bool _isDrawDrawerOpen = false;
 
   /// Document → canvas local for ink. Wave G: mutate in place or copy from
   /// `ZoomPanSurface.onTransformChanged` (and rebuild).
@@ -290,28 +294,80 @@ class _CreateNoteViewState extends State<CreateNoteView> {
       scaffoldKey: _scaffoldKey,
       controller: _richTextController,
       outline: _outline,
+      isEditorInteractive: !_isDrawingMode,
       outlineWideBreakpoint: _kOutlineWideBreakpoint,
       editorStyleBreakpoint: 600,
       toolbarLayout: SloteToolbarLayout.verticalScroll,
       outlineTitleTextStyle: outlineTitle,
       outlineEmptyTextStyle: outlineEmpty,
       outlineEntryTextStyle: outlineEntry,
-      bodyFooter: SizedBox(
-        height: 300,
-        child: Material(
-          color: Theme.of(context).colorScheme.surface,
-          child: SloteDrawScaffold(
-            controller: _drawController,
-            isDrawingMode: _isDrawingMode,
-            documentTransform: _drawingDocumentTransform,
-            onStrokeCaptureActiveChanged: (active) {
-              setState(() => _isDrawingActive = active);
-            },
-            selectedToolColor: scheme.primary,
-            selectedColorBorderColor: scheme.primary,
-          ),
-        ),
-      ),
+      bottomBar: _isDrawingMode
+          ? DrawModeBar(
+              controller: _drawController,
+              drawerTitle: 'Draw',
+              onDrawerOpenChanged: (open) {
+                if (!mounted) return;
+                setState(() => _isDrawDrawerOpen = open);
+              },
+            )
+          : null,
+      // Wave G: viewport owns pan/zoom/scroll for the note “canvas”.
+      //
+      // Scroll ownership note: AppFlowy has internal scroll behaviors; this
+      // integration treats the viewport as authoritative for wheel/trackpad and
+      // drag-to-pan when drawing is OFF. If you observe “double scroll”, we
+      // should disable or bypass AppFlowy’s internal scroll in this shell.
+      bodyBuilder: (context, editor) {
+        return LayoutBuilder(
+          builder: (context, constraints) {
+            return ViewportSurface(
+              viewportHeight: constraints.maxHeight,
+              // TODO(waveG): Measure real document height (editor + ink) and feed
+              // it here so BoundaryManager clamps correctly.
+              contentHeight: 4000,
+              isDrawingMode: _isDrawingMode,
+              isDrawingActive: _isDrawingActive,
+              onTransformChanged: (m) {
+                setState(() => _drawingDocumentTransform.setFrom(m));
+              },
+              child: SizedBox(
+                width: constraints.maxWidth,
+                height: constraints.maxHeight,
+                child: Stack(
+                  children: [
+                    Positioned.fill(
+                      child: AbsorbPointer(
+                        absorbing: _isDrawingMode,
+                        child: editor,
+                      ),
+                    ),
+                    Positioned.fill(
+                      child: IgnorePointer(
+                        ignoring: !_isDrawingMode,
+                        child: SloteDrawScaffold(
+                          controller: _drawController,
+                          isDrawingMode: _isDrawingMode,
+                          documentTransform: _drawingDocumentTransform,
+                          onStrokeCaptureActiveChanged: (active) {
+                            if (_isDrawingActive == active) return;
+                            setState(() => _isDrawingActive = active);
+                          },
+                          selectedToolColor: scheme.primary,
+                          selectedColorBorderColor: scheme.primary,
+                          canvasMargin: EdgeInsets.zero,
+                          showCanvasBorder: false,
+                          showStatusBar: false,
+                          showInlineControls: false,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
       appBar: AppBar(
         toolbarHeight: 52,
         leading: IconButton(
@@ -342,15 +398,22 @@ class _CreateNoteViewState extends State<CreateNoteView> {
           IconButton(
             icon: FaIcon(
               _isDrawingMode
-                  ? FontAwesomeIcons.pen
-                  : FontAwesomeIcons.eye,
+                  ? FontAwesomeIcons.eye
+                  : FontAwesomeIcons.pen,
               size: 18,
               color: scheme.onPrimary,
             ),
             onPressed: () {
-              setState(() => _isDrawingMode = !_isDrawingMode);
+              setState(() {
+                _isDrawingMode = !_isDrawingMode;
+                if (_isDrawingMode) {
+                  FocusManager.instance.primaryFocus?.unfocus();
+                } else if (_isDrawDrawerOpen) {
+                  Navigator.of(context).pop();
+                }
+              });
             },
-            tooltip: _isDrawingMode ? 'Drawing on' : 'Drawing off (view)',
+            tooltip: _isDrawingMode ? 'View mode' : 'Draw',
           ),
           IconButton(
             icon: FaIcon(

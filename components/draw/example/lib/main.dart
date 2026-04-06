@@ -1,5 +1,6 @@
 import 'package:draw/draw.dart';
 import 'package:flutter/material.dart';
+import 'package:viewport/viewport.dart';
 
 void main() {
   runApp(const DrawExampleApp());
@@ -31,6 +32,8 @@ class _DrawExampleScreen extends StatefulWidget {
 class _DrawExampleScreenState extends State<_DrawExampleScreen> {
   late DrawController _drawController;
   bool _isDrawingMode = true;
+  bool _isDrawingActive = false;
+  final Matrix4 _documentTransform = Matrix4.identity();
 
   @override
   void initState() {
@@ -48,6 +51,7 @@ class _DrawExampleScreenState extends State<_DrawExampleScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Scaffold(
       appBar: AppBar(
         title: const Text('Draw Example'),
@@ -61,9 +65,96 @@ class _DrawExampleScreenState extends State<_DrawExampleScreen> {
           ),
         ],
       ),
-      body: SloteDrawScaffold(
-        controller: _drawController,
-        isDrawingMode: _isDrawingMode,
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          return ViewportSurface(
+            viewportHeight: constraints.maxHeight,
+            contentHeight: 2400,
+            isDrawingMode: _isDrawingMode,
+            isDrawingActive: _isDrawingActive,
+            onTransformChanged: (m) {
+              setState(() => _documentTransform.setFrom(m));
+            },
+            child: Stack(
+              children: [
+                DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: scheme.surface,
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 24,
+                      vertical: 16,
+                    ),
+                    child: _FakeDocument(
+                      isDrawingMode: _isDrawingMode,
+                    ),
+                  ),
+                ),
+                Positioned.fill(
+                  child: SloteDrawScaffold(
+                    controller: _drawController,
+                    isDrawingMode: _isDrawingMode,
+                    documentTransform: _documentTransform,
+                    onStrokeCaptureActiveChanged: (active) {
+                      if (_isDrawingActive == active) return;
+                      setState(() => _isDrawingActive = active);
+                    },
+                    selectedToolColor: scheme.primary,
+                    selectedColorBorderColor: scheme.primary,
+                    canvasMargin: const EdgeInsets.all(16),
+                    showStatusBar: true,
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _FakeDocument extends StatelessWidget {
+  const _FakeDocument({
+    required this.isDrawingMode,
+  });
+
+  final bool isDrawingMode;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+
+    return ConstrainedBox(
+      constraints: const BoxConstraints(minHeight: 2400),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Viewport + ink (Wave G demo)',
+            style: textTheme.headlineSmall,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            isDrawingMode
+                ? 'Drawing is ON: draw with one finger (pan is disabled).'
+                : 'Drawing is OFF: drag with one finger to pan.',
+            style: textTheme.bodyMedium,
+          ),
+          const SizedBox(height: 16),
+          ...List.generate(
+            18,
+            (i) => Padding(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              child: Text(
+                'Block ${i + 1}: This is fake document content to make the viewport scrollable. '
+                'Pinch to zoom. Start a stroke and try pinching: pinch should be suppressed while ink is active.',
+                style: textTheme.bodyLarge,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

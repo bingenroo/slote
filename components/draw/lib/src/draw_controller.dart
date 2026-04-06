@@ -38,12 +38,14 @@ class DrawController extends ChangeNotifier {
   DrawTool _currentTool = DrawTool.pen;
   bool _pressureEnabled = true;
   EraserMode _eraserMode = EraserMode.pixel;
+  double _eraserDiameterDoc = kDefaultEraserDiameterDoc;
 
   List<Stroke> get strokes => List.unmodifiable(_strokes);
   Color get currentColor => _currentColor;
   double get currentStrokeWidth => _currentStrokeWidth;
   DrawTool get currentTool => _currentTool;
   bool get pressureEnabled => _pressureEnabled;
+  double get eraserDiameterDoc => _eraserDiameterDoc;
 
   /// Whole-stroke vs polyline-split erasure (see [eraseStrokesHitByEraserPath]).
   EraserMode get eraserMode => _eraserMode;
@@ -195,6 +197,13 @@ class DrawController extends ChangeNotifier {
     notifyListeners();
   }
 
+  void setEraserDiameterDoc(double diameterDoc) {
+    final next = diameterDoc.clamp(1.0, 512.0).toDouble();
+    if (_eraserDiameterDoc == next) return;
+    _eraserDiameterDoc = next;
+    notifyListeners();
+  }
+
   void addStroke(Stroke stroke) {
     assert(_inkGroupDepth == 0);
     _recordInkMutationStart();
@@ -214,18 +223,30 @@ class DrawController extends ChangeNotifier {
 
   /// Erases ink along [path] using [eraserMode]: [EraserMode.stroke] removes
   /// whole pen/highlighter strokes when hit; [EraserMode.pixel] splits the
-  /// centerline (Wave D2). Footprint: [kDefaultEraserDiameterDoc] + ink
-  /// half-width. Other tools are unchanged.
+  /// centerline (Wave D2). Footprint: [eraserDiameterDoc] + ink half-width.
+  /// Other tools are unchanged.
   void eraseStrokesHitByEraserPath(List<StrokeSample> path) {
     if (path.isEmpty) return;
 
     if (_eraserMode == EraserMode.stroke) {
-      final wouldChange = _strokes.any((s) => strokeHitByEraserPath(s, path));
+      final wouldChange = _strokes.any(
+        (s) => strokeHitByEraserPath(
+          s,
+          path,
+          eraserDiameterDoc: _eraserDiameterDoc,
+        ),
+      );
       if (!wouldChange) return;
       if (_inkGroupDepth == 0) {
         _recordInkMutationStart();
       }
-      _strokes.removeWhere((s) => strokeHitByEraserPath(s, path));
+      _strokes.removeWhere(
+        (s) => strokeHitByEraserPath(
+          s,
+          path,
+          eraserDiameterDoc: _eraserDiameterDoc,
+        ),
+      );
       notifyListeners();
       _notifyInkHistoryMaybeChanged();
       return;
@@ -233,7 +254,11 @@ class DrawController extends ChangeNotifier {
 
     var hit = false;
     for (final s in _strokes) {
-      if (strokeHitByEraserPath(s, path)) {
+      if (strokeHitByEraserPath(
+        s,
+        path,
+        eraserDiameterDoc: _eraserDiameterDoc,
+      )) {
         hit = true;
         break;
       }
@@ -250,11 +275,17 @@ class DrawController extends ChangeNotifier {
         out.add(s);
         continue;
       }
-      if (!strokeHitByEraserPath(s, path)) {
+      if (!strokeHitByEraserPath(
+        s,
+        path,
+        eraserDiameterDoc: _eraserDiameterDoc,
+      )) {
         out.add(s);
         continue;
       }
-      out.addAll(splitStrokeByEraserPath(s, path));
+      out.addAll(
+        splitStrokeByEraserPath(s, path, eraserDiameterDoc: _eraserDiameterDoc),
+      );
     }
 
     _strokes
@@ -271,6 +302,7 @@ class DrawController extends ChangeNotifier {
       'schemaVersion': _currentSchemaVersion,
       'strokes': _strokes.map((s) => s.toJson()).toList(),
       'eraserMode': _eraserMode.name,
+      'eraserDiameterDoc': _eraserDiameterDoc,
     };
   }
 
@@ -301,6 +333,11 @@ class DrawController extends ChangeNotifier {
         'pixel' => EraserMode.pixel,
         _ => EraserMode.pixel,
       };
+    }
+    final eraserDiameterDoc =
+        (payload['eraserDiameterDoc'] as num?)?.toDouble();
+    if (eraserDiameterDoc != null) {
+      _eraserDiameterDoc = eraserDiameterDoc;
     }
     notifyListeners();
   }

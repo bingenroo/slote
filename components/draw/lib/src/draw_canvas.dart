@@ -185,7 +185,9 @@ class _DrawCanvasState extends State<DrawCanvas> {
       setState(() {
         _holdTracker.reset();
         _clearStraightLock();
-        _currentSamples = [StrokeSample(doc.dx, doc.dy, _pressureForSample(event))];
+        _currentSamples = [
+          StrokeSample(doc.dx, doc.dy, _pressureForSample(event)),
+        ];
         _currentColor = widget.controller.currentColor;
         _currentStrokeWidth = widget.controller.currentStrokeWidth;
         _currentTool = widget.controller.currentTool;
@@ -225,7 +227,9 @@ class _DrawCanvasState extends State<DrawCanvas> {
 
     setState(() {
       if (!_holdTracker.isLocked) {
-        _currentSamples!.add(StrokeSample(doc.dx, doc.dy, _pressureForSample(event)));
+        _currentSamples!.add(
+          StrokeSample(doc.dx, doc.dy, _pressureForSample(event)),
+        );
       }
     });
 
@@ -268,18 +272,18 @@ class _DrawCanvasState extends State<DrawCanvas> {
     }
 
     final tool = _currentTool ?? widget.controller.currentTool;
-    final locked = _straightLockedStart != null &&
+    final locked =
+        _straightLockedStart != null &&
         _straightLockedEnd != null &&
         straightLineHoldAppliesToTool(tool);
 
-    final committedSamples = locked
-        ? <StrokeSample>[_straightLockedStart!, _straightLockedEnd!]
-        : List<StrokeSample>.from(samples);
+    final committedSamples =
+        locked
+            ? <StrokeSample>[_straightLockedStart!, _straightLockedEnd!]
+            : List<StrokeSample>.from(samples);
 
     if (tool == DrawTool.eraser) {
-      widget.controller.eraseStrokesHitByEraserPath(
-        committedSamples,
-      );
+      widget.controller.eraseStrokesHitByEraserPath(committedSamples);
       _endEraserInkUndoGroupIfOpen();
       setState(() {
         _currentSamples = null;
@@ -331,13 +335,15 @@ class _DrawCanvasState extends State<DrawCanvas> {
     final s = _currentSamples;
     if (s == null || s.isEmpty) return null;
     final tool = _currentTool ?? widget.controller.currentTool;
-    final locked = _straightLockedStart != null &&
+    final locked =
+        _straightLockedStart != null &&
         _straightLockedEnd != null &&
         straightLineHoldAppliesToTool(tool);
 
-    final previewSamples = locked
-        ? <StrokeSample>[_straightLockedStart!, _straightLockedEnd!]
-        : List<StrokeSample>.from(s);
+    final previewSamples =
+        locked
+            ? <StrokeSample>[_straightLockedStart!, _straightLockedEnd!]
+            : List<StrokeSample>.from(s);
 
     return Stroke(
       samples: previewSamples,
@@ -361,6 +367,7 @@ class _DrawCanvasState extends State<DrawCanvas> {
           strokes: widget.controller.strokes,
           currentStroke: _previewStroke,
           documentTransform: widget.documentTransform,
+          eraserDiameterDoc: widget.controller.eraserDiameterDoc,
         ),
         child: const SizedBox.expand(),
       ),
@@ -373,11 +380,13 @@ class DrawPainter extends CustomPainter {
     required this.strokes,
     this.currentStroke,
     required this.documentTransform,
+    required this.eraserDiameterDoc,
   });
 
   final List<Stroke> strokes;
   final Stroke? currentStroke;
   final Matrix4 documentTransform;
+  final double eraserDiameterDoc;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -388,7 +397,11 @@ class DrawPainter extends CustomPainter {
     }
     if (currentStroke != null) {
       if (currentStroke!.tool == DrawTool.eraser) {
-        paintEraserTouchVisual(canvas, currentStroke!.samples);
+        paintEraserTouchVisual(
+          canvas,
+          currentStroke!.samples,
+          eraserDiameterDoc: eraserDiameterDoc,
+        );
       } else {
         StrokeRenderer.render(canvas, currentStroke!, isPreview: true);
       }
@@ -400,6 +413,7 @@ class DrawPainter extends CustomPainter {
   bool shouldRepaint(DrawPainter oldDelegate) {
     return oldDelegate.strokes != strokes ||
         oldDelegate.currentStroke != currentStroke ||
+        oldDelegate.eraserDiameterDoc != eraserDiameterDoc ||
         !MatrixUtils.matrixEquals(
           documentTransform,
           oldDelegate.documentTransform,

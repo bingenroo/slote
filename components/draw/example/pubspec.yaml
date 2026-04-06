@@ -12,6 +12,8 @@ dependencies:
     sdk: flutter
   draw:
     path: ../
+  viewport:
+    path: ../../viewport
 
 dev_dependencies:
   flutter_test:
