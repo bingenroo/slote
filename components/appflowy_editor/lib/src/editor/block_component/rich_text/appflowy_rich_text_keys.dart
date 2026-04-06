@@ -19,6 +19,8 @@ class AppFlowyRichTextKeys {
     italic,
     underline,
     strikethrough,
+    fontFamily,
+    fontSize,
     textColor,
     backgroundColor,
     code,
@@ -40,6 +42,7 @@ class AppFlowyRichTextKeys {
     strikethrough,
     code,
     fontFamily,
+    fontSize,
     textColor,
     backgroundColor,
   ];

@@ -18,6 +18,9 @@ import 'package:appflowy_editor/appflowy_editor.dart';
 void ensureSloteAppFlowyRichTextKeysRegistered() {
   final toggled = AppFlowyRichTextKeys.supportToggled;
   final sliced = AppFlowyRichTextKeys.supportSliced;
+  if (!toggled.contains(AppFlowyRichTextKeys.fontSize)) {
+    toggled.add(AppFlowyRichTextKeys.fontSize);
+  }
   if (!toggled.contains(kSloteSuperscriptAttribute)) {
     toggled.add(kSloteSuperscriptAttribute);
   }

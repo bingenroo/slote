@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 
 import 'draw_controller.dart';
@@ -185,6 +186,18 @@ class _DrawCanvasState extends State<DrawCanvas> {
   }
 
   void _handlePointerDown(PointerDownEvent event) {
+    if (kDebugMode) {
+      final scale = widget.documentTransform.getMaxScaleOnAxis();
+      if (scale >= 2.999) {
+        final t = widget.documentTransform.getTranslation();
+        debugPrint(
+          'DBG-DRAWCANVAS down ptr=${event.pointer} local=${event.localPosition} '
+          'doc=${_localToDocument(event.localPosition)} '
+          'docScale=${scale.toStringAsFixed(3)} tx=${t.x.toStringAsFixed(1)} ty=${t.y.toStringAsFixed(1)}',
+        );
+      }
+    }
+
     _activePointers.add(event.pointer);
 
     if (!widget.isDrawingMode) return;

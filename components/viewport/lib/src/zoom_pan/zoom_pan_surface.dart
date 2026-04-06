@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/gestures.dart';
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'boundary_manager.dart';
 import 'gesture_handler.dart';
 import 'content_measurer.dart';
@@ -135,6 +136,19 @@ class _ZoomPanSurfaceState extends State<ZoomPanSurface> {
   }
 
   void _handlePointerDown(PointerDownEvent event) {
+    if (kDebugMode) {
+      final scale = _transform.getMaxScaleOnAxis();
+      if (scale >= widget.maxScale - 0.001) {
+        final t = _transform.getTranslation();
+        debugPrint(
+          'DBG-VIEWPORT down ptr=${event.pointer} local=${event.localPosition} '
+          'global=${event.position} scale=${scale.toStringAsFixed(3)} '
+          'tx=${t.x.toStringAsFixed(1)} ty=${t.y.toStringAsFixed(1)} '
+          'drawingMode=${widget.isDrawingMode} drawingActive=${widget.isDrawingActive}',
+        );
+      }
+    }
+
     _gestureHandler.addPointer(event.pointer, event.position);
 
     // Initialize zoom state if we have 2 pointers

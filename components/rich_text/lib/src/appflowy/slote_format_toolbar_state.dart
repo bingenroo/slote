@@ -9,7 +9,24 @@ import 'slote_inline_attributes.dart';
 /// caret; non-collapsed ranges use [EditorState.getNodesInSelection].
 bool sloteIsFormatKeyActive(EditorState editorState, String key) {
   final selection = editorState.selection;
-  if (selection == null) return false;
+  if (selection == null) {
+    final toggled = editorState.toggledStyle;
+    if (key == kSloteSuperscriptAttribute || key == kSloteSubscriptAttribute) {
+      final supOn = toggled[kSloteSuperscriptAttribute] == true;
+      final subOn = toggled[kSloteSubscriptAttribute] == true;
+      if (supOn && subOn) {
+        return key == kSloteSuperscriptAttribute;
+      }
+      if (supOn != subOn) {
+        return key == kSloteSuperscriptAttribute ? supOn : subOn;
+      }
+      return false;
+    }
+    if (toggled.containsKey(key)) {
+      return toggled[key] == true;
+    }
+    return false;
+  }
 
   if (selection.isCollapsed) {
     final toggled = editorState.toggledStyle;
@@ -65,8 +82,11 @@ bool sloteIsLinkActiveInSelection(EditorState editorState) {
 /// style at a collapsed caret, or full-range highlight when expanded.
 bool sloteIsHighlightActiveForToolbar(EditorState editorState) {
   final selection = editorState.selection;
-  if (selection == null) return false;
   final bg = AppFlowyRichTextKeys.backgroundColor;
+  if (selection == null) {
+    final toggled = editorState.toggledStyle;
+    return toggled.containsKey(bg) && toggled[bg] != null;
+  }
 
   if (selection.isCollapsed) {
     final toggled = editorState.toggledStyle;
@@ -95,8 +115,11 @@ bool sloteIsHighlightActiveForToolbar(EditorState editorState) {
 /// `font_color` across a range.
 bool sloteIsTextColorActiveForToolbar(EditorState editorState) {
   final selection = editorState.selection;
-  if (selection == null) return false;
   final colorKey = AppFlowyRichTextKeys.textColor;
+  if (selection == null) {
+    final toggled = editorState.toggledStyle;
+    return toggled.containsKey(colorKey) && toggled[colorKey] != null;
+  }
 
   if (selection.isCollapsed) {
     final toggled = editorState.toggledStyle;

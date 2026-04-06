@@ -20,6 +20,24 @@ void main() {
       final es = EditorState.blank(withInitialText: true);
       expect(es.selection, isNull);
       expect(() => applyBiusToggle(es, AppFlowyRichTextKeys.bold), returnsNormally);
+      expect(es.toggledStyle[AppFlowyRichTextKeys.bold], isTrue);
+    });
+
+    test('sloteApplyFontFamily writes toggledStyle when selection is null',
+        () async {
+      final es = EditorState.blank(withInitialText: true);
+      expect(es.selection, isNull);
+      await sloteApplyFontFamily(es, 'serif');
+      expect(es.toggledStyle[AppFlowyRichTextKeys.fontFamily], 'serif');
+    });
+
+    test('sloteApplyFontSize writes toggledStyle when selection is null',
+        () async {
+      ensureSloteAppFlowyRichTextKeysRegistered();
+      final es = EditorState.blank(withInitialText: true);
+      expect(es.selection, isNull);
+      await sloteApplyFontSize(es, 18);
+      expect(es.toggledStyle[AppFlowyRichTextKeys.fontSize], 18);
     });
   });
 

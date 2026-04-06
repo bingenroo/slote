@@ -57,6 +57,12 @@ final String sloteSpikeTextColorHex = kSloteSpikeTextColor.toHex();
 
 /// Shared BIUS entry point for toolbar buttons, tests, and custom shortcuts.
 void applyBiusToggle(EditorState editorState, String attributeKey) {
+  if (editorState.selection == null) {
+    final toggled = editorState.toggledStyle;
+    final currentlyOn = toggled[attributeKey] == true;
+    editorState.updateToggledStyle(attributeKey, currentlyOn ? false : true);
+    return;
+  }
   editorState.toggleAttribute(attributeKey);
 }
 
@@ -285,9 +291,10 @@ Future<void> sloteApplyFontSize(
   double? fontSize,
 ) async {
   final selection = editorState.selection;
-  // `font_size` is not in AppFlowy `supportToggled`; collapsed would assert in
-  // debug on insert. Range-only until upstream adds it.
-  if (selection == null || selection.isCollapsed) return;
+  if (selection == null || selection.isCollapsed) {
+    editorState.updateToggledStyle(AppFlowyRichTextKeys.fontSize, fontSize);
+    return;
+  }
 
   await editorState.formatDelta(selection, {
     AppFlowyRichTextKeys.fontSize: fontSize,
@@ -310,7 +317,10 @@ Future<void> sloteApplyFontFamily(
   String? fontFamily,
 ) async {
   final selection = editorState.selection;
-  if (selection == null) return;
+  if (selection == null) {
+    editorState.updateToggledStyle(AppFlowyRichTextKeys.fontFamily, fontFamily);
+    return;
+  }
 
   if (selection.isCollapsed) {
     editorState.updateToggledStyle(AppFlowyRichTextKeys.fontFamily, fontFamily);

@@ -46,6 +46,7 @@ class FormatToolbar extends StatelessWidget {
         final hasSelection = sel != null;
         final rangeSelection = sel != null && !sel.isCollapsed;
         final caretSelection = sel != null && sel.isCollapsed;
+        final allowPendingTypingStyle = sel == null || sel.isCollapsed;
 
         final groups = <List<Widget>>[
           [
@@ -151,7 +152,7 @@ class FormatToolbar extends StatelessWidget {
           [
             _formatToggle(
               context: context,
-              enabled: hasSelection,
+              enabled: allowPendingTypingStyle,
               selected: sloteIsFormatKeyActive(
                 editorState,
                 AppFlowyRichTextKeys.bold,
@@ -163,7 +164,7 @@ class FormatToolbar extends StatelessWidget {
             ),
             _formatToggle(
               context: context,
-              enabled: hasSelection,
+              enabled: allowPendingTypingStyle,
               selected: sloteIsFormatKeyActive(
                 editorState,
                 AppFlowyRichTextKeys.italic,
@@ -176,7 +177,7 @@ class FormatToolbar extends StatelessWidget {
             ),
             _formatToggle(
               context: context,
-              enabled: hasSelection,
+              enabled: allowPendingTypingStyle,
               selected: sloteIsFormatKeyActive(
                 editorState,
                 AppFlowyRichTextKeys.underline,
@@ -191,7 +192,7 @@ class FormatToolbar extends StatelessWidget {
             ),
             _formatToggle(
               context: context,
-              enabled: hasSelection,
+              enabled: allowPendingTypingStyle,
               selected: sloteIsFormatKeyActive(
                 editorState,
                 AppFlowyRichTextKeys.strikethrough,
@@ -217,7 +218,7 @@ class FormatToolbar extends StatelessWidget {
             ),
             _formatToggle(
               context: context,
-              enabled: hasSelection,
+              enabled: allowPendingTypingStyle,
               selected: sloteIsHighlightActiveForToolbar(editorState),
               icon: Icons.highlight,
               tooltip: 'Highlight',
@@ -229,7 +230,7 @@ class FormatToolbar extends StatelessWidget {
             ),
             _formatToggle(
               context: context,
-              enabled: hasSelection,
+              enabled: allowPendingTypingStyle,
               selected: sloteIsTextColorActiveForToolbar(editorState),
               icon: Icons.format_color_text,
               tooltip: 'Text color',
@@ -250,8 +251,14 @@ class FormatToolbar extends StatelessWidget {
             ),
           ],
           [
-            _FontSizeMenu(editorState: editorState, enabled: rangeSelection),
-            _FontFamilyMenu(editorState: editorState, enabled: hasSelection),
+            _FontSizeMenu(
+              editorState: editorState,
+              enabled: allowPendingTypingStyle || rangeSelection,
+            ),
+            _FontFamilyMenu(
+              editorState: editorState,
+              enabled: allowPendingTypingStyle,
+            ),
             _formatToggle(
               context: context,
               enabled: hasSelection,

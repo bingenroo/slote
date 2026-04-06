@@ -249,7 +249,6 @@ void showSloteColorFormatDrawer(
   BuildContext? hostContext,
 }) {
   final selection = editorState.selection;
-  if (selection == null) return;
 
   final ctx = sloteResolveEditorSheetContext(editorState, hostContext);
   if (ctx == null) return;
@@ -278,14 +277,24 @@ class _SloteColorSheetContent extends StatelessWidget {
   });
 
   final EditorState editorState;
-  final Selection selection;
+  final Selection? selection;
 
   Future<void> _applyTextColor(String? hex) async {
-    await sloteApplyTextColor(editorState, selection, hex);
+    final sel = selection;
+    if (sel == null) {
+      editorState.updateToggledStyle(AppFlowyRichTextKeys.textColor, hex);
+      return;
+    }
+    await sloteApplyTextColor(editorState, sel, hex);
   }
 
   Future<void> _applyHighlight(String? hex) async {
-    await sloteApplyHighlightColor(editorState, selection, hex);
+    final sel = selection;
+    if (sel == null) {
+      editorState.updateToggledStyle(AppFlowyRichTextKeys.backgroundColor, hex);
+      return;
+    }
+    await sloteApplyHighlightColor(editorState, sel, hex);
   }
 
   @override

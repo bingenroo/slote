@@ -35,6 +35,7 @@ extension TextTransforms on EditorState {
     final next = position.path.next;
     final children = node.children;
     final delta = node.delta;
+    final caretAttributes = delta?.sliceAttributes(position.offset) ?? const {};
 
     if (delta != null) {
       // Delete the text after the cursor in the current node.
@@ -87,6 +88,13 @@ extension TextTransforms on EditorState {
 
     // Apply the transaction.
     await apply(transaction);
+
+    for (final entry in caretAttributes.entries) {
+      if (!AppFlowyRichTextKeys.supportToggled.contains(entry.key)) {
+        continue;
+      }
+      updateToggledStyle(entry.key, entry.value);
+    }
     return true;
   }
 
