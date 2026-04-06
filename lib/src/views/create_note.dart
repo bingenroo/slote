@@ -316,16 +316,17 @@ class _CreateNoteViewState extends State<CreateNoteView> {
       bodyBuilder: (context, editor) {
         return LayoutBuilder(
           builder: (context, constraints) {
+            const contentHeight = 4000.0;
             return ViewportSurface(
               viewportHeight: constraints.maxHeight,
               // TODO(waveG): Measure real document height (editor + ink) and feed
               // it here so BoundaryManager clamps correctly.
-              contentHeight: 4000,
+              contentHeight: contentHeight,
               isDrawingMode: _isDrawingMode,
               isDrawingActive: _isDrawingActive,
               child: SizedBox(
                 width: constraints.maxWidth,
-                height: constraints.maxHeight,
+                height: contentHeight,
                 child: Stack(
                   children: [
                     Positioned.fill(

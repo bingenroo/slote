@@ -71,6 +71,9 @@ class DrawCanvas extends StatefulWidget {
 
 class _DrawCanvasState extends State<DrawCanvas> {
   final Set<int> _activePointers = <int>{};
+  int _dbgDownCount = 0;
+  int _dbgMoveCount = 0;
+  bool _dbgStrokeActive = false;
 
   List<StrokeSample>? _currentSamples;
   Color? _currentColor;
@@ -187,13 +190,20 @@ class _DrawCanvasState extends State<DrawCanvas> {
 
   void _handlePointerDown(PointerDownEvent event) {
     if (kDebugMode) {
-      final scale = widget.documentTransform.getMaxScaleOnAxis();
-      if (scale >= 2.999) {
+      // Keep this very lightweight: only log the first few downs per run so
+      // we can diagnose hit-testing without spamming.
+      if (_dbgDownCount < 25) {
+        _dbgDownCount++;
+        _dbgMoveCount = 0;
+        _dbgStrokeActive = true;
+        final scale = widget.documentTransform.getMaxScaleOnAxis();
         final t = widget.documentTransform.getTranslation();
         debugPrint(
-          'DBG-DRAWCANVAS down ptr=${event.pointer} local=${event.localPosition} '
-          'doc=${_localToDocument(event.localPosition)} '
-          'docScale=${scale.toStringAsFixed(3)} tx=${t.x.toStringAsFixed(1)} ty=${t.y.toStringAsFixed(1)}',
+          'DBG-DRAWCANVAS down#$_dbgDownCount ptr=${event.pointer} '
+          'local=${event.localPosition} doc=${_localToDocument(event.localPosition)} '
+          'docXformScale=${scale.toStringAsFixed(3)} '
+          'docXformTx=${t.x.toStringAsFixed(1)} docXformTy=${t.y.toStringAsFixed(1)} '
+          'drawingMode=${widget.isDrawingMode} drawingActive=${widget.isDrawingActive}',
         );
       }
     }
@@ -231,9 +241,40 @@ class _DrawCanvasState extends State<DrawCanvas> {
   }
 
   void _handlePointerMove(PointerMoveEvent event) {
-    if (!widget.isDrawingMode || _activePointers.length != 1) return;
-    if (_currentSamples == null) return;
-    if (event.pointer != _drawingPointerId) return;
+    if (kDebugMode && _dbgStrokeActive && _dbgMoveCount < 60) {
+      _dbgMoveCount++;
+      debugPrint(
+        'DBG-DRAWCANVAS move#$_dbgMoveCount ptr=${event.pointer} '
+        'activePointers=${_activePointers.length} drawingPtr=$_drawingPointerId '
+        'drawingMode=${widget.isDrawingMode} samples=${_currentSamples?.length ?? 0} '
+        'local=${event.localPosition}',
+      );
+    }
+
+    if (!widget.isDrawingMode || _activePointers.length != 1) {
+      if (kDebugMode && _dbgStrokeActive && _dbgMoveCount < 80) {
+        debugPrint(
+          'DBG-DRAWCANVAS moveIgnored reason=modeOrPointers '
+          'drawingMode=${widget.isDrawingMode} activePointers=${_activePointers.length}',
+        );
+      }
+      return;
+    }
+    if (_currentSamples == null) {
+      if (kDebugMode && _dbgStrokeActive && _dbgMoveCount < 80) {
+        debugPrint('DBG-DRAWCANVAS moveIgnored reason=noCurrentSamples');
+      }
+      return;
+    }
+    if (event.pointer != _drawingPointerId) {
+      if (kDebugMode && _dbgStrokeActive && _dbgMoveCount < 80) {
+        debugPrint(
+          'DBG-DRAWCANVAS moveIgnored reason=pointerMismatch '
+          'ptr=${event.pointer} drawingPtr=$_drawingPointerId',
+        );
+      }
+      return;
+    }
 
     final doc = _localToDocument(event.localPosition);
     final tool = _currentTool ?? widget.controller.currentTool;
@@ -278,12 +319,19 @@ class _DrawCanvasState extends State<DrawCanvas> {
     if (shouldCommit) {
       _commitAndClearInProgress();
     }
+    if (kDebugMode && event.pointer == _drawingPointerId) {
+      _dbgStrokeActive = false;
+    }
   }
 
   void _handlePointerCancel(PointerCancelEvent event) {
     _activePointers.remove(event.pointer);
     if (event.pointer == _drawingPointerId) {
+      if (kDebugMode) {
+        debugPrint('DBG-DRAWCANVAS cancel ptr=${event.pointer}');
+      }
       _discardInProgress();
+      _dbgStrokeActive = false;
     }
   }
 

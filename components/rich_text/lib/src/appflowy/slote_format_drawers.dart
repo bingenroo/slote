@@ -283,6 +283,11 @@ class _SloteColorSheetContent extends StatelessWidget {
     final sel = selection;
     if (sel == null) {
       editorState.updateToggledStyle(AppFlowyRichTextKeys.textColor, hex);
+      sloteRememberPendingTypingStyle(
+        editorState,
+        AppFlowyRichTextKeys.textColor,
+        hex,
+      );
       return;
     }
     await sloteApplyTextColor(editorState, sel, hex);
@@ -292,6 +297,11 @@ class _SloteColorSheetContent extends StatelessWidget {
     final sel = selection;
     if (sel == null) {
       editorState.updateToggledStyle(AppFlowyRichTextKeys.backgroundColor, hex);
+      sloteRememberPendingTypingStyle(
+        editorState,
+        AppFlowyRichTextKeys.backgroundColor,
+        hex,
+      );
       return;
     }
     await sloteApplyHighlightColor(editorState, sel, hex);

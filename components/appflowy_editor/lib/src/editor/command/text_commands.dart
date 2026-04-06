@@ -35,7 +35,13 @@ extension TextTransforms on EditorState {
     final next = position.path.next;
     final children = node.children;
     final delta = node.delta;
-    final caretAttributes = delta?.sliceAttributes(position.offset) ?? const {};
+    // Keep inline typing style across multiple consecutive newlines:
+    // - If the current line has text, slice attrs at the caret (usual behavior).
+    // - If the current line is empty, fall back to current toggledStyle.
+    final Map<String, dynamic> caretAttributes =
+        (delta != null && delta.isNotEmpty)
+            ? (delta.sliceAttributes(position.offset) ?? const {})
+            : Map<String, dynamic>.from(toggledStyle);
 
     if (delta != null) {
       // Delete the text after the cursor in the current node.

@@ -6,6 +6,55 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   group('RichTextEditorController (stability)', () {
+    testWidgets('restores pending toggledStyle when caret is first planted',
+        (tester) async {
+      final controller = RichTextEditorController(
+        document: Document.blank(withInitialText: true),
+      );
+      final es = controller.editorState;
+
+      expect(es.selection, isNull);
+      applyBiusToggle(es, AppFlowyRichTextKeys.bold);
+      await sloteApplyFontFamily(es, 'serif');
+      await sloteApplyFontSize(es, 18);
+
+      // Simulate the editor planting a caret selection.
+      es.selection =
+          Selection.single(path: [0], startOffset: 0, endOffset: 0).normalized;
+      (es.selectionNotifier as dynamic).notifyListeners();
+
+      // Let the controller restore pending toggledStyle.
+      await tester.pump();
+
+      expect(es.toggledStyle[AppFlowyRichTextKeys.bold], isTrue);
+      expect(es.toggledStyle[AppFlowyRichTextKeys.fontFamily], 'serif');
+      expect(es.toggledStyle[AppFlowyRichTextKeys.fontSize], 18);
+
+      // Verify IME contract: insertText uses `toggledStyle` for new text.
+      final node = es.getNodeAtPath([0]);
+      expect(node, isNotNull);
+      final tx = es.transaction;
+      tx.insertText(
+        node!,
+        0,
+        'x',
+        toggledAttributes: es.toggledStyle,
+        sliceAttributes: true,
+      );
+      await es.apply(tx);
+      final updated = es.getNodeAtPath([0]);
+      expect(updated, isNotNull);
+      final delta = updated!.delta;
+      expect(delta, isNotNull);
+      final first = delta!.iterator..moveNext();
+      final op = first.current;
+      expect(op, isA<TextInsert>());
+      final attrs = (op as TextInsert).attributes;
+      expect(attrs?[AppFlowyRichTextKeys.bold], isTrue);
+
+      controller.dispose();
+    });
+
     testWidgets('debounces onDocumentJsonChanged after apply', (tester) async {
       final emitted = <Map<String, Object>>[];
       final controller = RichTextEditorController(

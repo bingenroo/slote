@@ -4,6 +4,7 @@ import 'package:appflowy_editor/appflowy_editor.dart';
 import 'package:flutter/foundation.dart';
 
 import 'slote_inline_attributes.dart';
+import 'slote_delta_format.dart';
 import 'appflowy_undo_support.dart';
 
 class _UndoRedoListenable extends ChangeNotifier {
@@ -77,8 +78,30 @@ class RichTextEditorController {
   bool _lastCanRedo = false;
 
   bool _caretStyleSyncInFlight = false;
+  Selection? _lastSelection;
 
   void _onSelectionChangedForSupSub() {
+    final next = editorState.selection;
+    final prev = _lastSelection;
+    _lastSelection = next;
+
+    // When the editor first becomes interactive, AppFlowy can transition from
+    // `selection == null` to a collapsed caret and clear/normalize toggledStyle.
+    // If the user set pending typing styles before the caret existed, re-apply
+    // them right after the selection settles so the first insert uses them.
+    if (prev == null && next != null && next.isCollapsed) {
+      final pending = sloteTakePendingTypingStyle(editorState);
+      if (pending != null && pending.isNotEmpty) {
+        scheduleMicrotask(() {
+          if (editorState.isDisposed) return;
+          final sel = editorState.selection;
+          if (sel == null || !sel.isCollapsed) return;
+          for (final e in pending.entries) {
+            editorState.updateToggledStyle(e.key, e.value);
+          }
+        });
+      }
+    }
     _syncCaretSupSubTypingStyle();
   }
 

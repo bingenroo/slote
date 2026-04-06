@@ -1,5 +1,33 @@
 import 'package:appflowy_editor/appflowy_editor.dart';
 
+// Stores pending typing style for the "no caret yet" state.
+//
+// We cannot rely on `EditorState.toggledStyle` because AppFlowy clears it on any
+// selection change (including when the caret is first planted). We also cannot
+// rely on `selectionExtraInfo` because AppFlowy may overwrite it during
+// selection updates.
+//
+// `Expando` safely attaches data to an object without manual lifecycle hooks.
+final Expando<Map<String, dynamic>> _slotePendingTypingStyle =
+    Expando<Map<String, dynamic>>('slotePendingTypingStyle');
+
+void sloteRememberPendingTypingStyle(
+  EditorState editorState,
+  String attributeKey,
+  dynamic value,
+) {
+  final pending = _slotePendingTypingStyle[editorState] ?? <String, dynamic>{};
+  pending[attributeKey] = value;
+  _slotePendingTypingStyle[editorState] = pending;
+}
+
+Map<String, dynamic>? sloteTakePendingTypingStyle(EditorState editorState) {
+  final pending = _slotePendingTypingStyle[editorState];
+  if (pending == null || pending.isEmpty) return null;
+  _slotePendingTypingStyle[editorState] = <String, dynamic>{};
+  return Map<String, dynamic>.from(pending);
+}
+
 /// Applies or clears `href` on [selection] (non-collapsed).
 Future<void> sloteApplyLinkHref(
   EditorState editorState,

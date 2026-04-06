@@ -33,6 +33,7 @@ class _DrawExampleScreenState extends State<_DrawExampleScreen> {
   late DrawController _drawController;
   bool _isDrawingMode = true;
   bool _isDrawingActive = false;
+  static const double _kContentHeight = 3200;
 
   @override
   void initState() {
@@ -84,7 +85,7 @@ class _DrawExampleScreenState extends State<_DrawExampleScreen> {
               Expanded(
                 child: ViewportSurface(
                   viewportHeight: constraints.maxHeight,
-                  contentHeight: 2400,
+                  contentHeight: _kContentHeight,
                   isDrawingMode: _isDrawingMode,
                   isDrawingActive: _isDrawingActive,
                   child: Padding(
@@ -97,29 +98,34 @@ class _DrawExampleScreenState extends State<_DrawExampleScreen> {
                       ),
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(8),
-                        child: Stack(
-                          children: [
-                            Padding(
-                              padding: pagePadding,
-                              child: _FakeDocument(isDrawingMode: _isDrawingMode),
-                            ),
-                            Positioned.fill(
-                              child: SloteDrawScaffold(
-                                controller: _drawController,
-                                isDrawingMode: _isDrawingMode,
-                                onStrokeCaptureActiveChanged: (active) {
-                                  if (_isDrawingActive == active) return;
-                                  setState(() => _isDrawingActive = active);
-                                },
-                                selectedToolColor: scheme.primary,
-                                selectedColorBorderColor: scheme.primary,
-                                canvasMargin: EdgeInsets.zero,
-                                showCanvasBorder: false,
-                                showStatusBar: true,
-                                showInlineControls: false,
+                        child: SizedBox(
+                          height: _kContentHeight,
+                          child: Stack(
+                            children: [
+                              Padding(
+                                padding: pagePadding,
+                                child: _FakeDocument(
+                                  isDrawingMode: _isDrawingMode,
+                                ),
                               ),
-                            ),
-                          ],
+                              Positioned.fill(
+                                child: SloteDrawScaffold(
+                                  controller: _drawController,
+                                  isDrawingMode: _isDrawingMode,
+                                  onStrokeCaptureActiveChanged: (active) {
+                                    if (_isDrawingActive == active) return;
+                                    setState(() => _isDrawingActive = active);
+                                  },
+                                  selectedToolColor: scheme.primary,
+                                  selectedColorBorderColor: scheme.primary,
+                                  canvasMargin: EdgeInsets.zero,
+                                  showCanvasBorder: false,
+                                  showStatusBar: true,
+                                  showInlineControls: false,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     ),
@@ -145,36 +151,33 @@ class _FakeDocument extends StatelessWidget {
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
 
-    return ConstrainedBox(
-      constraints: const BoxConstraints(minHeight: 2400),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Viewport + ink (Wave G demo)',
-            style: textTheme.headlineSmall,
-          ),
-          const SizedBox(height: 8),
-          Text(
-            isDrawingMode
-                ? 'Drawing is ON: draw with one finger (pan is disabled).'
-                : 'Drawing is OFF: drag with one finger to pan.',
-            style: textTheme.bodyMedium,
-          ),
-          const SizedBox(height: 16),
-          ...List.generate(
-            18,
-            (i) => Padding(
-              padding: const EdgeInsets.symmetric(vertical: 12),
-              child: Text(
-                'Block ${i + 1}: This is fake document content to make the viewport scrollable. '
-                'Pinch to zoom. Start a stroke and try pinching: pinch should be suppressed while ink is active.',
-                style: textTheme.bodyLarge,
-              ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Viewport + ink (Wave G demo)',
+          style: textTheme.headlineSmall,
+        ),
+        const SizedBox(height: 8),
+        Text(
+          isDrawingMode
+              ? 'Drawing is ON: draw with one finger (pan is disabled).'
+              : 'Drawing is OFF: drag with one finger to pan.',
+          style: textTheme.bodyMedium,
+        ),
+        const SizedBox(height: 16),
+        ...List.generate(
+          18,
+          (i) => Padding(
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            child: Text(
+              'Block ${i + 1}: This is fake document content to make the viewport scrollable. '
+              'Pinch to zoom. Start a stroke and try pinching: pinch should be suppressed while ink is active.',
+              style: textTheme.bodyLarge,
             ),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }

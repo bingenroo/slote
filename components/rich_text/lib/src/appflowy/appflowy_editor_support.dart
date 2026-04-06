@@ -60,7 +60,9 @@ void applyBiusToggle(EditorState editorState, String attributeKey) {
   if (editorState.selection == null) {
     final toggled = editorState.toggledStyle;
     final currentlyOn = toggled[attributeKey] == true;
-    editorState.updateToggledStyle(attributeKey, currentlyOn ? false : true);
+    final next = currentlyOn ? false : true;
+    editorState.updateToggledStyle(attributeKey, next);
+    sloteRememberPendingTypingStyle(editorState, attributeKey, next);
     return;
   }
   editorState.toggleAttribute(attributeKey);
@@ -293,6 +295,13 @@ Future<void> sloteApplyFontSize(
   final selection = editorState.selection;
   if (selection == null || selection.isCollapsed) {
     editorState.updateToggledStyle(AppFlowyRichTextKeys.fontSize, fontSize);
+    if (selection == null) {
+      sloteRememberPendingTypingStyle(
+        editorState,
+        AppFlowyRichTextKeys.fontSize,
+        fontSize,
+      );
+    }
     return;
   }
 
@@ -319,6 +328,11 @@ Future<void> sloteApplyFontFamily(
   final selection = editorState.selection;
   if (selection == null) {
     editorState.updateToggledStyle(AppFlowyRichTextKeys.fontFamily, fontFamily);
+    sloteRememberPendingTypingStyle(
+      editorState,
+      AppFlowyRichTextKeys.fontFamily,
+      fontFamily,
+    );
     return;
   }
 
