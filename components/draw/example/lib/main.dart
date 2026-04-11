@@ -83,53 +83,59 @@ class _DrawExampleScreenState extends State<_DrawExampleScreen> {
                 const Divider(height: 1),
               ],
               Expanded(
-                child: ViewportSurface(
-                  viewportHeight: constraints.maxHeight,
-                  contentHeight: _kContentHeight,
-                  isDrawingMode: _isDrawingMode,
-                  isDrawingActive: _isDrawingActive,
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        color: scheme.surface,
-                        border: Border.all(color: scheme.outlineVariant),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(8),
-                        child: SizedBox(
-                          height: _kContentHeight,
-                          child: Stack(
-                            children: [
-                              Padding(
-                                padding: pagePadding,
-                                child: _FakeDocument(
-                                  isDrawingMode: _isDrawingMode,
-                                ),
+                child: LayoutBuilder(
+                  builder: (context, viewportConstraints) {
+                    return ViewportSurface(
+                      viewportHeight: viewportConstraints.maxHeight,
+                      contentHeight: _kContentHeight,
+                      isDrawingMode: _isDrawingMode,
+                      isDrawingActive: _isDrawingActive,
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            color: scheme.surface,
+                            border: Border.all(color: scheme.outlineVariant),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: SizedBox(
+                              height: _kContentHeight,
+                              child: Stack(
+                                children: [
+                                  Padding(
+                                    padding: pagePadding,
+                                    child: _FakeDocument(
+                                      isDrawingMode: _isDrawingMode,
+                                    ),
+                                  ),
+                                  Positioned.fill(
+                                    child: SloteDrawScaffold(
+                                      controller: _drawController,
+                                      isDrawingMode: _isDrawingMode,
+                                      onStrokeCaptureActiveChanged: (active) {
+                                        if (_isDrawingActive == active) return;
+                                        setState(
+                                          () => _isDrawingActive = active,
+                                        );
+                                      },
+                                      selectedToolColor: scheme.primary,
+                                      selectedColorBorderColor: scheme.primary,
+                                      canvasMargin: EdgeInsets.zero,
+                                      showCanvasBorder: false,
+                                      showStatusBar: false,
+                                      showInlineControls: false,
+                                    ),
+                                  ),
+                                ],
                               ),
-                              Positioned.fill(
-                                child: SloteDrawScaffold(
-                                  controller: _drawController,
-                                  isDrawingMode: _isDrawingMode,
-                                  onStrokeCaptureActiveChanged: (active) {
-                                    if (_isDrawingActive == active) return;
-                                    setState(() => _isDrawingActive = active);
-                                  },
-                                  selectedToolColor: scheme.primary,
-                                  selectedColorBorderColor: scheme.primary,
-                                  canvasMargin: EdgeInsets.zero,
-                                  showCanvasBorder: false,
-                                  showStatusBar: true,
-                                  showInlineControls: false,
-                                ),
-                              ),
-                            ],
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                  ),
+                    );
+                  },
                 ),
               ),
             ],

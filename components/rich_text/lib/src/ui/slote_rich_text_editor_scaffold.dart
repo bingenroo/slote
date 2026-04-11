@@ -190,6 +190,9 @@ class SloteRichTextEditorScaffoldState extends State<SloteRichTextEditorScaffold
       selectionColor: selectionColor,
       textStyleConfiguration: base.textStyleConfiguration.copyWith(
         text: baseTextStyle,
+        bold: base.textStyleConfiguration.bold.copyWith(
+          fontWeight: FontWeight.w800,
+        ),
         href: base.textStyleConfiguration.href.copyWith(
           color: scheme.primary,
         ),

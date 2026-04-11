@@ -16,25 +16,37 @@ class GestureHandler {
   Offset? _focalPoint;
   Matrix4? _initialTransform;
 
-  // Pan state for 1-finger scrolling
-  Offset? _initialPanPosition;
-  Matrix4? _initialPanTransform;
+  // Pan: incremental deltas from last local position (1-finger scroll)
+  Offset? _lastPanLocal;
 
   int get pointerCount => _pointers.length;
+
+  /// Live pinch midpoint in listener-local space (null unless exactly 2 pointers).
+  Offset? get pinchMidpointLocal {
+    if (_pointers.length != 2) return null;
+    final values = _pointers.values.toList(growable: false);
+    return _midPoint(values[0], values[1]);
+  }
+
+  /// Distance between the two pointers in listener-local space.
+  double? get pinchSpanLocal {
+    if (_pointers.length != 2) return null;
+    final values = _pointers.values.toList(growable: false);
+    return _distance(values[0], values[1]);
+  }
 
   void addPointer(int id, Offset position) {
     _pointers[id] = position;
 
-    // Initialize zoom if we have 2 pointers
     if (_pointers.length == 2) {
+      _lastPanLocal = null;
       final positions = _pointers.values.toList();
       _initialDistance = _distance(positions[0], positions[1]);
       _focalPoint = _midPoint(positions[0], positions[1]);
     }
 
-    // Initialize pan if we have 1 pointer
     if (_pointers.length == 1) {
-      _initialPanPosition = position;
+      _lastPanLocal = position;
     }
   }
 
@@ -46,7 +58,6 @@ class GestureHandler {
   void removePointer(int id) {
     _pointers.remove(id);
 
-    // Reset zoom state if we have less than 2 pointers
     if (_pointers.length < 2) {
       _initialScale = null;
       _initialDistance = null;
@@ -54,10 +65,12 @@ class GestureHandler {
       _initialTransform = null;
     }
 
-    // Reset pan state if no pointers
+    if (_pointers.length == 1) {
+      _lastPanLocal = _pointers.values.single;
+    }
+
     if (_pointers.isEmpty) {
-      _initialPanPosition = null;
-      _initialPanTransform = null;
+      _lastPanLocal = null;
     }
   }
 
@@ -68,42 +81,14 @@ class GestureHandler {
     }
   }
 
-  void initializePan(Matrix4 currentTransform) {
-    if (_pointers.length == 1 && _initialPanTransform == null) {
-      _initialPanTransform = Matrix4.copy(currentTransform);
+  /// Delta in listener-local space since the last [consumePanDelta] / pointer add.
+  Offset consumePanDelta(Offset currentLocal) {
+    if (_pointers.length != 1 || _lastPanLocal == null) {
+      return Offset.zero;
     }
-  }
-
-  /// Re-initialize pan from current single pointer and transform (e.g. when
-  /// transitioning from 2 fingers to 1 so the next move doesn't jump).
-  void reinitializePanFromCurrentPointer(Matrix4 currentTransform) {
-    if (_pointers.length == 1) {
-      _initialPanPosition = _pointers.values.single;
-      _initialPanTransform = Matrix4.copy(currentTransform);
-    }
-  }
-
-  void resetPanState(Matrix4 currentTransform) {
-    if (_pointers.length == 1) {
-      _initialPanPosition = _pointers.values.first;
-      _initialPanTransform = Matrix4.copy(currentTransform);
-    }
-  }
-
-  /// One-finger pan: translation in listener-local space applied to [_initialPanTransform].
-  Matrix4? calculatePanTransform() {
-    if (_pointers.length != 1 ||
-        _initialPanPosition == null ||
-        _initialPanTransform == null) {
-      return null;
-    }
-
-    final currentPosition = _pointers.values.first;
-    final delta = currentPosition - _initialPanPosition!;
-
-    final Matrix4 result = Matrix4.copy(_initialPanTransform!);
-    result.translate(delta.dx, delta.dy);
-    return result;
+    final d = currentLocal - _lastPanLocal!;
+    _lastPanLocal = currentLocal;
+    return d;
   }
 
   Matrix4? calculateZoomTransform() {
@@ -121,36 +106,33 @@ class GestureHandler {
 
     final scaleRatio = currentDistance / _initialDistance!;
 
-    // Calculate focal point movement
     final focalDelta = currentFocal - _focalPoint!;
 
-    // Apply zoom around focal point
     final Matrix4 result = Matrix4.copy(_initialTransform!);
 
-    // Convert focal point to content coordinates using initial transform
     final Matrix4 inverse = Matrix4.inverted(_initialTransform!);
     final Vector3 focalInContent = inverse.transform3(
       Vector3(_focalPoint!.dx, _focalPoint!.dy, 0.0),
     );
 
-    // Create zoom transformation
     final Matrix4 zoomTransform =
         Matrix4.identity()
           ..translate(focalInContent.x, focalInContent.y)
           ..scale(scaleRatio)
           ..translate(-focalInContent.x, -focalInContent.y);
 
-    // Apply zoom
     result.multiply(zoomTransform);
 
-    // Apply focal point movement
-    result.translate(focalDelta.dx, focalDelta.dy);
-
-    return result;
+    // Extract and rebuild as translate-then-scale so the focal delta is applied
+    // in viewport space (not content space, which post-multiply would do).
+    final t = result.getTranslation();
+    final newScale = result.getMaxScaleOnAxis();
+    return Matrix4.identity()
+      ..translate(t.x + focalDelta.dx, t.y + focalDelta.dy)
+      ..scale(newScale);
   }
 
   double _distance(Offset a, Offset b) => (a - b).distance;
   Offset _midPoint(Offset a, Offset b) =>
       Offset((a.dx + b.dx) / 2, (a.dy + b.dy) / 2);
 }
-

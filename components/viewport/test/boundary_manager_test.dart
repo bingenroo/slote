@@ -42,7 +42,7 @@ void main() {
       expect(tx, lessThanOrEqualTo(0.0));
     });
 
-    test('short content allows vertical slack band', () {
+    test('short content pins translation to origin (no floating slack band)', () {
       final bm = BoundaryManager(
         contentSize: const Size(100, 50),
         viewportSize: const Size(100, 200),
@@ -51,8 +51,24 @@ void main() {
       );
       final m = Matrix4.identity()..translate(0.0, 40.0);
       final c = bm.constrain(m);
-      final ty = c.getTranslation().y;
-      expect(ty, inInclusiveRange(-kVerticalOverscrollSlack, kVerticalOverscrollSlack));
+      expect(c.getTranslation().x, 0.0);
+      expect(c.getTranslation().y, 0.0);
+    });
+
+    test('rubberBand resists past vertical edge then settle snaps hard', () {
+      final bm = BoundaryManager(
+        contentSize: const Size(100, 400),
+        viewportSize: const Size(100, 200),
+        minScale: 1.0,
+        maxScale: 1.0,
+        maxEdgeRubber: 56.0,
+      );
+      final pulledDown = Matrix4.identity()..translate(0.0, 80.0);
+      final rubber = bm.constrain(pulledDown, rubberBand: true);
+      expect(rubber.getTranslation().y, greaterThan(0.0));
+      expect(rubber.getTranslation().y, lessThan(80.0));
+      final settled = bm.settle(rubber);
+      expect(settled.getTranslation().y, 0.0);
     });
 
     test('transformForScrollPosition scrollY 0 and 1 are in bounds', () {
@@ -81,6 +97,25 @@ void main() {
       );
       final t = Matrix4.identity();
       expect(bm.getScrollPosition(t), 0.0);
+    });
+  });
+
+  group('ViewportScrollGeometry', () {
+    test('applyAxisRubber via constrainState yields sublinear overshoot', () {
+      final g = ViewportScrollGeometry(
+        contentSize: const Size(100, 400),
+        viewportSize: const Size(100, 200),
+        minScale: 1.0,
+        maxScale: 1.0,
+        maxEdgeRubber: 40.0,
+      );
+      const s = ViewportScrollState(scale: 1.0, translateX: 0.0, translateY: 0.0);
+      final hard = g.constrainState(s, rubberBand: false);
+      expect(hard.translateY, 0.0);
+      final raw = const ViewportScrollState(scale: 1.0, translateX: 0.0, translateY: 100.0);
+      final soft = g.constrainState(raw, rubberBand: true);
+      expect(soft.translateY, lessThan(100.0));
+      expect(soft.translateY, greaterThan(0.0));
     });
   });
 }

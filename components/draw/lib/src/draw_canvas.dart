@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 
 import 'draw_controller.dart';
@@ -14,7 +13,7 @@ import 'stroke/stroke_eraser_visual.dart';
 ///
 /// Strokes are stored in **document space**.
 ///
-/// [documentTransform] is a **document → this widget’s local** mapping used for
+/// [documentTransform] is a **document → this widget's local** mapping used for
 /// both sampling (local → document via inverse) and painting (document → local
 /// via canvas transform).
 ///
@@ -22,16 +21,14 @@ import 'stroke/stroke_eraser_visual.dart';
 ///
 /// - If this `DrawCanvas` is placed **inside the same `Transform`** as the
 ///   document/editor (e.g. under `ViewportSurface` / `ZoomPanSurface`), keep
-///   [documentTransform] as **identity** (omit it). The viewport’s transform
+///   [documentTransform] as **identity** (omit it). The viewport's transform
 ///   will already apply to both ink and text.
 /// - If this `DrawCanvas` is an **overlay outside** that `Transform` (painted in
-///   viewport coordinates), pass the live viewport matrix so ink stays “stuck to
-///   paper” while zooming and panning.
+///   viewport coordinates), pass the live viewport matrix so ink stays "stuck to
+///   paper" while zooming and panning.
 ///
-/// **Wave B:** Uses a [Listener] and **active pointer count** — ink (preview and
-/// commit) happens **only while exactly one** pointer is down. A second (or
-/// further) pointer **discards** the in-progress stroke without committing or
-/// adding an undo step, so multi-touch is free for pinch/zoom/pan.
+/// **Multi-touch rule:** Two or more pointers **immediately** discard any
+/// in-progress stroke — multi-touch is reserved for zoom/pan only.
 ///
 /// **Wave C:** Speed + dwell straight line ([StraightLineHoldConfig]): slow
 /// movement inside a hold radius for [StraightLineHoldConfig.dwellDuration]
@@ -40,7 +37,7 @@ import 'stroke/stroke_eraser_visual.dart';
 /// **Wave D:** [DrawTool.eraser] splits pen/highlighter strokes where the fixed
 /// eraser disc overlaps ink (`kDefaultEraserDiameterDoc` in
 /// `stroke_hit_geometry.dart`, `stroke_eraser_split.dart`); preview is one
-/// “show touches” disc at the pointer; gestures are not stored as strokes.
+/// "show touches" disc at the pointer; gestures are not stored as strokes.
 ///
 /// **Wave E:** Eraser drags call [DrawController.beginInkUndoGroup] /
 /// [DrawController.endInkUndoGroup] so live erase steps form **one** undo step.
@@ -61,8 +58,8 @@ class DrawCanvas extends StatefulWidget {
   /// Document → local; identity when the canvas is not inside a zoom/pan shell.
   final Matrix4 documentTransform;
 
-  /// Called when in-progress stroke capture starts or ends (commit, multi-touch
-  /// discard, cancel, or [isDrawingMode] turned off).
+  /// Called when in-progress stroke capture starts or ends (commit, cancel, or
+  /// [isDrawingMode] turned off).
   final ValueChanged<bool>? onStrokeCaptureActiveChanged;
 
   @override
@@ -71,9 +68,6 @@ class DrawCanvas extends StatefulWidget {
 
 class _DrawCanvasState extends State<DrawCanvas> {
   final Set<int> _activePointers = <int>{};
-  int _dbgDownCount = 0;
-  int _dbgMoveCount = 0;
-  bool _dbgStrokeActive = false;
 
   List<StrokeSample>? _currentSamples;
   Color? _currentColor;
@@ -98,6 +92,10 @@ class _DrawCanvasState extends State<DrawCanvas> {
 
   /// Pointer id that owns the current in-progress stroke; commit only on its up.
   int? _drawingPointerId;
+
+  // --- debug instrumentation (disabled) ---
+  // import foundation kDebugMode when re-enabling.
+  // int _dbgDownCount = 0;
 
   @override
   void initState() {
@@ -189,30 +187,27 @@ class _DrawCanvasState extends State<DrawCanvas> {
   }
 
   void _handlePointerDown(PointerDownEvent event) {
-    if (kDebugMode) {
-      // Keep this very lightweight: only log the first few downs per run so
-      // we can diagnose hit-testing without spamming.
-      if (_dbgDownCount < 25) {
-        _dbgDownCount++;
-        _dbgMoveCount = 0;
-        _dbgStrokeActive = true;
-        final scale = widget.documentTransform.getMaxScaleOnAxis();
-        final t = widget.documentTransform.getTranslation();
-        debugPrint(
-          'DBG-DRAWCANVAS down#$_dbgDownCount ptr=${event.pointer} '
-          'local=${event.localPosition} doc=${_localToDocument(event.localPosition)} '
-          'docXformScale=${scale.toStringAsFixed(3)} '
-          'docXformTx=${t.x.toStringAsFixed(1)} docXformTy=${t.y.toStringAsFixed(1)} '
-          'drawingMode=${widget.isDrawingMode} drawingActive=${widget.isDrawingActive}',
-        );
-      }
-    }
-
     _activePointers.add(event.pointer);
+
+    // if (kDebugMode && _dbgDownCount < 25) {
+    //   _dbgDownCount++;
+    //   final scale = widget.documentTransform.getMaxScaleOnAxis();
+    //   final t = widget.documentTransform.getTranslation();
+    //   debugPrint(
+    //     'DrawCanvas down#$_dbgDownCount ptr=${event.pointer} '
+    //     'local=${event.localPosition} '
+    //     'doc=${_localToDocument(event.localPosition)} '
+    //     'activePointers=${_activePointers.length} '
+    //     'scale=${scale.toStringAsFixed(3)} '
+    //     'tx=${t.x.toStringAsFixed(1)} ty=${t.y.toStringAsFixed(1)} '
+    //     'drawingMode=${widget.isDrawingMode}',
+    //   );
+    // }
 
     if (!widget.isDrawingMode) return;
 
-    if (_activePointers.length != 1) {
+    // Multi-touch rule: 2+ pointers = zoom/pan only, immediately discard.
+    if (_activePointers.length > 1) {
       _discardInProgress();
       return;
     }
@@ -241,40 +236,10 @@ class _DrawCanvasState extends State<DrawCanvas> {
   }
 
   void _handlePointerMove(PointerMoveEvent event) {
-    if (kDebugMode && _dbgStrokeActive && _dbgMoveCount < 60) {
-      _dbgMoveCount++;
-      debugPrint(
-        'DBG-DRAWCANVAS move#$_dbgMoveCount ptr=${event.pointer} '
-        'activePointers=${_activePointers.length} drawingPtr=$_drawingPointerId '
-        'drawingMode=${widget.isDrawingMode} samples=${_currentSamples?.length ?? 0} '
-        'local=${event.localPosition}',
-      );
-    }
-
-    if (!widget.isDrawingMode || _activePointers.length != 1) {
-      if (kDebugMode && _dbgStrokeActive && _dbgMoveCount < 80) {
-        debugPrint(
-          'DBG-DRAWCANVAS moveIgnored reason=modeOrPointers '
-          'drawingMode=${widget.isDrawingMode} activePointers=${_activePointers.length}',
-        );
-      }
-      return;
-    }
-    if (_currentSamples == null) {
-      if (kDebugMode && _dbgStrokeActive && _dbgMoveCount < 80) {
-        debugPrint('DBG-DRAWCANVAS moveIgnored reason=noCurrentSamples');
-      }
-      return;
-    }
-    if (event.pointer != _drawingPointerId) {
-      if (kDebugMode && _dbgStrokeActive && _dbgMoveCount < 80) {
-        debugPrint(
-          'DBG-DRAWCANVAS moveIgnored reason=pointerMismatch '
-          'ptr=${event.pointer} drawingPtr=$_drawingPointerId',
-        );
-      }
-      return;
-    }
+    if (!widget.isDrawingMode) return;
+    if (_currentSamples == null) return;
+    if (_activePointers.length > 1) return;
+    if (event.pointer != _drawingPointerId) return;
 
     final doc = _localToDocument(event.localPosition);
     final tool = _currentTool ?? widget.controller.currentTool;
@@ -319,19 +284,12 @@ class _DrawCanvasState extends State<DrawCanvas> {
     if (shouldCommit) {
       _commitAndClearInProgress();
     }
-    if (kDebugMode && event.pointer == _drawingPointerId) {
-      _dbgStrokeActive = false;
-    }
   }
 
   void _handlePointerCancel(PointerCancelEvent event) {
     _activePointers.remove(event.pointer);
     if (event.pointer == _drawingPointerId) {
-      if (kDebugMode) {
-        debugPrint('DBG-DRAWCANVAS cancel ptr=${event.pointer}');
-      }
       _discardInProgress();
-      _dbgStrokeActive = false;
     }
   }
 

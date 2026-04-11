@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/gestures.dart';
-import 'package:flutter/foundation.dart' show kDebugMode;
+import 'package:flutter/rendering.dart';
 import 'boundary_manager.dart';
 import 'gesture_handler.dart';
 import 'content_measurer.dart';
@@ -71,6 +71,10 @@ class _ZoomPanSurfaceState extends State<ZoomPanSurface> {
   late GestureHandler _gestureHandler;
   BoundaryManager? _boundaryManager;
 
+  // --- debug instrumentation (disabled) ---
+  // import foundation kDebugMode when re-enabling.
+  // int _dbgDownCount = 0;
+
   @override
   void initState() {
     super.initState();
@@ -95,7 +99,7 @@ class _ZoomPanSurfaceState extends State<ZoomPanSurface> {
 
   void _applyTransformFromScrollbar(Matrix4 transform) {
     if (_boundaryManager == null) return;
-    final constrained = _boundaryManager!.constrain(transform);
+    final constrained = _boundaryManager!.constrain(transform, rubberBand: false);
     setState(() {
       _transform = constrained;
     });
@@ -119,9 +123,12 @@ class _ZoomPanSurfaceState extends State<ZoomPanSurface> {
   /// Always calls [_notifyTransformChanged] when a manager exists so pinch
   /// updates still propagate when the matrix is already in bounds (see
   /// two-finger branch in [_handlePointerMove]).
-  void _constrainTransform() {
+  void _constrainTransform({bool rubberBand = false}) {
     if (_boundaryManager == null) return;
-    final constrained = _boundaryManager!.constrain(_transform);
+    final constrained = _boundaryManager!.constrain(
+      _transform,
+      rubberBand: rubberBand,
+    );
     if (constrained != _transform) {
       setState(() {
         _transform = constrained;
@@ -130,40 +137,45 @@ class _ZoomPanSurfaceState extends State<ZoomPanSurface> {
     _notifyTransformChanged();
   }
 
+  void _settleTransform() {
+    if (_boundaryManager == null) return;
+    final settled = _boundaryManager!.settle(_transform);
+    if (settled != _transform) {
+      setState(() {
+        _transform = settled;
+      });
+      _notifyTransformChanged();
+    }
+  }
+
   void _notifyTransformChanged() {
     widget.onScaleChanged?.call(_transform.getMaxScaleOnAxis());
     widget.onTransformChanged?.call(_transform);
   }
 
   void _handlePointerDown(PointerDownEvent event) {
-    if (kDebugMode) {
-      final scale = _transform.getMaxScaleOnAxis();
-      if (scale >= widget.maxScale - 0.001) {
-        final t = _transform.getTranslation();
-        debugPrint(
-          'DBG-VIEWPORT down ptr=${event.pointer} local=${event.localPosition} '
-          'global=${event.position} scale=${scale.toStringAsFixed(3)} '
-          'tx=${t.x.toStringAsFixed(1)} ty=${t.y.toStringAsFixed(1)} '
-          'drawingMode=${widget.isDrawingMode} drawingActive=${widget.isDrawingActive}',
-        );
-      }
-    }
+    // if (kDebugMode && _dbgDownCount < 25) {
+    //   _dbgDownCount++;
+    //   final scale = _transform.getMaxScaleOnAxis();
+    //   final t = _transform.getTranslation();
+    //   debugPrint(
+    //     'ZoomPanSurface down#$_dbgDownCount ptr=${event.pointer} '
+    //     'local=${event.localPosition} pointers=${_gestureHandler.pointerCount + 1} '
+    //     'scale=${scale.toStringAsFixed(3)} '
+    //     'tx=${t.x.toStringAsFixed(1)} ty=${t.y.toStringAsFixed(1)} '
+    //     'drawingMode=${widget.isDrawingMode} drawingActive=${widget.isDrawingActive}',
+    //   );
+    // }
 
-    _gestureHandler.addPointer(event.pointer, event.position);
+    _gestureHandler.addPointer(event.pointer, event.localPosition);
 
-    // Initialize zoom state if we have 2 pointers
     if (_gestureHandler.pointerCount == 2) {
       _gestureHandler.initializeZoom(_transform);
-    }
-
-    // Initialize pan state for 1 pointer (drag-to-scroll at any scale)
-    if (_gestureHandler.pointerCount == 1 && !widget.isDrawingMode) {
-      _gestureHandler.initializePan(_transform);
     }
   }
 
   void _handlePointerMove(PointerMoveEvent event) {
-    _gestureHandler.updatePointer(event.pointer, event.position);
+    _gestureHandler.updatePointer(event.pointer, event.localPosition);
 
     // Handle 2-finger zoom/pan
     if (_gestureHandler.pointerCount == 2 && !widget.isDrawingActive) {
@@ -172,8 +184,7 @@ class _ZoomPanSurfaceState extends State<ZoomPanSurface> {
         setState(() {
           _transform = newTransform;
         });
-        _constrainTransform();
-        // Pinch before first layout: no boundary manager yet, but transform moved.
+        _constrainTransform(rubberBand: true);
         if (_boundaryManager == null) {
           _notifyTransformChanged();
         }
@@ -182,41 +193,33 @@ class _ZoomPanSurfaceState extends State<ZoomPanSurface> {
     // Handle 1-finger pan (drag-to-scroll at any scale when not drawing)
     else if (_gestureHandler.pointerCount == 1 &&
         !widget.isDrawingMode) {
-      final newTransform = _gestureHandler.calculatePanTransform();
+      final delta = _gestureHandler.consumePanDelta(event.localPosition);
+      if (delta == Offset.zero) return;
       final manager = _boundaryManager ?? _tempBoundaryManager();
-      if (newTransform != null && manager != null) {
-        final constrainedTransform = manager.constrain(newTransform);
-
-        final originalY = newTransform.getTranslation().y;
-        final constrainedY = constrainedTransform.getTranslation().y;
-        final wasConstrained =
-            (originalY - constrainedY).abs() > 0.001;
-
-        setState(() {
-          _transform = constrainedTransform;
-        });
-
-        if (wasConstrained) {
-          _gestureHandler.resetPanState(_transform);
-        }
-
-        _notifyTransformChanged();
-      }
+      if (manager == null) return;
+      final newTransform = Matrix4.copy(_transform)..translate(delta.dx, delta.dy);
+      final constrainedTransform = manager.constrain(
+        newTransform,
+        rubberBand: true,
+      );
+      setState(() {
+        _transform = constrainedTransform;
+      });
+      _notifyTransformChanged();
     }
   }
 
   void _handlePointerUp(PointerUpEvent event) {
     _gestureHandler.removePointer(event.pointer);
-    // When going from 2 to 1 finger, re-initialize pan so next move doesn't jump
-    if (_gestureHandler.pointerCount == 1) {
-      _gestureHandler.reinitializePanFromCurrentPointer(_transform);
+    if (_gestureHandler.pointerCount == 0) {
+      _settleTransform();
     }
   }
 
   void _handlePointerCancel(PointerCancelEvent event) {
     _gestureHandler.removePointer(event.pointer);
-    if (_gestureHandler.pointerCount == 1) {
-      _gestureHandler.reinitializePanFromCurrentPointer(_transform);
+    if (_gestureHandler.pointerCount == 0) {
+      _settleTransform();
     }
   }
 
@@ -265,7 +268,10 @@ class _ZoomPanSurfaceState extends State<ZoomPanSurface> {
     final adjustedDelta = Offset(delta.dx * scaleFactor, delta.dy * scaleFactor);
     final newTransform = Matrix4.copy(_transform)
       ..translate(-adjustedDelta.dx, -adjustedDelta.dy);
-    final constrained = boundaryManager.constrain(newTransform);
+    final constrained = boundaryManager.constrain(
+      newTransform,
+      rubberBand: false,
+    );
     setState(() {
       _transform = constrained;
     });
@@ -310,10 +316,7 @@ class _ZoomPanSurfaceState extends State<ZoomPanSurface> {
                 child: ClipRect(
                   child: Transform(
                     transform: _transform,
-                    child: OverflowBox(
-                      maxWidth: constraints.maxWidth,
-                      maxHeight: double.infinity,
-                      alignment: Alignment.topLeft,
+                    child: _HitTestExpandedBox(
                       child: ContentMeasurer(
                         onSizeChanged: _updateContentSize,
                         child: widget.child,
@@ -325,16 +328,65 @@ class _ZoomPanSurfaceState extends State<ZoomPanSurface> {
             ),
             // Custom scrollbar (vertical and horizontal, interactive)
             if (widget.showScrollbar && _boundaryManager != null)
-              TransformAwareScrollbar(
-                transform: _transform,
-                boundaryManager: _boundaryManager!,
-                isVisible: true,
-                onTransformApplied: widget.controller?.applyTransform,
+              IgnorePointer(
+                // In drawing mode, a new stroke must be able to start anywhere.
+                // We still render scrollbars as a hint, but they must not steal
+                // the pointer-down hit test (which would create “dead bands” where
+                // new strokes can’t begin while continuing strokes can cross).
+                ignoring: widget.isDrawingMode,
+                child: TransformAwareScrollbar(
+                  transform: _transform,
+                  boundaryManager: _boundaryManager!,
+                  isVisible: true,
+                  onTransformApplied: widget.controller?.applyTransform,
+                ),
               ),
           ],
         );
       },
     );
+  }
+}
+
+/// Like [OverflowBox] but does **not** clip hit-testing to its own size.
+///
+/// [OverflowBox] lets its child paint beyond its bounds, but
+/// `RenderBox.hitTest` gates on `size.contains(position)`, so touches that map
+/// to content coordinates outside the viewport-sized box are silently dropped.
+/// This widget keeps the same layout behaviour (child is unconstrained in
+/// height) but forwards **all** hit-tests to the child.
+class _HitTestExpandedBox extends SingleChildRenderObjectWidget {
+  const _HitTestExpandedBox({super.child});
+
+  @override
+  RenderObject createRenderObject(BuildContext context) =>
+      _RenderHitTestExpandedBox();
+}
+
+class _RenderHitTestExpandedBox extends RenderProxyBox {
+  @override
+  void performLayout() {
+    if (child != null) {
+      child!.layout(
+        constraints.copyWith(maxHeight: double.infinity),
+        parentUsesSize: true,
+      );
+      size = constraints.biggest;
+    } else {
+      size = constraints.smallest;
+    }
+  }
+
+  @override
+  bool hitTest(BoxHitTestResult result, {required Offset position}) {
+    // Skip the default `size.contains(position)` gate so the child (which may
+    // be taller than this box) can handle its own bounds.
+    if (hitTestChildren(result, position: position) ||
+        hitTestSelf(position)) {
+      result.add(BoxHitTestEntry(this, position));
+      return true;
+    }
+    return false;
   }
 }
 

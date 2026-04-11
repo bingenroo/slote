@@ -1,7 +1,7 @@
 {
   "mcpServers": {
     "context-mesh": {
-      "command": "/Users/bingenro/Documents/ContextMesh/.venv/bin/python",
+      "command": "/Users/bingenro/Documents/Code/ContextMesh/.venv/bin/python",
       "args": [
         "-m",
         "context_mesh",
